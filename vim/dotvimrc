@@ -1,5 +1,6 @@
 " color scheme
-colorscheme molokai
+" colorscheme molokai
+colorscheme delek
 syntax on
 
 " default settings
