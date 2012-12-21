@@ -21,7 +21,7 @@ if [ "$1" == "" ]; then
     exit 1
 fi
 
-ENVID=$1
+export ENVID=$1
 ENVPREFIX=srwd
 
 #
@@ -36,6 +36,7 @@ done
 #
 # Set sanity check
 #
+export PS1="[\u:${ENVPREFIX}${ENVID}@\h \W]\$ "
 export STCK="http://${ENVPREFIX}${ENVID}hub001.${ENVPREFIX}${ENVID}.com:8080/jmxsitemgr/dashboard.jsp"
 export JBDP="/opt/jboss/server/default/deploy"
 export JBLG="/opt/jboss/server/default/log/jboss.log"
