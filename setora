@@ -1,0 +1,4 @@
+#!/bin/bash
+export ORACLE_HOME=/nas/home/oracle/OraHome
+export LD_LIBRARY_PATH=/nas/home/oracle/OraHome/lib
+export PATH=$PATH:$ORACLE_HOME/bin

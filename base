@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# Set basic environment variables
+#
+# Author: minjzhang@ebay.com
+#
+
+export HOME=/nas/home/minjzhang
+export BIN=$HOME/bin
+export VARS=$BIN/vars

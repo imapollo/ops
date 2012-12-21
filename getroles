@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# Get all the roles
+#
+# Usage:
+#  getroles [options]
+#
+# Options:
+#  -v Show verbose details for each role
+#
+# author: minjzhang@ebay.com
+
+. /nas/home/minjzhang/bin/base
+
+ROLES_FILE=$VARS/roles
+
+if [ "$1" == "-v" ]; then
+    cat $ROLES_FILE
+else
+    awk '{ print $1 }' $ROLES_FILE
+fi
+
+exit $?

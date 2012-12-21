@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# Set all the variables related to the specified environment
+#
+# Usage:
+#  setenv ENVID
+#
+# Options:
+#  NA
+#
+# Example:
+#  setenv 59
+#
+# Author: minjzhang@ebay.com
+#
+
+. /nas/home/minjzhang/bin/base
+
+if [ "$1" == "" ]; then
+    echo "Error: Lack of variables. Please check the usage."
+    exit 1
+fi
+
+ENVID=$1
+ENVPREFIX=srwd
+
+#
+# Set roles
+#
+roles=`$BIN/getroles`
+for ROLE in $roles
+do
+    export $ROLE=${ENVPREFIX}${ENVID}${ROLE}001.${ENVPREFIX}${ENVID}.com
+done
+
+#
+# Set sanity check
+#
+export STCK="http://${ENVPREFIX}${ENVID}hub001.${ENVPREFIX}${ENVID}.com:8080/jmxsitemgr/dashboard.jsp"
+export JBDP="/opt/jboss/server/default/deploy"
+export JBLG="/opt/jboss/server/default/log/jboss.log"
+export ENVPP="/etc/stubhub/properties/ENV.stubhub.properties"
+export APLG="/var/log/httpd"
