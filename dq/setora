@@ -1,0 +1,5 @@
+. /qad/local/scripts/putenv o1192bora
+export ORACLE_BASE=/qad/oracle/linux
+export ORACLE_TERM=$TERM
+export ORACLE_HOME=$ORACLE_BASE/product/10.2
+export PATH=$ORACLE_HOME/bin:/qad/local/scripts:/qad/local/bin:/qad/env/oratools:$PATH

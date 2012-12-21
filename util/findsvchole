@@ -1,0 +1,41 @@
+#!/bin/ksh
+# author: lsy
+
+typeset -i last=0
+typeset -i prevPort=0
+typeset -i port
+typeset proto
+typeset name
+typeset prevProto
+typeset prevName
+
+cat /etc/services | sed -e 's/#.*$//' | awk '{print $2 "/" $1}' | \
+sed 's!/! !g' | sort -nr | while read port proto name
+do
+
+    if [ last -eq 0 ]; then
+	last=$port
+	echo "last $last"
+    else
+
+        [ port -eq prevPort -a "${prevProto}" == "${proto}" ] && {
+            echo "DUPLICATE: $prevPort/$prevProto : $prevName : $name" 1>&2
+            continue
+        }
+
+        last=last-1
+        #printf "\r%s " $port
+        if [ last -ne port ]; then
+
+            typeset -i numb=last-port
+            port=port+1
+            printf "\rfree %s .. %s  (%s)\n" $port $last $numb
+            last=port-1
+            [ last -le 1024 ] && break
+        fi
+    fi
+    prevPort=port
+    prevProto=$proto
+    prevName=$name
+done
+

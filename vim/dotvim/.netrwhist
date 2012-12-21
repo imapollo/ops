@@ -1,0 +1,9 @@
+let g:netrw_dirhistmax  =10
+let g:netrw_dirhist_cnt =7
+let g:netrw_dirhist_1='/remote/cona05/home/mzq/o1192b'
+let g:netrw_dirhist_2='/remote/cona05/home/mzq/public'
+let g:netrw_dirhist_3='/remote/cona05/home/mzq/.subversion'
+let g:netrw_dirhist_4='/remote/cona05/home/mzq/.vim'
+let g:netrw_dirhist_5='/remote/cona05/home/mzq/.vim/colors'
+let g:netrw_dirhist_6='/remote/cona05/home/mzq/o1192b'
+let g:netrw_dirhist_7='/remote/cona05/home/mzq/temp/ctags-5.8'

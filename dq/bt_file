@@ -1,0 +1,74 @@
+#!/usr/bin/perl -w
+# rename set of files
+# Author: Minjie Zhang (ze.apollo@gmail.com)
+# Revision: 01 Oct 04, 2010
+
+use strict;
+use Readonly;
+
+# constant variables
+my Readonly $EMPTY_STRING = q{};
+my Readonly $CURRENT_DIR  = q{.};
+
+# global variables
+use vars qw / %opt /;
+my @file_list   = ();
+my $file_dir    = $CURRENT_DIR;
+my $file_prefix = $EMPTY_STRING;
+my $file_suffix = $EMPTY_STRING;
+my $bit         = 3;
+
+# usage
+Readonly my $USAGE => <<'END_USAGE';
+Usage: bt_file [option] file
+Options:
+    -d directory : save the renamed file to the directory
+    -p prefix    : add a prefix at the beginning of each file
+    -s suffix    : add a suffix at the end of each file
+    -b bit       : the length of number string of each file
+Example:
+    bt_file -p abc -s .txt -b 3 *.txt
+END_USAGE
+
+sub init() {
+    use Getopt::Std;
+    my $opt_string = 'd:p:s:b:';
+    getopts( "$opt_string", \%opt ) or usage();
+    @file_list   = @ARGV;
+    $file_dir    = $opt{d} if defined $opt{d};
+    $file_prefix = $opt{p} if defined $opt{p};
+    $file_suffix = $opt{s} if defined $opt{s};
+    $bit         = $opt{b} if defined $opt{b};
+    usage() unless (@ARGV);
+}
+
+sub usage() {
+    printf "$USAGE";
+    exit;
+}
+
+sub rename_file() {
+    my $file_seq = 1;
+    foreach (@file_list) {
+        my $file_seq_str = gen_str_with_bit($file_seq, $bit);
+        my $dest_file_name
+                = $file_prefix . $file_seq_str . $file_suffix;
+        unless (-d $_) {
+            printf "rename $_ to $file_dir/$dest_file_name\n";
+            rename ("$_", "$file_dir/$dest_file_name");
+            $file_seq++;
+        }
+    }
+}
+
+sub gen_str_with_bit() {
+    my ($num_str, $bit_num) = @_;
+    my $seq_format = "%$bit_num" . "d";
+    $num_str = sprintf("$seq_format", $num_str);
+    $num_str =~ tr/ /0/;
+    return $num_str;
+}
+
+init();
+rename_file();
+exit;

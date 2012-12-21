@@ -1,0 +1,143 @@
+#!/bin/ksh
+#
+# Refresh the mfg-ee stuffs to mfg-ee demo (explore) environment.
+# Usage:
+#   ./refresh_mfgee_demo
+#
+# Author: mzq@qad.com
+# 
+
+# global variables
+typeset MFGEE_DEMO_HOST="167.3.201.209"
+typeset MFGEE_DEMO_ENV_ROOT="/dr01/qadapps/qea"
+typeset MFGEE_ENV_ROOT="/qad/local/sandbox/team/mfgee1"
+typeset WORKDING_DIR="/dr01/bf/mzq/mfgee1"
+typeset PRIVATE_KEY="$WORKDING_DIR/id_dsa"
+typeset TIME_STAMP="$WORKDING_DIR/sync_time"
+typeset INSTALLED_PKG="$WORKDING_DIR/installed_package"
+typeset QPM_CLIENT="/dr01/qadapps/qpm/qpm"
+typeset SETENV_SCRIPT="/dr01/scripts/setenv"
+typeset QPM_REPO="http://packages.qad.com"
+typeset DEMO_HOST_USER="demo-admin"
+
+#
+# Check time stamp.
+#
+function check_time_stamp
+{
+   find -L $check_folder -newer $TIME_STAMP -type f | grep -v ".svn" | grep -v ".pct"
+}
+
+#
+# Transfer file via SCP.
+#
+function scp_file
+{
+   run devel scp -i $PRIVATE_KEY $file $DEMO_HOST_USER@$MFGEE_DEMO_HOST:$dest_file
+}
+
+#
+# Sync rcode.
+#
+typeset check_folder="$MFGEE_ENV_ROOT/build/work/dist"
+typeset temp_dist="$MFGEE_ENV_ROOT/build/work/.temp_dist"
+rm $temp_dist -rf
+rm $MFGEE_ENV_ROOT/build/work/.dist.tar.gz -rf
+mkdir -p $temp_dist
+print "Checking folder $check_folder ..."
+check_time_stamp | while read line
+do
+   typeset file=$line 
+   typeset relative_file=`print "$file" | sed "s'$check_folder\/\(.*\)'\1'"`
+   cd $check_folder
+   cp --parents $relative_file $temp_dist
+done
+cd $temp_dist
+tar czf $MFGEE_ENV_ROOT/build/work/.dist.tar.gz *
+typeset file=$MFGEE_ENV_ROOT/build/work/.dist.tar.gz
+typeset dest_file=$MFGEE_DEMO_ENV_ROOT/build/work/.dist.tar.gz
+scp_file
+run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "tar xf $MFGEE_DEMO_ENV_ROOT/build/work/.dist.tar.gz -C $MFGEE_DEMO_ENV_ROOT/build/work/dist"
+run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "rm -rf $MFGEE_DEMO_ENV_ROOT/build/work/.dist.tar.gz"
+rm $temp_dist -rf
+rm $MFGEE_ENV_ROOT/build/work/.dist.tar.gz -rf
+cd -
+
+#
+# Install configured-attributes package via qpm.
+#
+typeset pkg_name=`grep netui-module-configured-attributes $MFGEE_ENV_ROOT/build/config/deploymentDescriptorTemplate.xml | sed 's/\s\+\(.*\);/\1/'`
+if [ -f $INSTALLED_PKG ]; then
+   typeset installed_package_version=`cat $INSTALLED_PKG`
+   if [[ $installed_package_version != $pkg_name ]]; then
+      print "Installing netui-module-configured-attributes package ..."
+      run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST ". $SETENV_SCRIPT;$QPM_CLIENT install $pkg_name -config.src:$MFGEE_DEMO_ENV_ROOT -repository:$QPM_REPO"
+      echo $pkg_name > $INSTALLED_PKG
+   fi
+else
+   print "Installing netui-module-configured-attributes package ..."
+   run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST ". $SETENV_SCRIPT;$QPM_CLIENT install $pkg_name -config.src:$MFGEE_DEMO_ENV_ROOT -repository:$QPM_REPO"
+   echo $pkg_name > $INSTALLED_PKG
+fi
+
+#
+# Sync controllers.xml.
+#
+typeset file="$MFGEE_ENV_ROOT/build/work/config/controllers.xml"
+typeset dest_file="$MFGEE_DEMO_ENV_ROOT/build/work/config/controllers.xml"
+scp_file
+
+#
+# Update schema.
+#
+typeset check_folder="$MFGEE_ENV_ROOT/database/progress/schema"
+print "Checking folder $check_folder ..."
+if check_time_stamp | grep -iq df
+then
+   cd $WORKDING_DIR
+   cp $MFGEE_ENV_ROOT/database/progress/schema update_schema -rf
+   cd update_schema
+   rm update_schema.tar.gz
+   tar -czf update_schema.tar.gz schema update_schema build.xml build_database.xml deploymentDescriptor.xml
+   typeset file="update_schema.tar.gz"
+   typeset dest_file="$MFGEE_DEMO_ENV_ROOT/build/.tmp"
+   scp_file
+   run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "tar xf $MFGEE_DEMO_ENV_ROOT/build/.tmp/update_schema.tar.gz -C $MFGEE_DEMO_ENV_ROOT/build/.tmp"
+   run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "$MFGEE_DEMO_ENV_ROOT/build/work/scripts/stop.sh"
+   run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "$MFGEE_DEMO_ENV_ROOT/build/.tmp/update_schema"
+   run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "$MFGEE_DEMO_ENV_ROOT/build/work/scripts/start.sh"
+   run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "rm $MFGEE_DEMO_ENV_ROOT/build/.tmp/schema $MFGEE_DEMO_ENV_ROOT/build/.tmp/build.xml $MFGEE_DEMO_ENV_ROOT/build/.tmp/update_schema $MFGEE_DEMO_ENV_ROOT/build/.tmp/build_database.xml $MFGEE_DEMO_ENV_ROOT/build/.tmp/deploymentDescriptor.xml $MFGEE_DEMO_ENV_ROOT/build/.tmp/update_schema.tar.gz $MFGEE_DEMO_ENV_ROOT/build/.tmp/logs/* $MFGEE_DEMO_ENV_ROOT/build/.tmp/velocity.log* -rf"
+   cd -
+fi
+
+#
+# Load data.
+#
+typeset check_folder="$MFGEE_ENV_ROOT/database/progress/xml_data"
+print "Checking folder $check_folder ..."
+if check_time_stamp | grep -iq xml
+then
+cd $WORKDING_DIR
+   cp $MFGEE_ENV_ROOT/database/progress/xml_data load_xml -rf
+   cp $MFGEE_ENV_ROOT/database/progress/mapping load_xml -rf
+   cd $WORKDING_DIR/load_xml
+   tar -czf load_xml.tar.gz xml_data mapping load_data build.xml
+   typeset file="load_xml.tar.gz"
+   typeset dest_file="$MFGEE_DEMO_ENV_ROOT/build/.tmp"
+   scp_file
+   run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "tar xf $MFGEE_DEMO_ENV_ROOT/build/.tmp/load_xml.tar.gz -C $MFGEE_DEMO_ENV_ROOT/build/.tmp"
+   run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "$MFGEE_DEMO_ENV_ROOT/build/.tmp/load_data"
+   run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST "rm $MFGEE_DEMO_ENV_ROOT/build/.tmp/mapping $MFGEE_DEMO_ENV_ROOT/build/.tmp/xml_data $MFGEE_DEMO_ENV_ROOT/build/.tmp/build.xml $MFGEE_DEMO_ENV_ROOT/build/.tmp/load_data $MFGEE_DEMO_ENV_ROOT/build/.tmp/load_xml.tar.gz $MFGEE_DEMO_ENV_ROOT/build/.tmp/logs/* $MFGEE_DEMO_ENV_ROOT/build/.tmp/velocity.log* -rf"
+   rm load_xml.tar.gz mapping xml_data -rf
+   cd -
+fi
+
+#
+# Fin sync.
+#
+run devel ssh -i $PRIVATE_KEY $DEMO_HOST_USER@$MFGEE_DEMO_HOST ". $SETENV_SCRIPT;$MFGEE_DEMO_ENV_ROOT/build/work/scripts/fin_sync.sh Topic15"
+
+#
+# Touch the time stamp.
+#
+run devel touch $TIME_STAMP

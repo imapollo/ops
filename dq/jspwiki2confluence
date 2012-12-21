@@ -1,0 +1,31 @@
+#!/bin/ksh
+# convert the wiki notation format from jspwiki to 
+
+while [ -n $1 ]; do
+
+FILENAME=$1
+CONVERTEDFILE=$FILENAME.conv
+
+sed -e 's/^!!!/h2. /g' $FILENAME \
+  | sed -e 's/^!!/h3. /g' \
+  | sed -e 's/^!/h4. /g' \
+  | sed -e 's/^\(\*+\)/\1 /g' \
+  | sed -e 's/^%%prettify$//g' \
+  | sed -e 's/^\/%$//g' \
+  | sed -e 's/{{{/{code}/g' \
+  | sed -e 's/}}}/{code}/g' \
+  | sed -e 's/__/_/g' \
+  | sed -e 's/_\[0-9a-zA-Z\._-\]/*/g' \
+  | sed -e 's/^#/# /g' \
+  | sed -e 's/^||\(.*\)/||\1||/g' \
+  | sed -e 's/^|\(.*\)/|\1|/g' \
+  | sed -e 's/\xe2\x80\x93/-/g' \
+  | sed -e 's/[\(\[^:|]\]*\)|\(\[^:|]\]*\)]/[\1|Wiki \2]/g' \
+  > $CONVERTEDFILE
+
+  echo $CONVERTEDFILE
+  shift
+
+# | sed -e 's/[token]/[replace]/g' \
+
+done

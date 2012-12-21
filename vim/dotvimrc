@@ -1,0 +1,51 @@
+" color scheme
+colorscheme molokai
+syntax on
+
+" default settings
+set expandtab
+set nobackup
+set number
+set tabstop=4
+set sw=4
+set sts=4
+set wm=4
+set backspace=indent,eol,start
+set hlsearch
+set wildmenu
+set matchpairs+=<:>
+set autoindent
+set smarttab
+
+" enable file type
+filetype plugin on
+filetype indent on
+let g:tlist_ant_settings = 'ant;p:Project;t:Target'
+
+" () auto completion in insert mode
+:inoremap ( ()<ESC>i
+:inoremap { {}<ESC>i
+:inoremap [ []<ESC>i
+:inoremap " ""<ESC>i
+
+" key mapping
+noremap \s mm:%s/\s\+$//g<CR>'m
+noremap \r mm:%s/\r//g<CR>'m
+noremap \t mm:%s/\t/    /g<CR>'m
+noremap \c mm:%s/\s\+$//g<CR>:%s/\r//g<CR>%s/\t/    /g<CR>'m
+noremap \<> mm:%s/</\&lt;/g<CR>:%s/>/\&gt;/g<CR>'m
+noremap \2 :set tabstop=2<CR>:set sw=2<CR>:set sts=2<CR>:set wm=2<CR>
+noremap \3 :set tabstop=3<CR>:set sw=3<CR>:set sts=3<CR>:set wm=3<CR>
+noremap \4 :set tabstop=4<CR>:set sw=4<CR>:set sts=4<CR>:set wm=4<CR>
+
+" set 256 color mode on character client on putty
+if &term =~ "xterm"
+ set t_Co=256
+ if has("terminfo")
+   let &t_Sf=nr2char(27).'[3%p1%dm'
+   let &t_Sb=nr2char(27).'[4%p1%dm'
+ else
+   let &t_Sf=nr2char(27).'[3%dm'
+   let &t_Sb=nr2char(27).'[4%dm'
+ endif
+endif

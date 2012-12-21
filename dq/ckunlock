@@ -1,0 +1,50 @@
+#!/bin/ksh
+# Display file version information
+# CATEGORY: VAT
+#
+# Usage:  ckunlock <file(s)>
+#
+# Displays the file, environment, version, lock and check-out flag
+# based on the currently active environment.  Environments are
+# defined and activated by the putenv script.
+#
+# ckunlock mzq
+#
+
+#------------------------------------------------------------------------------
+# $Log$
+# Revision 1.0  2011/08/11 mzq
+# handle dvs-1173
+#------------------------------------------------------------------------------
+# 08/11/11 mzq handle dvs-1173
+#------------------------------------------------------------------------------
+
+if [ "$1" = "-?" ]; then
+   exec qhelp `basename $0` >&2
+fi
+
+ThisProgram=`basename $0`
+
+#
+# Handle various Software Configuration Management implementations
+# Added for RCS support
+#
+case "$SCMID" in
+	RCS) # RCS environment
+		Files=$*
+		. rcs_ctrl
+		for File in $Files;do
+			rcs_unlock $File $RCSDEVSYM
+		done
+		return
+		;;
+	"") # standard SCM environment
+		echo "$ThisProgram: No environment is currently active.  Please run putenv." >&2
+		return
+		;;
+	*) # Unknown environment
+		echo "$ThisProgram: Unknown Software Configuration Management ID $SCMID" >&2
+		return
+		;;
+esac
+

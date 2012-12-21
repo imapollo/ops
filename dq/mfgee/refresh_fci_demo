@@ -1,0 +1,145 @@
+#!/bin/ksh
+#
+# Refresh the srn93 stuffs to FCI demo env
+# Usage:
+#   ./refresh_fci_demo.ksh
+#
+# Author: mzq@qad.com
+# 
+
+# global variables
+typeset FCI_LINUX="172.16.28.40"
+typeset FCI_ENV_ROOT="/dr01/fci/fci_demo"
+typeset SRN_ENV_ROOT="/qad/local/sandbox/team/srn93"
+typeset PRIVATE_KEY="/users/mzq/fci/id_dsa"
+typeset TIME_STAMP="/users/mzq/fci/sync_time"
+
+# check time stamp
+function check_time_stamp
+{
+   find -L $check_folder -newer $TIME_STAMP -type f | grep -v ".svn" | grep -v ".pct"
+}
+
+# scp file
+function scp_file
+{
+   run devel scp -i $PRIVATE_KEY $file root@$FCI_LINUX:$dest_file
+}
+
+# sync rcode
+typeset check_folder="$SRN_ENV_ROOT/build/work/dist"
+typeset temp_dist="$SRN_ENV_ROOT/build/work/.temp_dist"
+rm $temp_dist -rf
+rm $SRN_ENV_ROOT/build/work/.dist.tar.gz -rf
+mkdir -p $temp_dist
+print "Checking folder $check_folder ..."
+check_time_stamp | while read line
+do
+   typeset file=$line 
+   typeset relative_file=`print "$file" | sed "s'$check_folder\/\(.*\)'\1'"`
+   cd $check_folder
+   cp --parents $relative_file $temp_dist
+done
+cd $temp_dist
+tar czf $SRN_ENV_ROOT/build/work/.dist.tar.gz *
+typeset file=$SRN_ENV_ROOT/build/work/.dist.tar.gz
+typeset dest_file=$FCI_ENV_ROOT/build/work/.dist.tar.gz
+scp_file
+run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "tar xf $FCI_ENV_ROOT/build/work/.dist.tar.gz -C $FCI_ENV_ROOT/build/work/dist"
+run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "rm -rf $FCI_ENV_ROOT/build/work/.dist.tar.gz"
+rm $temp_dist -rf
+rm $SRN_ENV_ROOT/build/work/.dist.tar.gz -rf
+cd -
+
+# sync custom browse
+typeset check_folder="$SRN_ENV_ROOT/build/work/pro/com/qad/shell/browse/custom"
+print "Checking folder $check_folder ..."
+check_time_stamp | while read line
+do
+   typeset file=$line 
+   typeset dest_file=`print "$file" | sed "s'$check_folder\(.*\)'$FCI_ENV_ROOT\/build\/work\/pro\/com\/qad\/shell\/browse\/custom\1'"`
+   scp_file
+done
+
+# sync browse collections
+typeset check_folder="$SRN_ENV_ROOT/build/work/tomcat/webapps/qadhome/configurations/srn93-devel/storage/browse-collections"
+print "Checking folder $check_folder ..."
+check_time_stamp | while read line
+do
+   typeset file=$line 
+   typeset dest_file=`print "$file" | sed "s'$check_folder\(.*\)'$FCI_ENV_ROOT\/build\/work\/tomcat\/webapps\/qadhome\/configurations\/fci-demo\/storage\/browse-collections\1'"`
+   scp_file
+done
+
+# sync controllers.xml
+typeset file="$SRN_ENV_ROOT/build/work/config/controllers.xml"
+typeset dest_file="$FCI_ENV_ROOT/build/work/config/controllers.xml"
+scp_file
+
+# sync reports def
+typeset check_folder="$SRN_ENV_ROOT/reports/definitions"
+print "Checking folder $check_folder ..."
+check_time_stamp | while read line
+do
+   typeset file=$line 
+   typeset dest_file=`print "$file" | sed "s'$check_folder\(.*\)'$FCI_ENV_ROOT\/build\/work\/pro\/com\/qad\/db\/reports\/sys_reports\1'"`
+   scp_file
+done
+
+# sync reports
+typeset check_folder="$SRN_ENV_ROOT/build/work/pro/com/qad/shell/report/reports"
+print "Checking folder $check_folder ..."
+check_time_stamp | grep -v ".p$" | grep -v ".i$" | while read line
+do
+   typeset file=$line 
+   typeset dest_file=`print "$file" | sed "s'$check_folder\(.*\)'$FCI_ENV_ROOT\/build\/work\/pro\/com\/qad\/shell\/report\/reports\1'"`
+   scp_file
+done
+
+
+# update schema
+typeset check_folder="$SRN_ENV_ROOT/database/progress/schema"
+print "Checking folder $check_folder ..."
+if check_time_stamp | grep -iq df
+then
+   cd /users/mzq/fci
+   cp $SRN_ENV_ROOT/database/progress/schema update_schema -rf
+   cd update_schema
+   rm update_schema.tar.gz
+   tar -czf update_schema.tar.gz schema update_schema build.xml build_database.xml deploymentDescriptor.xml
+   typeset file="update_schema.tar.gz"
+   typeset dest_file="$FCI_ENV_ROOT/build/.tmp"
+   scp_file
+   run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "tar xf $FCI_ENV_ROOT/build/.tmp/update_schema.tar.gz -C $FCI_ENV_ROOT/build/.tmp"
+   run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "$FCI_ENV_ROOT/build/work/scripts/stop.sh"
+   run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "$FCI_ENV_ROOT/build/.tmp/update_schema"
+   run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "$FCI_ENV_ROOT/build/work/scripts/start.sh"
+   run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "rm $FCI_ENV_ROOT/build/.tmp/schema $FCI_ENV_ROOT/build/.tmp/build.xml $FCI_ENV_ROOT/build/.tmp/update_schema $FCI_ENV_ROOT/build/.tmp/build_database.xml $FCI_ENV_ROOT/build/.tmp/deploymentDescriptor.xml $FCI_ENV_ROOT/build/.tmp/update_schema.tar.gz $FCI_ENV_ROOT/build/.tmp/logs/* $FCI_ENV_ROOT/build/.tmp/velocity.log* -rf"
+   cd -
+fi
+
+# load data
+typeset check_folder="$SRN_ENV_ROOT/database/progress/xml_data"
+print "Checking folder $check_folder ..."
+if check_time_stamp | grep -iq xml
+then
+cd /users/mzq/fci
+   cp $SRN_ENV_ROOT/database/progress/xml_data load_xml -rf
+   cp $SRN_ENV_ROOT/database/progress/mapping load_xml -rf
+   cd /users/mzq/fci/load_xml
+   tar -czf load_xml.tar.gz xml_data mapping load_data build.xml
+   typeset file="load_xml.tar.gz"
+   typeset dest_file="$FCI_ENV_ROOT/build/.tmp"
+   scp_file
+   run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "tar xf $FCI_ENV_ROOT/build/.tmp/load_xml.tar.gz -C $FCI_ENV_ROOT/build/.tmp"
+   run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "$FCI_ENV_ROOT/build/.tmp/load_data"
+   run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "rm $FCI_ENV_ROOT/build/.tmp/mapping $FCI_ENV_ROOT/build/.tmp/xml_data $FCI_ENV_ROOT/build/.tmp/build.xml $FCI_ENV_ROOT/build/.tmp/load_data $FCI_ENV_ROOT/build/.tmp/load_xml.tar.gz $FCI_ENV_ROOT/build/.tmp/logs/* $FCI_ENV_ROOT/build/.tmp/velocity.log* -rf"
+   rm load_xml.tar.gz mapping xml_data -rf
+   cd -
+fi
+
+# mkdt and fin sync
+run devel ssh -i $PRIVATE_KEY root@$FCI_LINUX "/dr01/scripts/mkdt_sync"
+
+# touch time stamp
+run devel touch $TIME_STAMP

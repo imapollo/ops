@@ -1,0 +1,86 @@
+#!/bin/ksh
+# set dde environment variables
+# category: dde
+#
+# usage: dde [ -user xxx ] env_name
+#
+# if -user is set, go to the user's environment; otherwise go to team
+# environment
+#
+# example:
+# dde -user mzq mfg93
+# dde mfg93
+#
+# history:
+# revision: 1    author: mzq    date: 2010-09-09
+# revision: 2    author: mzq    date: 2010-09-12
+
+PRIVATEENV=0
+USERNAME=""
+
+# get the -user option
+
+case $1 in
+-user)
+  PRIVATEENV=1
+  shift
+  USERNAME=$1
+  shift
+  ;;
+*)
+  ;;
+esac
+
+ENVNAME=$1
+ROOTDIR="/qad/local/sandbox"
+
+# set the root directory for the environment
+
+if [[ $PRIVATEENV -eq 1 ]]
+then
+  ROOTDIR=`find "$ROOTDIR/user/$USERNAME" -maxdepth 3 -name $ENVNAME -type d`
+  ROOTDIR=$ROOTDIR
+  if [ ! -d "$ROOTDIR/build" ]
+  then
+    echo "The dde environment [$ENVNAME] doesn't exist for [$USERNAME]."
+    return
+  fi
+else
+  ROOTDIR="$ROOTDIR/team/$ENVNAME"
+  if [ ! -d "$ROOTDIR/build" ]
+  then
+    echo "The dde environment [$ENVNAME] doesn't exist."
+    return
+  fi
+fi
+
+# set variables
+
+cd $ROOTDIR
+. pset `grep "unix.DLC" build/config/deploymentDescriptor.xml | sed  -e 's/.*>.*dlc\(.*\)<.*/\1/g'`
+export ENVID=$1
+export THOST=`grep "<host name=" build/config/deploymentDescriptor.xml | sed  -e 's/.*name="\(.*\)".*/\1/g'`
+export ROOT=$ROOTDIR
+export BUILD=$ROOTDIR/build
+export WORK=$BUILD/work
+export SRC=$ROOT/src
+export RCODE=$WORK/dist
+export DBSRC=$ROOT/database
+export SCH=$DBSRC/progress/schema
+export DATA=$DBSRC/progress/data
+export XML=$DBSRC/progress/xml_data
+export MAPPING=$DBSRC/progress/mapping
+export TOMCAT_HOME=$WORK/tomcat
+export SCRIPT=$WORK/scripts
+export LOG=$WORK/logs
+export BROKER=$WORK/broker
+export PUBDB=$WORK/database
+export CONFIG=$BUILD/config
+export DD=$CONFIG/deploymentDescriptor.xml
+export DDT=$CONFIG/deploymentDescriptorTemplate.xml
+export DM=$CONFIG/deploymentManifest.xml
+
+if [[ "$THOST" != "$THISHOST" ]] && [[ "$THOST.qad.com" != "$THISHOST" ]] && [[ "$THOST" != "$THISHOST.qad.com" ]]
+then
+  echo "The dde environment [$1] is hosted on $THOST."
+fi
