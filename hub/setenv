@@ -37,8 +37,26 @@ done
 # Set sanity check
 #
 export PS1="[\u:${ENVPREFIX}${ENVID}@\h \W]\$ "
-export STCK="http://${ENVPREFIX}${ENVID}hub001.${ENVPREFIX}${ENVID}.com:8080/jmxsitemgr/dashboard.jsp"
-export JBDP="/opt/jboss/server/default/deploy"
-export JBLG="/opt/jboss/server/default/log/jboss.log"
-export ENVPP="/etc/stubhub/properties/ENV.stubhub.properties"
+
+#
+# Set JBoss variables
+#
+export JBDF="/opt/jboss/server/default"
+export JBDP="${JBDF}/deploy"
+export JBLG="${JBDF}/log/jboss.log"
+
+#
+# Set Apache variables
+#
 export APLG="/var/log/httpd"
+
+#
+# Set Stubhub properties
+#
+export ENVPP="/etc/stubhub/properties/ENV.stubhub.properties"
+export STCK="http://${ENVPREFIX}${ENVID}hub001.${ENVPREFIX}${ENVID}.com:8080/jmxsitemgr/dashboard.jsp"
+
+#
+# Useful URL
+#
+export SOLR="http://${ENVPREFIX}${ENVID}mci001.${ENVPREFIX}${ENVID}.com/solr"

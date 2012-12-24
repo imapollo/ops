@@ -9,7 +9,7 @@
 # Author: minjzhang@ebay.com
 #
 
-DB_CONNECTION=`ssh $act "cat $ENVPP" | grep "SERVICE_NAME = D" | head -n 1`
+DB_CONNECTION=`ssh $job "cat $ENVPP" | grep "SERVICE_NAME = D" | head -n 1`
 echo $DB_CONNECTION | sed "s/.*(SERVICE_NAME = \([^)]*\)).*/\1/"
 echo $DB_CONNECTION | sed "s/.*(HOST=\([^)]*\)).*/\1/"
 echo $DB_CONNECTION | sed "s/.*(PORT=\([^)]*\)).*/\1/"
