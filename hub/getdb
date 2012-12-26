@@ -4,13 +4,41 @@
 # Please run 'go' script at first.
 #
 # Usage:
-#  getdb
+#  getdb [option]
+#
+# Option:
+#  -s --service  only print the service name
+#  -h --host     only print the host name
+#  -p --port     only print the port number
+#  -t --protocol only print the protocol of the connection
 #
 # Author: minjzhang@ebay.com
 #
 
 DB_CONNECTION=`ssh $job "cat $ENVPP" | grep "SERVICE_NAME = D" | head -n 1`
-echo $DB_CONNECTION | sed "s/.*(SERVICE_NAME = \([^)]*\)).*/\1/"
-echo $DB_CONNECTION | sed "s/.*(HOST=\([^)]*\)).*/\1/"
-echo $DB_CONNECTION | sed "s/.*(PORT=\([^)]*\)).*/\1/"
-echo $DB_CONNECTION | sed "s/.*(PROTOCOL=\([^)]*\)).*/\1/"
+service_name=`echo $DB_CONNECTION | sed "s/.*(SERVICE_NAME = \([^)]*\)).*/\1/"`
+host=`echo $DB_CONNECTION | sed "s/.*(HOST=\([^)]*\)).*/\1/"`
+port=`echo $DB_CONNECTION | sed "s/.*(PORT=\([^)]*\)).*/\1/"`
+protocol=`echo $DB_CONNECTION | sed "s/.*(PROTOCOL=\([^)]*\)).*/\1/"`
+
+if [ "$1" == "" ]; then
+    echo $service_name
+    echo $host
+    echo $port
+    echo $protocol
+    exit 0
+fi
+
+if [[ "$1" == "-s" || "$1" == "--service" ]]; then
+    echo $service_name
+    exit 0
+elif [[ "$1" == "-h" || "$1" == "--host" ]]; then
+    echo $host
+    exit 0
+elif [[ "$1" == "-p" || "$1" == "--port" ]]; then
+    echo $port
+    exit 0
+elif [[ "$1" == "-t" || "$1" == "--protocol" ]]; then
+    echo $protocol
+    exit 0
+fi

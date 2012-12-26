@@ -37,3 +37,4 @@ umi # TBD
 tkn # CC tokenization (roles allowed to access: pay, rfi)
 jos # Migration jobs and health check job
 sts # Migrated and ported tools from CFM and csTool.ear respectively
+hub # Mock server for CC tokenization

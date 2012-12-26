@@ -31,6 +31,7 @@ roles=`$BIN/getroles`
 for ROLE in $roles
 do
     export $ROLE=${ENVPREFIX}${ENVID}${ROLE}001.${ENVPREFIX}${ENVID}.com
+    export ${ROLE}jmx=http://${ENVPREFIX}${ENVID}${ROLE}001.${ENVPREFIX}${ENVID}.com/jmx-console
 done
 
 #
@@ -60,3 +61,5 @@ export STCK="http://${ENVPREFIX}${ENVID}hub001.${ENVPREFIX}${ENVID}.com:8080/jmx
 # Useful URL
 #
 export SOLR="http://${ENVPREFIX}${ENVID}mci001.${ENVPREFIX}${ENVID}.com/solr"
+export MQ="http://${ENVPREFIX}${ENVID}mqm001.${ENVPREFIX}${ENVID}.com:8161/admin/queues.jsp"
+export STBTX="https://stubtex.${ENVPREFIX}${ENVID}.com/cstool"
