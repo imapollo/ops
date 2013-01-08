@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# Go to sqlplus console.
+# Please run 'go' script at first.
+#
+# Usage:
+#  sqlora
+#
+# Author: minjzhang@ebay.com
+#
+
+service_name=`$BIN/getdb -s`
+. setora
+sqlplus stub/dstub@${service_name}
