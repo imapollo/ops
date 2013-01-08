@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# <brief information about the script>
+# <detail information about the script if any>
+#
+# Usage:
+#  <usage of the script>
+#
+# Options:
+#  <options if any>
+#
+# Author: <email address>
+#
+
+options=$@
+
+another_option=0
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+<script> $options
+$*
+    Usage: <script> <[options]>
+    Options:
+        -a  --another=..    Another option
+        -d  --debug         Print debut messages
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o a:d -l another:,debug -- "$options"`
+if [ $? != 0 ]
+then
+    echo "Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -a | --another) echo "Got a, arg: $2"; shift 2;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+
+exit 0
