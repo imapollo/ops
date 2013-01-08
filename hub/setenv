@@ -2,11 +2,10 @@
 #
 # Set all the variables related to the specified environment
 #
-# Usage:
-#  setenv ENVID
-#
+# Usage: setenv [options] ENVID
 # Options:
-#  NA
+#  -t  --type=..    The type of the environment. Values can be srwd and srwe. Default value is srwd.
+#  -d  --debug      Print debug messages
 #
 # Example:
 #  setenv 59
@@ -16,13 +15,68 @@
 
 . /nas/home/minjzhang/bin/base
 
-if [ "$1" == "" ]; then
-    echo "Error: Lack of variables. Please check the usage."
-    exit 1
+options=$@
+
+debug_level=0
+ENVPREFIX=srwd
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+setenv $options
+$*
+ Usage: setenv [options] ENVID
+ Options:
+  -t  --type=..    The type of the environment. Values can be srwd and srwe. Default value is srwd.
+  -d  --debug      Print debug messages
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o t:d -l type:,debug -- "$options"`
+if [ $? != 0 ]
+then
+    echo "Error: Unrecognized parameters."
+    _usage
+    return 1
 fi
 
-export ENVID=$1
-ENVPREFIX=srwd
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -t | --type) ENVPREFIX=`echo $2 | awk '{print $1}'`; ENVID=`echo $2 | awk '{print $2}'`; shift 2;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+if [[ "$1" == "" && "$ENVID" == "" ]]; then
+    echo "Error: Lack of ENVID."
+    _usage
+    return 1
+fi
+
+if [[ "$1" != "" ]]; then
+    export ENVID=$1
+fi
 
 #
 # Set roles
