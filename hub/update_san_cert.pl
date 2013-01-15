@@ -10,14 +10,21 @@ my $in_san_key = 0;
 my $start_document = 0;
 my $new_document_written = 0;
 
+my $envs = "srwd40,srwd50,srwd70";
+my @environments = split(',', $envs);
+
+# TODO accept parameter to proceed selected environments
+# TODO accept parameter to pass the path of new san certs
+
 my $san_cert_dir = "/nas/reg/relmgt/new_certs_01142013";
 
 while ( my $line = <OLDFILE> ) {
-    if ( $line =~ m/^\s*<(srwd50)>\s*$/ ) {
+    if ( $line =~ m/^\s*<(srwd[0-9]*)>\s*$/ ) {
         # catch the start line of a environment
-        $envid = $1;
-        print "$envid \n";
-    } elsif ( $line =~ m/^\s*<\/(srwd50)>\s*$/ ) {
+        if ( grep /$1/, @environments ) {
+            $envid = $1;
+        }
+    } elsif ( $line =~ m/^\s*<\/(srwd[0-9]*)>\s*$/ ) {
         $envid = "";
     } elsif ( $envid ne "" and $line =~ m/^\s*san_crt\s*=\s*<<\s*EOD\s*$/ ) {
         # catch the start line of san_crt
