@@ -85,7 +85,7 @@ roles=`$BIN/getroles`
 for ROLE in $roles
 do
     export $ROLE=${ENVPREFIX}${ENVID}${ROLE}001.${ENVPREFIX}${ENVID}.com
-    export ${ROLE}jmx=http://${ENVPREFIX}${ENVID}${ROLE}001.${ENVPREFIX}${ENVID}.com/jmx-console
+    export ${ROLE}jmx=http://${ENVPREFIX}${ENVID}${ROLE}001.${ENVPREFIX}${ENVID}.com/jmx-console/
 done
 
 #

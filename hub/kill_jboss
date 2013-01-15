@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+# Kill jboss
+#
+# Usage:
+#  restart_jboss ROLE
+#
+# Author: minjzhang@ebay.com
+#
+
+if [[ "$1" == "" ]]; then
+    echo "Error: Role not set."
+    exit 1
+fi
+
+ROLE=$1
+
+if [[ "${ROLE}" == `hostname` ]]; then
+    ps -efl | grep jboss | grep -v grep | grep -v restart_jboss | awk '{print $4}' | xargs sudo kill -9
+    echo "Killed jboss on ${ROLE}.."
+    exit 0
+else
+    ssh ${ROLE} "restart_jboss ${ROLE}"
+fi
