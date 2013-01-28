@@ -40,3 +40,4 @@ sts # Migrated and ported tools from CFM and csTool.ear respectively
 hub # Mock server for CC tokenization
 mri # mail return
 lsi # TBD
+mxx # mail exchange external

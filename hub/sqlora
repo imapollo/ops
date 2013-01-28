@@ -11,4 +11,5 @@
 
 service_name=`$BIN/getdb -s`
 . setora
+echo $service_name
 sqlplus stub/dstub@${service_name}
