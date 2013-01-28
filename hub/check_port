@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# Check accessibility from specific host to specific host and port
+# Like: telnet <hostname> <portnumber>
+#
+# Usage:
+#  check_port <host> <port>
+#
+# Options:
+#  NA
+#
+# Author: minjzhang@ebay.com
+#
+
+#
+# Check if the process has ended
+#
+check_process_end() {
+    telnet_process=`ps -efl | grep $telnet_pid | grep -v grep`
+    if [[ $telnet_process == "" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+#
+# Check if telnet has been connected
+#
+check_telnet_connected() {
+    if grep -q "Connected to " $tmp_output; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+#
+# Check if telnet has been refused
+#
+check_telnet_refused() {
+    if grep -q "Connection refused" $tmp_output; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+#
+# Check if telnet to specified port success
+#
+check_telnet_success() {
+    if [[ $check_process_result == 0 ]]; then
+        check_telnet_connected
+        if [[ $? == 0 ]]; then
+            clean_up
+            exit 0
+        fi
+        check_telnet_refused
+        if [[ $? == 0 ]]; then
+            clean_up
+            exit 1
+        fi
+    fi
+}
+
+#
+# Clean up the process and temp files
+#
+clean_up() {
+    kill -9 $telnet_pid &> /dev/null
+    rm -f $tmp_output
+    rm -f $tmp_telnet_escape
+}
+
+to_host=$1
+port=$2
+tmp_output="$(mktemp)"
+
+tmp_telnet_escape="$(mktemp)"
+echo "^]" > $tmp_telnet_escape
+
+telnet $to_host $port < $tmp_telnet_escape &> $tmp_output &
+telnet_pid=$!
+
+check_process_end
+check_process_result=$?
+check_telnet_success
+
+sleep 5
+
+check_process_end
+check_process_result=$?
+check_telnet_success
+
+clean_up
+exit 1
