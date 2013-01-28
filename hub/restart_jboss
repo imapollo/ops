@@ -17,7 +17,7 @@ ROLE=$1
 
 if [[ "${ROLE}" == `hostname` ]]; then
     echo "Restarting jboss on ${ROLE}.."
-    ps -efl | grep jboss | grep -v grep | grep -v restart_jboss | awk '{print $4}' | xargs sudo kill -9
+    ps -efl | grep jboss | grep -v grep | grep -v restart_jboss | grep -v tail | awk '{print $4}' | xargs sudo kill -9 &> /dev/null
     sleep 5
     sudo /sbin/service jboss start
     echo "Jboss restarted."
