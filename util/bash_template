@@ -3,10 +3,10 @@
 # <brief information about the script>
 # <detail information about the script if any>
 #
-# Usage:
-#  <usage of the script>
+# Usage: <usage of the script>
 #
 # Options:
+#  -d | --debug        Print debug messages
 #  <options if any>
 #
 # Author: <email address>
@@ -24,10 +24,11 @@ function _usage() {
     cat <<EOF
 <script> $options
 $*
-    Usage: <script> <[options]>
-    Options:
-        -a  --another=..    Another option
-        -d  --debug         Print debut messages
+Usage: <script> [options]
+
+Options:
+ -a | --another=..    Another option
+ -d | --debug         Print debug messages
 EOF
 }
 
