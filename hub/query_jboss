@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Query the status of jboss.
+
+# Usage: jboss_query [options]
+# Options:
+#  -r | --role=..   JBoss Role. Check all the roles if not specified.
+#  -d | --debug     Print debut messages.
+#  
+#
+# Author: minjzhang@ebay.com
+#
+
+options=$@
+
+ENV_PREFIX="srwd"
+jboss_role=""
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+jboss_query $options
+$*
+ Usage: jboss_query [options]
+ Options:
+  -r | --role=..   JBoss Role. Check all the roles if not specified.
+  -d | --debug     Print debut messages.
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o r:d -l role:,debug -- "$options"`
+if [ $? != 0 ]
+then
+    echo "Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -r | --role) jboss_role=${2// }; shift 2;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+jmx_console="http://${ENV_PREFIX}${ENVID}${jboss_role}001.${ENV_PREFIX}${ENVID}.com/jmx-console/"
+curl ${jmx_console} 2>/dev/null |grep "DomainName" | \
+    grep -v jboss | grep -v Catalina | grep -v jmx.loading | grep -v JMImplementation | \
+    sed 's/.*>\(.*\)<.*/\1/'
+
+exit 0
