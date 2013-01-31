@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# Enable Sanity Check in Database
+#
+# Usage: enable_sanity_check
+#
+# Options:
+#  -d | --debug        Print debug messages
+#
+# Author: minjzhang@ebay.com
+#
+
+options=$@
+
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+<script> $options
+$*
+Usage: <script> [options]
+
+Options:
+ -d | --debug         Print debug messages
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o d -l debug -- "$options"`
+if [ $? != 0 ]
+then
+    echo "Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+
+. /nas/home/minjzhang/bin/base
+
+$BIN/execute_sql $BIN/sql/sanity_check_enable.sql
+
+exit 0

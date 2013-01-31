@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# Query the database with specified SQL statement.
+#
+# Usage:
+#  execute_sql SQLFILE
+#
+# Author: minjzhang@ebay.com
+#
+
+. /nas/home/minjzhang/bin/base
+. $BIN/setora
+
+if [ "$ENVID" == "" ]; then
+    echo "Please set environment variables by 'go' at first."
+    exit 1
+fi
+
+sql_file=$1
+if [[ "$sql_file" == "" ]]; then
+    echo "Error: Parameter SQL file must be set."
+    exit 1
+fi
+
+DB_SERVICE_NAME=`$BIN/getdb -s`
+DB_USER="stub"
+DB_PASSWORD="dstub"
+DB_CONNECTION=${DB_USER}/${DB_PASSWORD}@${DB_SERVICE_NAME}
+
+sqlplus ${DB_CONNECTION} < $sql_file
+
+exit 0
