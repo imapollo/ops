@@ -1,0 +1,167 @@
+#!/bin/bash
+#
+# Clean and rebuild lcs index.
+# Restart activeMQ, memcached, JBoss on lcm, lcg and lcx.
+#
+# Usage: rebuild_lcs [options]
+#
+# Options:
+#  -e | --env          Specify the environment need to rebuild. For
+#                      example: srwd90
+#  -c | --clean        Whether to clean the lcs and activemq data or
+#                      not.
+#  -d | --debug        Print debug messages.
+#
+# Author: minjzhang@ebay.com
+#
+
+options=$@
+
+envid=""
+clean_data=0
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+rebuild_lcs $options
+$*
+Usage: rebuild_lcs [options]
+
+Options:
+ -e | --env=..        Specify the environment need to rebuild. For
+                      example: srwd90
+ -c | --clean         Whether to clean the lcs and activemq data or
+                      not.
+ -d | --debug         Print debug messages
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o e:cd -l env:,clean,debug -- "$options"`
+if [ $? != 0 ]
+then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -e | --env) envid=${2// }; shift 2;;
+        -c | --clean) clean_data=1; shift;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Kill JBoss
+#
+function kill_jboss_server {
+    jboss_role=$1
+    _print_debug_msg "Stopping Jboss on $jboss_role"
+    if ps -efl | grep -v grep | grep -iq "jboss"; then
+        ssh $jboss_role "ps -efl | grep jboss | grep -v grep | grep -v kill_jboss | awk '{print $4}' | xargs sudo kill -9}" < /dev/null
+    fi
+    _print_debug_msg "Stopped Jboss on $jboss_role"
+}
+
+#
+# Main
+#
+
+if [[ "`whoami`" != "relmgt" ]]; then
+    echo "Error: Please run as user 'relmgt'."
+    _usage
+    exit 1
+fi
+
+LCX_HOST=${envid}lcx001.${envid}.com
+LCM_HOST=${envid}lcm001.${envid}.com
+LCG_HOST=${envid}lcg001.${envid}.com
+
+# Stop lcs-slave on LCX
+_print_debug_msg "Stopping lcs-slave on LCX"
+ssh $LCX_HOST "sudo /sbin/service lcs-slave stop" < /dev/null
+_print_debug_msg "Stopped lcs-slave on LCX"
+
+# Stop jboss on LCM, LCG and LCX
+kill_jboss_server $LCM_HOST
+kill_jboss_server $LCG_HOST
+kill_jboss_server $LCX_HOST
+
+# Stop activeMQ on LCG and LCM
+_print_debug_msg "Stopping activeMQ on LCG and LCM"
+ssh $LCG_HOST "sudo /sbin/service activeMQ stop" < /dev/null
+ssh $LCM_HOST "sudo /sbin/service activeMQ stop" < /dev/null
+_print_debug_msg "Stopped activeMQ on LCG and LCM"
+
+# Stop memcached on LCM
+_print_debug_msg "Stopping memcached on LCM"
+ssh $LCM_HOST "sudo /sbin/service memcached stop" < /dev/null
+_print_debug_msg "Stopped memcached on LCM"
+
+# Clean SOLR index
+if [[ "$clean_data" == 1 ]]; then
+    _print_debug_msg "Cleaning SOLR index"
+    ssh $LCX_HOST "sudo rm -rf /opt/jboss/bin/solr/data/*/*" < /dev/null
+    _print_debug_msg "Cleaned SOLR index"
+fi
+
+# Clean data for activeMQ
+if [[ "$clean_data" == 1 ]]; then
+    _print_debug_msg "Cleaning data for active MQ"
+    ssh $LCM_HOST "sudo rm -rf /opt/activemq/data" < /dev/null
+    ssh $LCG_HOST "sudo rm -rf /opt/activemq/data" < /dev/null
+    _print_debug_msg "Cleaned data for active MQ"
+fi
+
+# Start JBoss on LCX
+_print_debug_msg "Starting JBoss on LCX"
+ssh $LCX_HOST "sudo /sbin/service jboss start" < /dev/null
+_print_debug_msg "Started JBoss on LCX"
+
+# Start lcs-slave on LCX
+_print_debug_msg "Starting lcs-slave on LCX"
+ssh $LCX_HOST "sudo /sbin/service lcs-slave start" < /dev/null
+_print_debug_msg "Started lcs-slave on LCX"
+
+# Start activeMQ on LCG and LCM
+_print_debug_msg "Starting activeMQ on LCG and LCM"
+ssh $LCG_HOST "sudo /sbin/service activeMQ start" < /dev/null
+ssh $LCM_HOST "sudo /sbin/service activeMQ start" < /dev/null
+_print_debug_msg "Started activeMQ on LCG and LCM"
+
+# Start memcached on LCM
+_print_debug_msg "Starting memcached on LCM"
+ssh $LCM_HOST "sudo /sbin/service memcached start" < /dev/null
+_print_debug_msg "Started memcached on LCM"
+
+# Start JBoss on LCG and LCM
+_print_debug_msg "Starting JBoss on LCG and LCM"
+ssh $LCG_HOST "sudo /sbin/service jboss start" < /dev/null
+ssh $LCM_HOST "sudo /sbin/service jboss start" < /dev/null
+_print_debug_msg "Started JBoss on LCG and LCM"
+
+if [[ "$clean_data" == 1 ]]; then
+    echo "Please do re-index."
+fi
+
+exit 0

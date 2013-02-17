@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# Restart mqm/mqs
+#
+# Usage: restart_mqm [options]
+#
+# Options:
+#  -e | --env          Specify the environment need to restart. For
+#                      example: srwd90
+#  -d | --debug        Print debug messages.
+#
+# Author: minjzhang@ebay.com
+#
+
+options=$@
+
+envid=""
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+restart_mqm $options
+$*
+Usage: restart_mqm [options]
+
+Options:
+ -e | --env=..        Specify the environment need to restart. For
+                      example: srwd90
+ -d | --debug         Print debug messages
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o e:cd -l env:,clean,debug -- "$options"`
+if [ $? != 0 ]
+then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -e | --env) envid=${2// }; shift 2;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+
+if [[ "`whoami`" != "relmgt" ]]; then
+    echo "Error: Please run as user 'relmgt'."
+    _usage
+    exit 1
+fi
+
+MQM_HOST=${envid}mqm001.${envid}.com
+
+ssh $MQM_HOST "sudo /etc/init.d/broker-slave stop" < /dev/null
+ssh $MQM_HOST "sudo /etc/init.d/broker-master stop" < /dev/null
+ssh $MQM_HOST "sudo /etc/init.d/broker-master start" < /dev/null
+ssh $MQM_HOST "sudo /etc/init.d/broker-slave start" < /dev/null
+
+exit 0

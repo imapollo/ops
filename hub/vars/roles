@@ -41,3 +41,6 @@ hub # Mock server for CC tokenization
 mri # mail return
 lsi # TBD
 mxx # mail exchange external
+mwx # TBD
+brs # TBD
+agg # TBD
