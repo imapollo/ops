@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# Query email logs for specific email address.
+#
+# Usage: query_email_logs [options]
+#
+# Options:
+#  -m | --email        Specify the email address to query.
+#  -d | --debug        Print debug messages.
+#
+# Author: minjzhang@ebay.com
+#
+
+options=$@
+
+email_address=""
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+query_email_logs $options
+$*
+Usage: query_email_logs [options]
+
+Options:
+ -m | --email         Specify the email address to query.
+ -d | --debug         Print debug messages.
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o m:d -l email:,debug -- "$options"`
+if [ $? != 0 ]
+then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -m | --email) email_address=${2// }; shift 2;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+
+. /nas/home/minjzhang/bin/base
+
+if [[ $email_address == "" ]]; then
+    echo "Error: Please speicfy email address by '-m'."
+    _usage
+    exit 1
+fi
+
+tmp_sql_file=$(mktemp)
+cat $BIN/sql/query_email_logs.sql | sed "s/USER_EMAIL/$email_address/" > $tmp_sql_file
+
+email_log_count=`$BIN/query_db $tmp_sql_file | grep -e "^\s*[0-9]\+\s*$"`
+email_log_count=`echo $email_log_count`
+
+if [[ $email_log_count == 0 ]]; then
+    echo "No email logs in the database for abc"
+    rm $tmp_sql_file
+    exit 1
+fi
+
+rm $tmp_sql_file
+
+exit 0
