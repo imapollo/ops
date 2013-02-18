@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+# Check network configuration (ifconfig) for mqm/mqs.
+# Including IP address, subnet mask.
+#
+# Usage: check_mqm_ifconfig
+#
+# Options:
+#  -e | --env          Specify the environment id. For example: srwd90.
+#  -d | --debug        Print debug messages
+#
+# Author: minjzhang@ebay.com
+#
+
+options=$@
+
+envid=""
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+check_mqm_ifconfig $options
+$*
+Usage: check_mqm_ifconfig [options]
+
+Options:
+ -e | --env=..        Specify the environment id. For example: srwd90.
+ -d | --debug         Print debug messages
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o e:d -l env:,debug -- "$options"`
+if [ $? != 0 ]
+then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -e | --env) envid=${2// }; shift 2;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+
+SUBNET_MASK="255.255.255.192"
+
+if [[ "$envid" == "" ]]; then
+    echo "Error: environment id must be set by '-e'."
+    _usage
+    exit 1
+fi
+
+MQM_HOST=${envid}mqm001.${envid}.com
+
+eth0_ifconfig=`ssh $MQM_HOST "/sbin/ifconfig -a eth0" < /dev/null | grep "inet addr"`
+eth0_0_ifconfig=`ssh $MQM_HOST "/sbin/ifconfig -a eth0:0" < /dev/null | grep "inet addr"`
+
+eth0_ip=`echo $eth0_ifconfig | awk -F: '{ print $2 }' | awk '{ print $1 }'`
+eth0_0_ip=`echo $eth0_0_ifconfig | awk -F: '{ print $2 }' | awk '{ print $1 }'`
+eth0_mask=`echo $eth0_ifconfig | awk -F: '{ print $4 }'`
+eth0_0_mask=`echo $eth0_0_ifconfig | awk -F: '{ print $4 }'`
+
+if [[ "$eth0_mask" != "$SUBNET_MASK" ]] || [[ "$eth0_0_mask" != "$SUBNET_MASK" ]]
+then
+    echo "Error: subnet mask set wrong. eth0: ${eth0_mask}, eth0:0: ${eth0_0_mask}."
+    exit 1
+fi
+
+exit 0
