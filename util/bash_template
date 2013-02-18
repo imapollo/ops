@@ -3,11 +3,11 @@
 # <brief information about the script>
 # <detail information about the script if any>
 #
-# Usage: <usage of the script>
+# Usage: <script> [options]
 #
 # Options:
-#  -d | --debug        Print debug messages
-#  <options if any>
+#  -a | --another=..   Another option.
+#  -d | --debug        Print debug messages.
 #
 # Author: <email address>
 #
@@ -27,8 +27,8 @@ $*
 Usage: <script> [options]
 
 Options:
- -a | --another=..    Another option
- -d | --debug         Print debug messages
+  -a | --another=..   Another option.
+  -d | --debug        Print debug messages.
 EOF
 }
 
@@ -36,9 +36,8 @@ EOF
 # Get options
 #
 OPTS=`getopt -o a:d -l another:,debug -- "$options"`
-if [ $? != 0 ]
-then
-    echo "Unrecognized parameters."
+if [ $? != 0 ]; then
+    echo "Error: Unrecognized parameters."
     _usage
     exit 1
 fi
