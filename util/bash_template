@@ -36,7 +36,7 @@ EOF
 #
 # Get options
 #
-OPTS=`getopt -o a:d -l another:,debug -- "$options"`
+OPTS=`getopt -o a:d -l another:,debug -- $options`
 if [ $? != 0 ]; then
     echo "Error: Unrecognized parameters."
     _usage
