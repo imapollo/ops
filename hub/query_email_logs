@@ -34,7 +34,7 @@ EOF
 #
 # Get options
 #
-OPTS=`getopt -o m:d -l email:,debug -- "$options"`
+OPTS=`getopt -o m:d -l email:,debug -- $options`
 if [ $? != 0 ]
 then
     echo "Error: Unrecognized parameters."
@@ -81,7 +81,7 @@ email_log_count=`$BIN/query_db $tmp_sql_file | grep -e "^\s*[0-9]\+\s*$"`
 email_log_count=`echo $email_log_count`
 
 if [[ $email_log_count == 0 ]]; then
-    echo "No email logs in the database for abc"
+    echo "No email logs in the database for $email_address."
     rm $tmp_sql_file
     exit 1
 fi

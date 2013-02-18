@@ -1,0 +1,113 @@
+#!/bin/bash
+#
+# To validate if email can be sent via strongmail server.
+#
+# Usage: email_validate [options]
+#
+# Options:
+#  -m | --email=..     Specify the email address to check.
+#  -e | --env=..       Specify the environment to check.
+#  -d | --debug        Print debug messages.
+#
+# Author: minjzhang@ebay.com
+#
+
+options=$@
+
+email_address=""
+envid=""
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+email_validate $options
+
+$*
+Usage: email_validate [options]
+
+Options:
+  -m | --email=..     Specify the email address to check.
+  -e | --env=..       Specify the environment to check.
+  -d | --debug        Print debug messages.
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o m:e:d -l email:,env:,debug -- $options`
+if [ $? != 0 ]; then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -m | --email) email_address=${2// }; shift 2;;
+        -e | --env) envid=${2// }; shift 2;;
+        -d | --debug) echo a; debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Query email logs in database
+#
+function query_email_logs_in_db {
+    . /nas/home/minjzhang/bin/base
+    
+    $BIN/query_email_logs -m $email_address > /dev/null
+    rc=$?
+    
+    if [[ "$rc" == 0 ]]; then
+        echo "Find email logs in database:                              PASS"
+    else
+        echo "Find email logs in database:                              FAIL"
+    fi
+}
+
+#
+# Check the logs in JBoss log on JOB
+#
+function query_email_logs_in_job_jboss {
+    JOB_HOST=${envid}job001.${envid}.com
+    email_jboss_log=`ssh $JOB_HOST "grep $email_address /opt/jboss/server/default/log/jboss.*" < /dev/null`
+    if [[ $email_jboss_log == "" ]]; then
+        echo "Find logs related to email address in JOB jboss log:      FAIL"
+        return 1
+    else
+        echo "Find logs related to email address in JOB jboss log:      PASS"
+    fi
+
+    if echo $email_jboss_log | grep -q "priority=ERROR"; then
+        echo "No errors in related to email address in JOB jboss log:   FAIL"
+        _print_debug_msg "[debug] echo $email_jboss_log | grep 'priority=ERROR'"
+    else
+        echo "No errors in related to email address in JOB jboss log:   PASS"
+    fi
+}
+
+#
+# Main
+#
+
+query_email_logs_in_db
+query_email_logs_in_job_jboss
+
+exit 0
