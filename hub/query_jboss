@@ -34,7 +34,7 @@ EOF
 #
 # Get options
 #
-OPTS=`getopt -o r:d -l role:,debug -- "$options"`
+OPTS=`getopt -o r:d -l role:,debug -- $options`
 if [ $? != 0 ]
 then
     echo "Unrecognized parameters."

@@ -35,7 +35,7 @@ EOF
 #
 # Get options
 #
-OPTS=`getopt -o e:d -l env:,debug -- "$options"`
+OPTS=`getopt -o e:d -l env:,debug -- $options`
 if [ $? != 0 ]
 then
     echo "Error: Unrecognized parameters."

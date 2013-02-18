@@ -31,7 +31,7 @@ EOF
 #
 # Get options
 #
-OPTS=`getopt -o d -l debug -- "$options"`
+OPTS=`getopt -o d -l debug -- $options`
 if [ $? != 0 ]
 then
     echo "Unrecognized parameters."
