@@ -71,10 +71,10 @@ function _print_debug_msg {
 #
 function query_email_logs_in_db {
     . /nas/home/minjzhang/bin/base
-    
+
     $BIN/query_email_logs -m $email_address > /dev/null
     rc=$?
-    
+
     if [[ "$rc" == 0 ]]; then
         echo "Find email logs in database:                              PASS"
     else
@@ -104,9 +104,65 @@ function query_email_logs_in_job_jboss {
 }
 
 #
+# Check network settings for mqm/mqs, including subnet mask
+#
+function check_mqm_ifconfig {
+    . /nas/home/minjzhang/bin/base
+
+    $BIN/check_mqm_ifconfig -e $envid > /dev/null
+    rc=$?
+
+    if [[ "$rc" == 0 ]]; then
+        echo "Check subnet mask for MQM/MQS:                            PASS"
+    else
+        echo "Check subnet mask for MQM/MQS:                            FAIL"
+    fi
+}
+
+#
+# Check /etc/passwd file on srwd00mri001 to ensure enough permission
+#
+function check_mri_passwd {
+    MRI_HOST=srwd00mri001.stubcorp.dev
+
+    passwd_line=`ssh $MRI_HOST "grep $envid /etc/passwd" < /dev/null`
+    user=`echo $passwd_line | awk -F: '{ print $1}'`
+    auth1=`echo $passwd_line | awk -F: '{ print $3}'`
+    auth2=`echo $passwd_line | awk -F: '{ print $4}'`
+    home_dir=`echo $passwd_line | awk -F: '{ print $6}'`
+
+    if [[ "$user" == "strongmailbcc_${envid}" && "$auth1" == "20128" \
+            && "$auth2" == "20128" && "$home_dir" == \
+            "/nas/strongmail/Maildir_${envid}" ]]; then
+        echo "Check MRI /etc/passwd:                                    PASS"
+    else
+        echo "Check MRI /etc/passwd:                                    FAIL"
+        _print_debug_msg "[debug] $passwd_line"
+    fi
+}
+
+#
+# Check new mail directory on JOB
+#
+function check_mail_dir_new {
+    JOB_HOST=${envid}job001.${envid}.com
+
+    file_count=`ssh $JOB_HOST "sudo ls /nas/strongmail/Maildir_srwd63/Maildir/new | wc -l"`
+    if [[ "$file_count" == 0 ]]; then
+        echo "Check new mail directory is empty:                        PASS"
+    else
+        echo "Check new mail directory is empty:                        FAIL"
+        _print_debug_msg "[debug] File count: $file_count"
+    fi
+}
+
+#
 # Main
 #
 
+check_mqm_ifconfig
+check_mri_passwd
+check_mail_dir_new
 query_email_logs_in_db
 query_email_logs_in_job_jboss
 
