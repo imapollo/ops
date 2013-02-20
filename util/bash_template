@@ -22,8 +22,8 @@ debug_level=0
 #
 function _usage() {
     cat <<EOF
-<script> $options
 
+<script> $options
 $*
 Usage: <script> [options]
 

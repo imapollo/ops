@@ -1,0 +1,116 @@
+#!/bin/bash
+#
+# Purge the pending messages in ActiveMQ (mqm)
+#
+# Usage: purge_mqm [options]
+#
+# Options:
+#  -e | --env=..       The environment MQM need to be purged. For
+#                      example: srwd90.
+#  -d | --debug        Print debug messages.
+#
+# Author: minjzhang@ebay.com
+#
+
+options=$@
+
+envid=""
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+
+purge_mqm $options
+$*
+Usage: purge_mqm [options]
+
+Options:
+  -e | --env=..       The environment MQM need to be purged. For
+                      example: srwd90.
+  -d | --debug        Print debug messages.
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o e:d -l env:,debug -- $options`
+if [ $? != 0 ]; then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -e | --env) envid=${2// }; shift 2;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+
+if [[ "$envid" == "" ]]; then
+    echo "Error: Please specify environment by '-e'."
+    _usage
+    exit 1
+fi
+
+MQM_QUEUE_PAGE="http://${envid}mqm001.${envid}.com:8161/admin/queues.jsp"
+tmp_queue_page=$(mktemp)
+wget -O $tmp_queue_page $MQM_QUEUE_PAGE 2> /dev/null
+
+sed -ne '/browse\.jsp?JMSDestination=.*">$/{
+    p;n;n;n;n;p
+}' $tmp_queue_page | \
+sed 's/.*JMSDestination=\(.*\)">/\1/' | \
+sed 's/<td>\(.*\)<\/td>/\1/' > $tmp_queue_page.new
+
+queues=`cat $tmp_queue_page.new` 
+queue_name=""
+pending_msg_number=0
+is_queue_name=1
+for line in $queues
+do
+    if [[ "$is_queue_name" == 1 ]]; then
+        queue_name=$line
+        is_queue_name=0
+    else
+        pending_msg_number=$line
+        if [[ "$pending_msg_number" == 0 ]]; then
+            _print_debug_msg "[debug] No pending message for: $queue_name"
+        elif echo $pending_msg_number | grep -q "^-"; then
+            _print_debug_msg "[debug] No pending message for: $queue_name"
+        elif [[ "$pending_msg_number" == "</a></td>" ]]; then
+            _print_debug_msg "[debug] Cannot determine for: $queue_name"
+        else
+            echo "Perge $pending_msg_number pending messages for: $queue_name"
+            purge_url="http://${envid}mqm001.${envid}.com:8161/admin/purgeDestination.action?JMSDestination=${queue_name}&JMSDestinationType=queue"
+            wget -O /dev/null $purge_url 2> /dev/null
+        fi
+
+        is_queue_name=1
+    fi
+done
+
+rm $tmp_queue_page $tmp_queue_page.new
+
+exit 0
