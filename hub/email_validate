@@ -97,7 +97,7 @@ function query_email_logs_in_job_jboss {
 
     if echo $email_jboss_log | grep -q "priority=ERROR"; then
         echo "No errors in related to email address in JOB jboss log:   FAIL"
-        _print_debug_msg "[debug] echo $email_jboss_log | grep 'priority=ERROR'"
+        _print_debug_msg "[debug] echo $email_jboss_log"
     else
         echo "No errors in related to email address in JOB jboss log:   PASS"
     fi
