@@ -71,13 +71,55 @@ if ( ! defined $source_envid || ! defined $target_envid ) {
 
 #
 # Filter variables related to environment
-# TODO remove db related informaiton
 #
 sub filter_variables {
-    my ( $line, $envid ) = @_;
+    my ( $line, $envid, $db_host_id ) = @_;
     $line =~ s/\s*//g;
     $line =~ s/$envid/<ENVID>/g;
+    if ( $db_host_id == "08" ) {
+        $line =~ s/\$<delphix_host01>/<DELPHIX_HOST>/;
+        $envid =~ s/srw[de]([0-9]+)/$1/;
+        $line =~ s/\$<delphix_db_prefix>$envid/<DELPHIX_SID>/;
+    }
+    if ( $db_host_id == "16" ) {
+        $line =~ s/\$<delphix_host02>/<DELPHIX_HOST>/;
+        $envid =~ s/srw[de]([0-9]+)/$1/;
+        $line =~ s/\$<delphix_db_prefix_16>$envid/<DELPHIX_SID>/;
+    }
+    if ( $db_host_id == "19" ) {
+        $line =~ s/\$<delphix_host03>/<DELPHIX_HOST>/;
+        $envid =~ s/srw[de]([0-9]+)/$1/;
+        $line =~ s/\$<delphix_db_prefix_19>$envid/<DELPHIX_SID>/;
+    }
+
     return $line;
+}
+
+#
+# Get database connection information
+# TODO how to get PE environment db connection
+#
+sub get_db_connection {
+    my ( $envid ) = @_;
+    if ( $envid !~ m/srwd.*/ ) {
+        return;
+    }
+    $envid =~ s/srwd([0-9]+)/$1/;
+    my $db_instance = "DE$envid";
+
+    my $tnsnames="/nas/home/oracle/OraHome/network/admin/tnsnames.ora";
+    open TNSNAMES_FH, "<$tnsnames" or die $!;
+
+    while ( my $line = <TNSNAMES_FH> ) {
+        if ( $line =~ m/D[0-9]{2}$db_instance/ ) {
+            $line =~ s/D([0-9]{2})$db_instance.*/$1/;
+            close TNSNAMES_FH;
+            return $line;
+        }
+    }
+
+    close TNSNAMES_FH;
+    return;
 }
 
 #
@@ -130,11 +172,13 @@ while ( my $line = <TOKEN_TABLE_STUBHUB> ) {
     # Not print empty line and comment line
     if ( $line !~ m/^\s*$/ && $line !~ m/^\s*#/ ) {
         if ( $in_source_node == 1 ) {
-            $line = filter_variables($line, $source_envid);
+            my $db_host_id = get_db_connection($source_envid);
+            $line = filter_variables($line, $source_envid, $db_host_id);
             push(@source_properties, $line);
         }
         if ( $in_target_node == 1 ) {
-            $line = filter_variables($line, $target_envid);
+            my $db_host_id = get_db_connection($target_envid);
+            $line = filter_variables($line, $target_envid, $db_host_id);
             push(@target_properties, $line);
         }
     }
