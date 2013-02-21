@@ -38,19 +38,18 @@ if ( $show_usage ) {
 #
 sub usage {
    print <<END_OF_HELP
-Usage: <script> [options]
-
-Options:
- -a | --another           Another parameter.
- -v | --verbose           Show verbose messages.
- -h | --help              Show help information.
-
-Examples:
- <script> ..
-
-Author: minjzhang
+<copy from header>
 
 END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $another) {
+    print "Error: The pamameter '-a' must be set.\n";
+    usage();
+    exit 1;
 }
 
 #

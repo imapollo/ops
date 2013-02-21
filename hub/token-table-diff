@@ -1,0 +1,155 @@
+#!/usr/bin/perl -w
+#
+# Diff between token table properties.
+#
+# Usage: token-table-diff [options]
+#
+# Options:
+#  -s | --source            The source environment id to diff. For example: srwd30.
+#  -t | --target            The target environment id to diff. For example: srwd40.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  token-table-diff -s srwd30 -t srwd40
+#
+# Author: minjzhang
+#
+
+use strict;
+use Getopt::Long;
+use File::Temp qw( tempfile );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $source_envid = qw{};
+my $target_envid = qw{};
+
+my $options_okay = GetOptions (
+   's|source=s'  => \$source_envid,
+   't|target=s'  => \$target_envid,
+   'v|verbose'   => \$show_verbose,
+   'h|help'      => \$show_usage,
+);
+
+if ( $show_usage ) {
+   usage();
+}
+
+#
+# Usage
+#
+sub usage {
+   print <<END_OF_HELP
+Diff between token table properties.
+
+Usage: token-table-diff [options]
+
+Options:
+ -s | --source            The source environment id to diff. For example: srwd30.
+ -t | --target            The target environment id to diff. For example: srwd40.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ token-table-diff -s srwd30 -t srwd40
+
+Author: minjzhang
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $source_envid || ! defined $target_envid ) {
+    print "Error: Pamater '-s' and '-t' must be set.\n";
+    usage();
+    exit 1;
+}
+
+#
+# Filter variables related to environment
+# TODO remove db related informaiton
+#
+sub filter_variables {
+    my ( $line, $envid ) = @_;
+    $line =~ s/\s*//g;
+    $line =~ s/$envid/<ENVID>/g;
+    return $line;
+}
+
+#
+# Main
+#
+
+# TODO Get token table from P4.
+my $token_table_stubhub="/nas/home/minjzhang/token-table-env-stubhub-properties";
+
+open TOKEN_TABLE_STUBHUB, "<$token_table_stubhub" or die $!;
+
+my $source_fh = new File::Temp( UNLINK => 1 );
+my $target_fh = new File::Temp( UNLINK => 1 );
+#my $source_fh = new File::Temp( UNLINK => 0 );
+#my $target_fh = new File::Temp( UNLINK => 0 );
+
+# TODO add suffix srwd60, or just create these diff files in a temp
+# directory
+open $source_fh, ">$source_fh" or die $!;
+open $target_fh, ">$target_fh" or die $!;
+
+my $in_source_node = 0;
+my $in_target_node = 0;
+
+my @source_properties = ();
+my @target_properties = ();
+
+while ( my $line = <TOKEN_TABLE_STUBHUB> ) {
+    # If matching the begining of source environment node
+    if ( $line =~ m/^\s*<$source_envid>\s*$/ ) {
+        $in_source_node = 1;
+        next;
+    }
+    # If matching the end of source environment node
+    if ( $line =~ m/^\s*<\/$source_envid>\s*$/ ) {
+        $in_source_node = 0;
+        next;
+    }
+    # If matching the begining of target environment node
+    if ( $line =~ m/^\s*<$target_envid>\s*$/ ) {
+        $in_target_node = 1;
+        next;
+    }
+    # If matching the end of source environment node
+    if ( $line =~ m/^\s*<\/$target_envid>\s*$/ ) {
+        $in_target_node = 0;
+        next;
+    }
+
+    # Not print empty line and comment line
+    if ( $line !~ m/^\s*$/ && $line !~ m/^\s*#/ ) {
+        if ( $in_source_node == 1 ) {
+            $line = filter_variables($line, $source_envid);
+            push(@source_properties, $line);
+        }
+        if ( $in_target_node == 1 ) {
+            $line = filter_variables($line, $target_envid);
+            push(@target_properties, $line);
+        }
+    }
+}
+
+print $source_fh join("\n", sort( @source_properties ) );
+print $target_fh join("\n", sort( @target_properties ) );
+$source_fh->flush();
+$target_fh->flush();
+
+my $result=`diff $source_fh $target_fh`;
+print $result;
+
+close TOKEN_TABLE_STUBHUB;
+close $source_fh;
+close $target_fh;
+
+exit 0;
