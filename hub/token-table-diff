@@ -255,76 +255,83 @@ sub maybe_log_into_perforce {
 }
 
 #
+# Get the env properties from the token-table file
+#
+sub diff_env_properties {
+    my ( $token_table_stubhub ) = @_;
+
+    open TOKEN_TABLE_STUBHUB, "<$token_table_stubhub" or die $!;
+
+    my $source_fh = new File::Temp( UNLINK => 1 );
+    my $target_fh = new File::Temp( UNLINK => 1 );
+
+    open $source_fh, ">$source_fh" or die $!;
+    open $target_fh, ">$target_fh" or die $!;
+
+    my $in_source_node = 0;
+    my $in_target_node = 0;
+
+    my @source_properties = ();
+    my @target_properties = ();
+
+    while ( my $line = <TOKEN_TABLE_STUBHUB> ) {
+        # If matching the begining of source environment node
+        if ( $line =~ m/^\s*<$source_envid>\s*$/ ) {
+            $in_source_node = 1;
+            next;
+        }
+        # If matching the end of source environment node
+        if ( $line =~ m/^\s*<\/$source_envid>\s*$/ ) {
+            $in_source_node = 0;
+            next;
+        }
+        # If matching the begining of target environment node
+        if ( $line =~ m/^\s*<$target_envid>\s*$/ ) {
+            $in_target_node = 1;
+            next;
+        }
+        # If matching the end of source environment node
+        if ( $line =~ m/^\s*<\/$target_envid>\s*$/ ) {
+            $in_target_node = 0;
+            next;
+        }
+
+        # Not print empty line and comment line
+        if ( $line !~ m/^\s*$/ && $line !~ m/^\s*#/ ) {
+            if ( $in_source_node == 1 ) {
+                my $db_host_id = get_db_connection($source_envid);
+                $line = filter_variables($line, $source_envid, $db_host_id);
+                push(@source_properties, $line);
+            }
+            if ( $in_target_node == 1 ) {
+                my $db_host_id = get_db_connection($target_envid);
+                $line = filter_variables($line, $target_envid, $db_host_id);
+                push(@target_properties, $line);
+            }
+        }
+    }
+
+    print $source_fh join("\n", sort( @source_properties ) );
+    print $target_fh join("\n", sort( @target_properties ) );
+    $source_fh->flush();
+    $target_fh->flush();
+
+    print "$source_envid <==> $target_envid\n";
+    print "-----------------------------------\n";
+    my $result=`/usr/bin/diff -y --suppress-common-lines $source_fh $target_fh`;
+    print $result;
+
+    close TOKEN_TABLE_STUBHUB;
+    close $source_fh;
+    close $target_fh;
+}
+
+#
 # Main
 #
 
 my $token_table_stubhub = check_out_token_table();
-
-open TOKEN_TABLE_STUBHUB, "<$token_table_stubhub" or die $!;
-
-my $source_fh = new File::Temp( UNLINK => 1 );
-my $target_fh = new File::Temp( UNLINK => 1 );
-
-open $source_fh, ">$source_fh" or die $!;
-open $target_fh, ">$target_fh" or die $!;
-
-my $in_source_node = 0;
-my $in_target_node = 0;
-
-my @source_properties = ();
-my @target_properties = ();
-
-while ( my $line = <TOKEN_TABLE_STUBHUB> ) {
-    # If matching the begining of source environment node
-    if ( $line =~ m/^\s*<$source_envid>\s*$/ ) {
-        $in_source_node = 1;
-        next;
-    }
-    # If matching the end of source environment node
-    if ( $line =~ m/^\s*<\/$source_envid>\s*$/ ) {
-        $in_source_node = 0;
-        next;
-    }
-    # If matching the begining of target environment node
-    if ( $line =~ m/^\s*<$target_envid>\s*$/ ) {
-        $in_target_node = 1;
-        next;
-    }
-    # If matching the end of source environment node
-    if ( $line =~ m/^\s*<\/$target_envid>\s*$/ ) {
-        $in_target_node = 0;
-        next;
-    }
-
-    # Not print empty line and comment line
-    if ( $line !~ m/^\s*$/ && $line !~ m/^\s*#/ ) {
-        if ( $in_source_node == 1 ) {
-            my $db_host_id = get_db_connection($source_envid);
-            $line = filter_variables($line, $source_envid, $db_host_id);
-            push(@source_properties, $line);
-        }
-        if ( $in_target_node == 1 ) {
-            my $db_host_id = get_db_connection($target_envid);
-            $line = filter_variables($line, $target_envid, $db_host_id);
-            push(@target_properties, $line);
-        }
-    }
-}
-
-print $source_fh join("\n", sort( @source_properties ) );
-print $target_fh join("\n", sort( @target_properties ) );
-$source_fh->flush();
-$target_fh->flush();
-
-print "$source_envid <==> $target_envid:\n";
-print "-----------------------------------\n";
-my $result=`/usr/bin/diff -y --suppress-common-lines $source_fh $target_fh`;
-print $result;
-
-close TOKEN_TABLE_STUBHUB;
-close $source_fh;
-close $target_fh;
-
+diff_env_properties( $token_table_stubhub );
 clean_up( $token_table_stubhub );
 
 exit 0;
