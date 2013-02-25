@@ -136,8 +136,6 @@ my $target_fh = new File::Temp( UNLINK => 1 );
 #my $source_fh = new File::Temp( UNLINK => 0 );
 #my $target_fh = new File::Temp( UNLINK => 0 );
 
-# TODO add suffix srwd60, or just create these diff files in a temp
-# directory
 open $source_fh, ">$source_fh" or die $!;
 open $target_fh, ">$target_fh" or die $!;
 
@@ -189,7 +187,9 @@ print $target_fh join("\n", sort( @target_properties ) );
 $source_fh->flush();
 $target_fh->flush();
 
-my $result=`diff $source_fh $target_fh`;
+print "$source_envid <==> $target_envid:\n";
+print "-----------------------------------\n";
+my $result=`diff -y --suppress-common-lines $source_fh $target_fh`;
 print $result;
 
 close TOKEN_TABLE_STUBHUB;
