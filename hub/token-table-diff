@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 #
 # Diff between token table properties.
 #
@@ -17,21 +17,16 @@
 #
 
 use strict;
+use warnings;
 
 use lib '/nas/reg/lib/perl';
 
 use Getopt::Long;
+use Readonly;
 use File::Temp qw( tempfile );
-use REG::P4::Util qw(
-                    $P4OPTS
-                    branch_path
-                    delete_dynamic_client
-                    dynamic_client
-                    is_valid_branch
-                    logged_in
-                    p4cmd
-                    );
-use REG::Util qw( mktmpdir rm_rf );
+
+use REG::P4::Util qw( $P4OPTS delete_dynamic_client dynamic_client logged_in p4cmd );
+use REG::Util qw( mktmpdir );
 
 sub clean_die ( @ ) ;
 
@@ -138,52 +133,76 @@ sub get_db_connection {
 }
 
 #
-# Check out token-table from perforce depot
+# Create temp directory
 #
-sub check_out_token_table {
+sub create_temp_directory {
+    my ( $dir_prefix ) = @_;
+    Readonly my $TMP_DIR => "/tmp";
+    my $tmp_directory_token = "$TMP_DIR/$dir_prefix" . '${timestamp}';
+    my $tmp_directory = mktmpdir ({
+            try => $tmp_directory_token,
+            perms => 0750,
+        });
+    return $tmp_directory;
+}
+
+#
+# Check out a file from perforce
+#
+sub check_out_perfoce_file {
+    my ( $file_path ) = @_;
+
     $ENV{ PATH } = ':/usr/local/bin'
         . ':/opt/java/bin'
         . ':/opt/ant/bin';
 
-    my $dynamic_perforce_client;
-    my $PERFORCE_DEFAULT_SERVER_SRW = "perforce.stubcorp.dev";
-    my $PERFORCE_DEFAULT_PORT_NUMBER = "1666";
     defined $ENV{ P4CONFIG } and $ENV{ P4CONFIG } = "";
 
-    my $PERFORCE_CLIENTS_DIRECTORY = "/tmp";
-    my $dynamic_client_try = "$PERFORCE_CLIENTS_DIRECTORY/p4-dynamic-wc-". '${timestamp}';
-    my $DYNAMIC_PERFORCE_CLIENT_ROOT_DIRECTORY = mktmpdir ({
-            try => $dynamic_client_try,
-            perms => 0750,
-        });
-    not defined $DYNAMIC_PERFORCE_CLIENT_ROOT_DIRECTORY and clean_die "could not create root directory of dynamic perforce client;"
-        , " first attempt tried to create '$dynamic_client_try'";
+    my $dynamic_perforce_client;
+    Readonly my $PERFORCE_DEFAULT_SERVER_SRW => "perforce.stubcorp.dev";
+    Readonly my $PERFORCE_DEFAULT_PORT_NUMBER => "1666";
+
+    my $dynamic_perfoce_dir = create_temp_directory( "p4-dynamic-wc-" );
+
+    not defined $dynamic_perfoce_dir and clean_die "Could not create root directory of dynamic perforce client;"
+        , " first attempt tried to create '$dynamic_perfoce_dir'";
 
     $P4OPTS = "-u build -p $PERFORCE_DEFAULT_SERVER_SRW:$PERFORCE_DEFAULT_PORT_NUMBER";
 
     $dynamic_perforce_client = dynamic_client({
             depot   => 'depot',
-            root    => $DYNAMIC_PERFORCE_CLIENT_ROOT_DIRECTORY,
+            root    => $dynamic_perfoce_dir,
         });
 
     $P4OPTS = "$P4OPTS -c $dynamic_perforce_client->{ Client }";
 
     maybe_log_into_perforce();
-
-    sync_files();
-
-
+    sync_perforce_files( "/$file_path" );
     clean_perforce_client( $dynamic_perforce_client );
 
-    return "$DYNAMIC_PERFORCE_CLIENT_ROOT_DIRECTORY/internal/dev/properties/tokenization/token-table-env-stubhub-properties";
+    return "$dynamic_perfoce_dir$file_path";
 }
 
+#
+# Check out token-table from perforce depot
+#
+sub check_out_token_table {
+    Readonly my $TOKEN_TABLE_FILE => "/internal/dev/properties/tokenization/token-table-env-stubhub-properties";
+    my $checked_out_file = check_out_perfoce_file( $TOKEN_TABLE_FILE );
+    return $checked_out_file;
+}
+
+#
+# Clean up the directory
+#
 sub clean_up {
     my ( $temp_dir ) = @_;
     `/bin/rm -rf $temp_dir`;
-    #rm_rf( $dynamic_client_try );
 }
 
+#
+# Clean up the perforce client
+#
 sub clean_perforce_client {
     my ( $dynamic_perforce_client, ) = @_;
     if ( defined $dynamic_perforce_client ) {
@@ -194,9 +213,14 @@ sub clean_perforce_client {
     }
 }
 
-sub sync_files {
+#
+# Sync files from perforce depot
+#
+sub sync_perforce_files {
+    my ( $depot_file ) = @_;
+
     my $func = ( caller 0 )[ 3 ];
-    my $ESP_TOKEN_TABLE_DEPOT_PATH="//internal/dev/properties/tokenization/token-table-env-stubhub-properties";
+    my $ESP_TOKEN_TABLE_DEPOT_PATH="$depot_file";
 
     my $cmd = p4cmd( "sync $ESP_TOKEN_TABLE_DEPOT_PATH" );
 
@@ -211,10 +235,11 @@ sub sync_files {
     return;
 }
 
+#
+# Login to perforce if necessary
+#
 sub maybe_log_into_perforce {
-
     my $BATCHMODE = ( not -t );
-
     # log into perforce if not already logged in
     if ( not logged_in() ) {
         if ( $BATCHMODE ) {
@@ -223,7 +248,6 @@ sub maybe_log_into_perforce {
             system p4cmd( 'login' );
         }
     }
-
     my $status = $? >> 8;
     $status != 0 and clean_die "could not log into perforce using => $P4OPTS";
 
