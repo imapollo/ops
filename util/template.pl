@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 #
 # <Brief description of the script>
 # <More information about the script>
@@ -17,6 +17,7 @@
 #
 
 use strict;
+use warnings;
 use Getopt::Long;
 
 # Get options
