@@ -17,8 +17,23 @@
 #
 
 use strict;
+
+use lib '/nas/reg/lib/perl';
+
 use Getopt::Long;
 use File::Temp qw( tempfile );
+use REG::P4::Util qw(
+                    $P4OPTS
+                    branch_path
+                    delete_dynamic_client
+                    dynamic_client
+                    is_valid_branch
+                    logged_in
+                    p4cmd
+                    );
+use REG::Util qw( mktmpdir rm_rf );
+
+sub clean_die ( @ ) ;
 
 # Get options
 my $show_usage = qw{};
@@ -123,18 +138,108 @@ sub get_db_connection {
 }
 
 #
+# Check out token-table from perforce depot
+#
+sub check_out_token_table {
+    $ENV{ PATH } = ':/usr/local/bin'
+        . ':/opt/java/bin'
+        . ':/opt/ant/bin';
+
+    my $dynamic_perforce_client;
+    my $PERFORCE_DEFAULT_SERVER_SRW = "perforce.stubcorp.dev";
+    my $PERFORCE_DEFAULT_PORT_NUMBER = "1666";
+    defined $ENV{ P4CONFIG } and $ENV{ P4CONFIG } = "";
+
+    my $PERFORCE_CLIENTS_DIRECTORY = "/tmp";
+    my $dynamic_client_try = "$PERFORCE_CLIENTS_DIRECTORY/p4-dynamic-wc-". '${timestamp}';
+    my $DYNAMIC_PERFORCE_CLIENT_ROOT_DIRECTORY = mktmpdir ({
+            try => $dynamic_client_try,
+            perms => 0750,
+        });
+    not defined $DYNAMIC_PERFORCE_CLIENT_ROOT_DIRECTORY and clean_die "could not create root directory of dynamic perforce client;"
+        , " first attempt tried to create '$dynamic_client_try'";
+
+    $P4OPTS = "-u build -p $PERFORCE_DEFAULT_SERVER_SRW:$PERFORCE_DEFAULT_PORT_NUMBER";
+
+    $dynamic_perforce_client = dynamic_client({
+            depot   => 'depot',
+            root    => $DYNAMIC_PERFORCE_CLIENT_ROOT_DIRECTORY,
+        });
+
+    $P4OPTS = "$P4OPTS -c $dynamic_perforce_client->{ Client }";
+
+    maybe_log_into_perforce();
+
+    sync_files();
+
+
+    clean_perforce_client( $dynamic_perforce_client );
+
+    return "$DYNAMIC_PERFORCE_CLIENT_ROOT_DIRECTORY/internal/dev/properties/tokenization/token-table-env-stubhub-properties";
+}
+
+sub clean_up {
+    my ( $temp_dir ) = @_;
+    `/bin/rm -rf $temp_dir`;
+    #rm_rf( $dynamic_client_try );
+}
+
+sub clean_perforce_client {
+    my ( $dynamic_perforce_client, ) = @_;
+    if ( defined $dynamic_perforce_client ) {
+        delete_dynamic_client({
+            client => $dynamic_perforce_client,
+            p4opts => $P4OPTS,
+        });
+    }
+}
+
+sub sync_files {
+    my $func = ( caller 0 )[ 3 ];
+    my $ESP_TOKEN_TABLE_DEPOT_PATH="//internal/dev/properties/tokenization/token-table-env-stubhub-properties";
+
+    my $cmd = p4cmd( "sync $ESP_TOKEN_TABLE_DEPOT_PATH" );
+
+    my @results = qx{ $cmd 2>&1 };
+    my $status = $? >> 8;
+
+    my $results = join( "", @results );
+
+    $status != 0 and clean_die "cmd returned non-zero status; cmd => '$cmd';",
+        " status => $status; output => '$results'";
+
+    return;
+}
+
+sub maybe_log_into_perforce {
+
+    my $BATCHMODE = ( not -t );
+
+    # log into perforce if not already logged in
+    if ( not logged_in() ) {
+        if ( $BATCHMODE ) {
+            clean_die "not logged into perforce; using => $P4OPTS";
+        } else {
+            system p4cmd( 'login' );
+        }
+    }
+
+    my $status = $? >> 8;
+    $status != 0 and clean_die "could not log into perforce using => $P4OPTS";
+
+    return;
+}
+
+#
 # Main
 #
 
-# TODO Get token table from P4.
-my $token_table_stubhub="/nas/home/minjzhang/token-table-env-stubhub-properties";
+my $token_table_stubhub = check_out_token_table();
 
 open TOKEN_TABLE_STUBHUB, "<$token_table_stubhub" or die $!;
 
 my $source_fh = new File::Temp( UNLINK => 1 );
 my $target_fh = new File::Temp( UNLINK => 1 );
-#my $source_fh = new File::Temp( UNLINK => 0 );
-#my $target_fh = new File::Temp( UNLINK => 0 );
 
 open $source_fh, ">$source_fh" or die $!;
 open $target_fh, ">$target_fh" or die $!;
@@ -189,11 +294,13 @@ $target_fh->flush();
 
 print "$source_envid <==> $target_envid:\n";
 print "-----------------------------------\n";
-my $result=`diff -y --suppress-common-lines $source_fh $target_fh`;
+my $result=`/usr/bin/diff -y --suppress-common-lines $source_fh $target_fh`;
 print $result;
 
 close TOKEN_TABLE_STUBHUB;
 close $source_fh;
 close $target_fh;
+
+clean_up( $token_table_stubhub );
 
 exit 0;
