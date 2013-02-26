@@ -7,6 +7,7 @@
 # Options:
 #  -e | --env=..       The environment MQM need to be purged. For
 #                      example: srwd90.
+#  -l | --list         Only list the queues have pending messages.
 #  -d | --debug        Print debug messages.
 #
 # Author: minjzhang@ebay.com
@@ -15,7 +16,9 @@
 options=$@
 
 envid=""
+only_list=0
 debug_level=0
+check_failed=0
 
 #
 # Usage
@@ -30,6 +33,7 @@ Usage: purge_mqm [options]
 Options:
   -e | --env=..       The environment MQM need to be purged. For
                       example: srwd90.
+  -l | --list         Only list the queues have pending messages.
   -d | --debug        Print debug messages.
 EOF
 }
@@ -37,7 +41,7 @@ EOF
 #
 # Get options
 #
-OPTS=`getopt -o e:d -l env:,debug -- $options`
+OPTS=`getopt -o e:ld -l env:,list,debug -- $options`
 if [ $? != 0 ]; then
     echo "Error: Unrecognized parameters."
     _usage
@@ -49,6 +53,7 @@ eval set -- "$OPTS"
 while true ; do
     case "$1" in
         -e | --env) envid=${2// }; shift 2;;
+        -l | --list) only_list=1; shift;;
         -d | --debug) debug_level=1; shift;;
         --) shift; break;;
     esac
@@ -102,9 +107,14 @@ do
         elif [[ "$pending_msg_number" == "</a></td>" ]]; then
             _print_debug_msg "[debug] Cannot determine for: $queue_name"
         else
-            echo "Perge $pending_msg_number pending messages for: $queue_name"
-            purge_url="http://${envid}mqm001.${envid}.com:8161/admin/purgeDestination.action?JMSDestination=${queue_name}&JMSDestinationType=queue"
-            wget -O /dev/null $purge_url 2> /dev/null
+            if [[ "$only_list" == 0 ]]; then
+                echo "Perge $pending_msg_number pending messages for: $queue_name"
+                purge_url="http://${envid}mqm001.${envid}.com:8161/admin/purgeDestination.action?JMSDestination=${queue_name}&JMSDestinationType=queue"
+                wget -O /dev/null $purge_url 2> /dev/null
+            else
+                check_failed=1
+                echo "Need to perge $pending_msg_number pending messages for: $queue_name"
+            fi
         fi
 
         is_queue_name=1
@@ -112,5 +122,9 @@ do
 done
 
 rm $tmp_queue_page $tmp_queue_page.new
+
+if [[ "$check_failed" == 1 ]]; then
+    exit 1
+fi
 
 exit 0
