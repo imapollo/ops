@@ -276,23 +276,27 @@ sub diff_env_properties {
 
     while ( my $line = <TOKEN_TABLE_STUBHUB> ) {
         # If matching the begining of source environment node
+        my $on_node_boundary = 0;
         if ( $line =~ m/^\s*<$source_envid>\s*$/ ) {
             $in_source_node = 1;
-            next;
+            $on_node_boundary = 1;
         }
         # If matching the end of source environment node
         if ( $line =~ m/^\s*<\/$source_envid>\s*$/ ) {
             $in_source_node = 0;
-            next;
+            $on_node_boundary = 1;
         }
         # If matching the begining of target environment node
         if ( $line =~ m/^\s*<$target_envid>\s*$/ ) {
             $in_target_node = 1;
-            next;
+            $on_node_boundary = 1;
         }
         # If matching the end of source environment node
         if ( $line =~ m/^\s*<\/$target_envid>\s*$/ ) {
             $in_target_node = 0;
+            $on_node_boundary = 1;
+        }
+        if ( $on_node_boundary == 1 ) {
             next;
         }
 
