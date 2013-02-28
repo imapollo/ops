@@ -83,39 +83,93 @@ if ( ! defined $source_envid || ! defined $target_envid ) {
 # Filter variables related to environment
 #
 sub filter_variables {
-    my ( $line, $envid, $db_host_id ) = @_;
+    my ( $line, $env_type, $envid, $db_host_id ) = @_;
     $line =~ s/\s*//g;
     $line =~ s/$envid/<ENVID>/g;
-    if ( $db_host_id == "08" ) {
-        $line =~ s/\$<delphix_host01>/<DELPHIX_HOST>/;
-        $envid =~ s/srw[de]([0-9]+)/$1/;
-        $line =~ s/\$<delphix_db_prefix>$envid/<DELPHIX_SID>/;
-    }
-    if ( $db_host_id == "16" ) {
-        $line =~ s/\$<delphix_host02>/<DELPHIX_HOST>/;
-        $envid =~ s/srw[de]([0-9]+)/$1/;
-        $line =~ s/\$<delphix_db_prefix_16>$envid/<DELPHIX_SID>/;
-    }
-    if ( $db_host_id == "19" ) {
-        $line =~ s/\$<delphix_host03>/<DELPHIX_HOST>/;
-        $envid =~ s/srw[de]([0-9]+)/$1/;
-        $line =~ s/\$<delphix_db_prefix_19>$envid/<DELPHIX_SID>/;
+    if ( $env_type eq "srwd" ) {
+        if ( $db_host_id == "08" ) {
+            $line =~ s/\$<delphix_host01>/<DELPHIX_HOST>/;
+            $envid =~ s/srw[de]([0-9]+)/$1/;
+            $line =~ s/\$<delphix_db_prefix>$envid/<DELPHIX_SID>/;
+        }
+        if ( $db_host_id == "16" ) {
+            $line =~ s/\$<delphix_host02>/<DELPHIX_HOST>/;
+            $envid =~ s/srw[de]([0-9]+)/$1/;
+            $line =~ s/\$<delphix_db_prefix_16>$envid/<DELPHIX_SID>/;
+        }
+        if ( $db_host_id == "19" ) {
+            $line =~ s/\$<delphix_host03>/<DELPHIX_HOST>/;
+            $envid =~ s/srw[de]([0-9]+)/$1/;
+            $line =~ s/\$<delphix_db_prefix_19>$envid/<DELPHIX_SID>/;
+        }
+    } elsif ( $env_type eq "srwe" ) {
+        if ( $envid eq "srwe01" ) {
+            $line =~ s/\$<db17_pe>/<DELPHIX_SID>/;
+        }
+        if ( $envid eq "srwe02" ) {
+            $line =~ s/\$<db17_pe02>/<DELPHIX_SID>/;
+        }
+        if ( $envid eq "srwe03" ) {
+            $line =~ s/\$<db06_pe03>/<DELPHIX_SID>/;
+        }
+        if ( $envid eq "srwe04" ) {
+            $line =~ s/\$<db18_pe>/<DELPHIX_SID>/;
+        }
+        if ( $envid eq "srwe05" ) {
+            $line =~ s/\$<db18_pe05>/<DELPHIX_SID>/;
+        }
+        if ( $envid eq "srwe06" ) {
+            $line =~ s/\$<db06_pe06>/<DELPHIX_SID>/;
+        }
+        if ( $db_host_id == "06" ) {
+            $line =~ s/\$<db03_host01>/<DELPHIX_HOST>/;
+        }
+        if ( $db_host_id == "17" ) {
+            $line =~ s/\$<db17_host01>/<DELPHIX_HOST>/;
+        }
+        if ( $db_host_id == "18" ) {
+            $line =~ s/\$<db18_host01>/<DELPHIX_HOST>/;
+        }
     }
 
     return $line;
 }
 
 #
+# Get environemtn type
+#
+sub get_env_type {
+    my ( $envid ) = @_;
+    my $env_type = qw{};
+
+    if ( $envid !~ m/srw[de].*/ ) {
+        print "Error: the environment id is wrong: $envid";
+        usage();
+        exit 1;
+    } else {
+        if ( $envid =~ m/srwd.*/ ) {
+            $env_type = "srwd";
+            return $env_type;
+        } elsif ( $envid =~ m/srwe.*/ ) {
+            $env_type = "srwe";
+            return $env_type;
+        }
+    }
+}
+
+#
 # Get database connection information
-# TODO how to get PE environment db connection
 #
 sub get_db_connection {
-    my ( $envid ) = @_;
-    if ( $envid !~ m/srwd.*/ ) {
-        return;
+    my ( $envid, $env_type ) = @_;
+    my $db_instance = qw{};
+    if ( $env_type eq "srwd" ) {
+        $envid =~ s/srwd([0-9]+)/$1/;
+        $db_instance = "DE$envid";
+    } elsif ( $env_type eq "srwe" ) {
+        $envid =~ s/srwe([0-9]+)/$1/;
+        $db_instance = "PE$envid";
     }
-    $envid =~ s/srwd([0-9]+)/$1/;
-    my $db_instance = "DE$envid";
 
     my $tnsnames="/nas/home/oracle/OraHome/network/admin/tnsnames.ora";
     open TNSNAMES_FH, "<$tnsnames" or die $!;
@@ -274,6 +328,11 @@ sub diff_env_properties {
     my @source_properties = ();
     my @target_properties = ();
 
+    my $source_env_type = get_env_type( $source_envid );
+    my $target_env_type = get_env_type( $target_envid );
+    my $source_db_host_id = get_db_connection( $source_envid, $source_env_type );
+    my $target_db_host_id = get_db_connection( $target_envid, $target_env_type );
+
     while ( my $line = <TOKEN_TABLE_STUBHUB> ) {
         # If matching the begining of source environment node
         my $on_node_boundary = 0;
@@ -303,13 +362,11 @@ sub diff_env_properties {
         # Not print empty line and comment line
         if ( $line !~ m/^\s*$/ && $line !~ m/^\s*#/ ) {
             if ( $in_source_node == 1 ) {
-                my $db_host_id = get_db_connection($source_envid);
-                $line = filter_variables($line, $source_envid, $db_host_id);
+                $line = filter_variables($line, $source_env_type, $source_envid, $source_db_host_id);
                 push(@source_properties, $line);
             }
             if ( $in_target_node == 1 ) {
-                my $db_host_id = get_db_connection($target_envid);
-                $line = filter_variables($line, $target_envid, $db_host_id);
+                $line = filter_variables($line, $source_env_type, $target_envid, $target_db_host_id);
                 push(@target_properties, $line);
             }
         }
