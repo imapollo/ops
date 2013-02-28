@@ -181,5 +181,6 @@ if [[ "$email_address" != "" ]]; then
     query_email_logs_in_db
     query_email_logs_in_job_jboss
 fi
+print "Check DB partition.\n";
 
 exit 0
