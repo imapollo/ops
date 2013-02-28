@@ -30,6 +30,18 @@ my $options_okay = GetOptions (
    'h|help'      => \$show_usage,
 );
 
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
 if ( $show_usage ) {
    usage();
 }
