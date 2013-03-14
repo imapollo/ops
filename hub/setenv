@@ -81,12 +81,20 @@ fi
 #
 # Set roles
 #
-roles=`$BIN/getroles`
+DEV_HOSTS=/nas/reg/etc/dev-qa-hosts
+roles=`grep ${ENVPREFIX}${ENVID} ${DEV_HOSTS} | sort | uniq`
 for ROLE in $roles
 do
-    export $ROLE=${ENVPREFIX}${ENVID}${ROLE}001.${ENVPREFIX}${ENVID}.com
-    export ${ROLE}jmx=http://${ENVPREFIX}${ENVID}${ROLE}001.${ENVPREFIX}${ENVID}.com/jmx-console/
+    shortcut=`echo $ROLE | sed "s/${ENVPREFIX}${ENVID}\(.*\)001.*/\1/"`
+    shortcut_long=`echo $ROLE | sed "s/${ENVPREFIX}${ENVID}\(.*00[0-9]\).*/\1/"`
+    if echo $shortcut | grep -q "^[a-z]\+$"; then
+        export $shortcut=$ROLE
+        export ${shortcut}jmx=http://${ROLE}/jmx-console/
+    fi
+    export $shortcut_long=$ROLE
+    export ${shortcut_long}jmx=http://${ROLE}/jmx-console/
 done
+return 0
 
 #
 # Set sanity check
