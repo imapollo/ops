@@ -86,6 +86,7 @@ sub filter_variables {
     my ( $line, $env_type, $envid, $db_host_id ) = @_;
     $line =~ s/\s*//g;
     $line =~ s/$envid/<ENVID>/g;
+
     if ( $env_type eq "srwd" ) {
         if ( $db_host_id == "08" ) {
             $line =~ s/\$<delphix_host01>/<DELPHIX_HOST>/;
@@ -366,7 +367,7 @@ sub diff_env_properties {
                 push(@source_properties, $line);
             }
             if ( $in_target_node == 1 ) {
-                $line = filter_variables($line, $source_env_type, $target_envid, $target_db_host_id);
+                $line = filter_variables($line, $target_env_type, $target_envid, $target_db_host_id);
                 push(@target_properties, $line);
             }
         }
