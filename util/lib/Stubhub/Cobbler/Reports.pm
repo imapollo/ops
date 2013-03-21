@@ -97,13 +97,13 @@ sub get_system_profile {
   $profile{"power_type"}      = get_system_value( "power_type", @output );
   $profile{"profile"}         = get_system_value( "profile", @output );
   $profile{"system_name"}     = get_system_value( "system_name", @output );
+  $profile{"interfaces"}      = get_network_interfaces( @output );
 
   # name_servers : ['10.80.10.175', '10.80.10.176']
   # eth0
   # eth0:0
   # havnic0
   # imaging
-  get_network_interfaces( @output );
 
   return %profile;
 }
@@ -114,11 +114,11 @@ sub get_system_profile {
 sub get_network_interfaces {
   my ( @settings ) = @_;
   my @interface_names = grep /^mac_address_/, @settings;
-  print @interface_names;
   @interface_names = map { local $_ = $_; s/^mac_address_(\S*)\s*:.*$/$1/; $_ } @interface_names;
 
   my %interfaces = ();
   foreach my $interface_name ( @interface_names ) {
+    chomp $interface_name;
     $interfaces{"$interface_name"} = get_network_interface_values($interface_name, @settings);
   }
   return %interfaces;
@@ -129,11 +129,11 @@ sub get_network_interfaces {
 sub get_network_interface_values {
   my ( $interface, @settings ) = @_;
   my %interface_values = (
-    "ip_address" => get_system_value("ip_address_$interface");
-    "mac_address" => get_system_value("mac_address_$interface");
-    "netmask" => get_system_value("netmask_$interface");
-    "static" => get_system_value("static_$interface");
-    "virt_bridge" => get_system_value("virt_bridge_$interface");
+    'ip_address'  => get_system_value("ip_address_$interface", @settings),
+    'mac_address' => get_system_value("mac_address_$interface", @settings),
+    'netmask'     => get_system_value("netmask_$interface", @settings),
+    'static'      => get_system_value("static_$interface", @settings),
+    'virt_bridge' => get_system_value("virt_bridge_$interface", @settings)
   );
   return %interface_values;
 }
@@ -143,8 +143,12 @@ sub get_network_interface_values {
 #
 sub get_system_value {
   my ( $key, @settings ) = @_;
-  my @values = grep /^$key/, @settings;
+  my @values = grep /^$key\s+:/, @settings;
   my $value = $values[0];
-  $value =~ s/^$key\s+:\s+(\S*)\s*$/$1/;
+  if ( $value =~ /^$key\s+:\s+\S+\s*$/ ) {
+    $value =~ s/^$key\s+:\s+(\S*)\s*$/$1/;
+  } else {
+    $value = qw();
+  }
   return $value;
 }
