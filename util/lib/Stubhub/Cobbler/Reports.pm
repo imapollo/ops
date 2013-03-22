@@ -99,12 +99,6 @@ sub get_system_profile {
   $profile{"system_name"}     = get_system_value( "system_name", @output );
   $profile{"interfaces"}      = get_network_interfaces( @output );
 
-  # name_servers : ['10.80.10.175', '10.80.10.176']
-  # eth0
-  # eth0:0
-  # havnic0
-  # imaging
-
   return %profile;
 }
 
