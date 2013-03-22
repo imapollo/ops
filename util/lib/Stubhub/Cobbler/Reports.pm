@@ -121,7 +121,7 @@ sub get_network_interfaces {
     chomp $interface_name;
     $interfaces{"$interface_name"} = get_network_interface_values($interface_name, @settings);
   }
-  return %interfaces;
+  return \%interfaces;
 }
 
 #
@@ -135,7 +135,7 @@ sub get_network_interface_values {
     'static'      => get_system_value("static_$interface", @settings),
     'virt_bridge' => get_system_value("virt_bridge_$interface", @settings)
   );
-  return %interface_values;
+  return \%interface_values;
 }
 
 #

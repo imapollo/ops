@@ -1,0 +1,92 @@
+#!/usr/bin/perl
+#
+# <Brief description of the script>
+# <More information about the script>
+#
+# Usage: <script> [options]
+#
+# Options:
+#  -a | --another           Another parameter.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  <script> ..
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Getopt::Long;
+use Data::Dumper;
+use Stubhub::Cobbler::Reports qw ( 
+                                    list_systems
+                                    list_matched_systems
+                                    get_readable_system_profile
+                                    get_system_profile
+                                 );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $another = qw{};
+my $options_okay = GetOptions (
+   'a|another=s' => \$another,
+   'v|verbose'   => \$show_verbose,
+   'h|help'      => \$show_usage,
+);
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+   usage();
+}
+
+#
+# Usage
+#
+sub usage {
+   print <<END_OF_HELP
+<copy from header>
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $another) {
+    print "Error: The pamameter '-a' must be set.\n";
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+
+# list_matched_systems( "srwe06" );
+# get_readable_system_profile( "srwe06mqm001.srwe06.com");
+# my $name = get_system_name("srwe06mqm001.srwe06.com");
+# print "$name\n";
+my %profile = get_system_profile("srwe06mqm001.srwe06.com");
+# my %profile = get_system_profile("srwd26mqm001.srwd6.com");
+# print $profile{"system_name"} . "\n";
+# print $profile{'interfaces'}{'imaging'}{'mac_address'} . "\n";
+print Dumper(\%profile);
+
+exit 0;
