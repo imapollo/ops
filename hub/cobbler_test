@@ -24,10 +24,10 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 use Getopt::Long;
 use Data::Dumper;
 use Stubhub::Cobbler::Reports qw ( 
-                                    list_systems
-                                    list_matched_systems
-                                    get_readable_system_profile
+                                    get_systems
+                                    get_matched_systems
                                     get_system_profile
+                                    print_readable_system_profile
                                  );
 
 # Get options

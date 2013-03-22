@@ -1,5 +1,9 @@
 package Stubhub::Cobbler::Reports;
 
+#
+# Get information from cobbler.
+#
+
 use strict;
 use warnings;
 
@@ -18,10 +22,10 @@ BEGIN {
   @ISA          = qw( Exporter );
   @EXPORT       = qw();
   @EXPORT_OK    = qw(
-                      &list_systems
-                      &list_matched_systems
-                      &get_readable_system_profile
+                      &get_systems
+                      &get_matched_systems
                       &get_system_profile
+                      &print_readable_system_profile
                     );
   %EXPORT_TAGS  = ();
 }
@@ -51,31 +55,19 @@ sub get_systems {
 }
 
 #
-# List all the systems in cobbler.
+# Get all the cobbler systems which match the pattern.
 #
-sub list_systems {
-  my @systems = get_systems();
-  foreach my $system ( @systems ) {
-    print "$system\n";
-  }
-}
-
-#
-# List all the cobbler systems which match the pattern.
-#
-sub list_matched_systems {
+sub get_matched_systems {
   my ( $pattern ) = @_;
   my @systems =  get_systems();
   my @matched_systems = grep /$pattern/, @systems;
-  foreach my $system ( @matched_systems ) {
-    print "$system\n";
-  }
+  return @matched_systems;
 }
 
 #
 # Show readable settings for specific system.
 #
-sub get_readable_system_profile {
+sub print_readable_system_profile {
   my ( $system ) = @_;
   my ( $status, @output ) = ssh_cmd($COBBLER_SERVER, "$COBBLER_SHOW_SYSTEM_PROFILE$system");
   print @output;
