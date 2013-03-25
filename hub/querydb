@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# Query the database with specified SQL statement.
+#
+# Usage
+#  querydb "SELECT ..."
+#
+# Author: minjzhang@ebay.com
+#
+
+. /nas/home/minjzhang/bin/base
+. $BIN/setora
+
+if [ "$ENVID" == "" ]; then
+    echo "Please set environment variables by 'go' at first."
+    exit 1
+fi
+
+DB_SERVICE_NAME=`$BIN/getdb -s`
+DB_USER="stub"
+DB_PASSWORD="dstub"
+DB_CONNECTION=${DB_USER}/${DB_PASSWORD}@${DB_SERVICE_NAME}
+
+sql_select_statement="select * from email_logs where user_id = (select id from users where default_email = 'seller20121225011410@testemail.co.uk');"
+
+echo "set wrap off
+set colsep ' | '
+set linesize 10000;
+$sql_select_statement" > tmp_query.sql
+sqlplus ${DB_CONNECTION} < tmp_query.sql | grep -v "^SQL>" | sed 's/^--.*/-----------------------------------------/'
+rm tmp_query.sql
+
+exit 0
