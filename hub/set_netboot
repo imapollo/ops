@@ -1,0 +1,12 @@
+#!/bin/bash
+
+hostname=$2
+
+if [ "$1" = "y" ]
+then
+    echo "set netboot to Yes for $hostname"
+    sudo cobbler system edit --name $hostname --netboot="Y"
+else
+    echo "set netboot to No for $hostname"
+    sudo cobbler system edit --name $hostname --netboot="N"
+fi
