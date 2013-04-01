@@ -1,0 +1,156 @@
+#!/usr/bin/perl
+#
+# Validate the BIG-IP settings for specified environment.
+# Following items will be checked:
+#  - Virtual IP
+#  - Pool
+#  - Pool Members
+#  - iRules
+#
+# Usage: validate_bigip [options]
+#
+# Options:
+#  -e | --env               Specify the environment ID. For example: srwd76.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  validate_bigip -e srwd76
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Getopt::Long;
+use Data::Dumper;
+use BigIP::iControl qw ( 
+                            get_node_list
+                            get_pool_list
+                            get_vs_list
+                            get_vs_destination
+                       );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $envid = qw{};
+my $options_okay = GetOptions (
+   'e|env=s'     => \$envid,
+   'v|verbose'   => \$show_verbose,
+   'h|help'      => \$show_usage,
+);
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+}
+
+#
+# Usage
+#
+sub usage {
+   print <<END_OF_HELP
+Validate the BIG-IP settings for specified environment.
+Following items will be checked:
+ - Virtual IP
+ - Pool
+ - Pool Members
+ - iRules
+
+Usage: validate_bigip [options]
+
+Options:
+ -e | --env               Specify the environment ID. For example: srwd76.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ validate_bigip -e srwd76
+
+END_OF_HELP
+}
+
+#
+# Get all the virtual servers.
+#
+sub get_virtual_servers {
+    my ( $iControl ) = @_;
+    my @virtual_servers = $iControl->get_vs_list();
+    return @virtual_servers;
+}
+
+#
+# Get environment specific virtual servers.
+#
+sub get_env_virtual_servers {
+    my ( $iControl, $pattern ) = @_;
+    my @full_virtual_servers = get_virtual_servers( $iControl );
+    my @virtual_servers = grep /$pattern/, @full_virtual_servers;
+    return @virtual_servers;
+}
+
+#
+# Validate virtual servers.
+#
+sub validate_virtual_servers {
+    my ( $iControl ) =@_;
+    my @virtual_servers = get_virtual_servers( $iControl );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $vs_destination = $iControl->get_vs_destination($virtual_server);
+        print "$virtual_server: $vs_destination\n";
+    }
+}
+
+#
+# Validate virtual servers for specified environment.
+#
+sub validate_env_virtual_servers {
+    my ( $iControl, $pattern ) =@_;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $vs_destination = $iControl->get_vs_destination($virtual_server);
+        print "$virtual_server: $vs_destination\n";
+    }
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $envid) {
+    print "Error: The pamameter '-e' must be set.\n";
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+
+our $iControl = BigIP::iControl->new(
+                                server => 'srwd00lba042-cl.stubcorp.dev',
+                                username => 'svcacctrelmgt',
+                                password => 'R8bbitSt3w',
+                                port     => 443,
+                                proto    => 'https'
+                            );
+
+# validate_virtual_servers( $iControl );
+validate_env_virtual_servers( $iControl, $envid );
+#print join "\n", ($iControl->get_pool_list());
+
+exit 0;
