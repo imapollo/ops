@@ -91,7 +91,7 @@ END_OF_HELP
 sub get_virtual_servers {
     my ( $iControl ) = @_;
     my @virtual_servers = $iControl->get_vs_list();
-    return @virtual_servers;
+    return sort @virtual_servers;
 }
 
 #
@@ -110,7 +110,7 @@ sub get_env_virtual_servers {
 sub get_hostname_from_ip {
     my ( $ip_address ) = @_;
     $ip_address =~ s/(.*):.*/$1/;
-    my $hostnames = `nslookup $ip_address | grep name | cut -d" " -f3 | sort`;
+    my $hostnames = `nslookup $ip_address | grep name | cut -d" " -f3`;
     chomp $hostnames;
     $hostnames =~ s/\n/,/g;
     return $hostnames;
@@ -143,6 +143,28 @@ sub validate_env_virtual_servers {
 }
 
 #
+# Validate default pool for specified environment.
+#
+sub validate_env_default_pool {
+    my ( $iControl, $pattern ) =@_;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $default_pool_name = $iControl->get_default_pool_name($virtual_server);
+        my $pool_name = $$default_pool_name[0];
+        print "$virtual_server: $pool_name\n";
+        if ( $pool_name ne "" ) {
+            print "Members:\n";
+            foreach my $member ( $iControl->get_pool_members($pool_name) ) {
+                my $ip_address = $member;
+                $ip_address =~ s/(.*):.*/$1/;
+                my $hostnames = get_hostname_from_ip($ip_address);
+                print "$hostnames $member\n";
+            }
+        }
+    }
+}
+
+#
 # Parameter validation
 #
 if ( ! defined $envid) {
@@ -154,8 +176,7 @@ if ( ! defined $envid) {
 #
 # Main
 #
-
-our $iControl = BigIP::iControl->new(
+my $iControl = BigIP::iControl->new(
                                 server => 'srwd00lba042-cl.stubcorp.dev',
                                 username => 'svcacctrelmgt',
                                 password => 'R8bbitSt3w',
@@ -164,7 +185,8 @@ our $iControl = BigIP::iControl->new(
                             );
 
 # validate_virtual_servers( $iControl );
-validate_env_virtual_servers( $iControl, $envid );
+# validate_env_virtual_servers( $iControl, $envid );
+validate_env_default_pool( $iControl, $envid );
 #print join "\n", ($iControl->get_pool_list());
 
 exit 0;
