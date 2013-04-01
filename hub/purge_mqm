@@ -108,12 +108,12 @@ do
             _print_debug_msg "[debug] Cannot determine for: $queue_name"
         else
             if [[ "$only_list" == 0 ]]; then
-                echo "Perge $pending_msg_number pending messages for: $queue_name"
+                echo "Purging $pending_msg_number pending messages for: $queue_name"
                 purge_url="http://${envid}mqm001.${envid}.com:8161/admin/purgeDestination.action?JMSDestination=${queue_name}&JMSDestinationType=queue"
                 wget -O /dev/null $purge_url 2> /dev/null
             else
                 check_failed=1
-                echo "Need to perge $pending_msg_number pending messages for: $queue_name"
+                echo "Need to purge $pending_msg_number pending messages for: $queue_name"
             fi
         fi
 
