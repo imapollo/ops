@@ -27,12 +27,7 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Getopt::Long;
 use Data::Dumper;
-use BigIP::iControl qw ( 
-                            get_node_list
-                            get_pool_list
-                            get_vs_list
-                            get_vs_destination
-                       );
+use BigIP::iControl;
 
 # Get options
 my $show_usage = qw{};
@@ -176,6 +171,7 @@ if ( ! defined $envid) {
 #
 # Main
 #
+# TODO add other lba DEV/PE servers
 my $iControl = BigIP::iControl->new(
                                 server => 'srwd00lba042-cl.stubcorp.dev',
                                 username => 'svcacctrelmgt',
@@ -184,9 +180,7 @@ my $iControl = BigIP::iControl->new(
                                 proto    => 'https'
                             );
 
-# validate_virtual_servers( $iControl );
-# validate_env_virtual_servers( $iControl, $envid );
+validate_env_virtual_servers( $iControl, $envid );
 validate_env_default_pool( $iControl, $envid );
-#print join "\n", ($iControl->get_pool_list());
 
 exit 0;
