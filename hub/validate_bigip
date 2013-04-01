@@ -105,6 +105,18 @@ sub get_env_virtual_servers {
 }
 
 #
+# Get the hostname from IP address (nslookup).
+#
+sub get_hostname_from_ip {
+    my ( $ip_address ) = @_;
+    $ip_address =~ s/(.*):.*/$1/;
+    my $hostnames = `nslookup $ip_address | grep name | cut -d" " -f3 | sort`;
+    chomp $hostnames;
+    $hostnames =~ s/\n/,/g;
+    return $hostnames;
+}
+
+#
 # Validate virtual servers.
 #
 sub validate_virtual_servers {
@@ -112,7 +124,8 @@ sub validate_virtual_servers {
     my @virtual_servers = get_virtual_servers( $iControl );
     foreach my $virtual_server ( @virtual_servers ) {
         my $vs_destination = $iControl->get_vs_destination($virtual_server);
-        print "$virtual_server: $vs_destination\n";
+        my $vs_hostname = get_hostname_from_ip($vs_destination);
+        print "$virtual_server: $vs_hostname $vs_destination\n";
     }
 }
 
@@ -124,7 +137,8 @@ sub validate_env_virtual_servers {
     my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
     foreach my $virtual_server ( @virtual_servers ) {
         my $vs_destination = $iControl->get_vs_destination($virtual_server);
-        print "$virtual_server: $vs_destination\n";
+        my $vs_hostname = get_hostname_from_ip($vs_destination);
+        print "$virtual_server: $vs_hostname $vs_destination\n";
     }
 }
 
