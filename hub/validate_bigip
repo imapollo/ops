@@ -24,7 +24,9 @@ use strict;
 use warnings;
 
 use lib '/nas/home/minjzhang/ops/util/lib';
+use lib '/nas/reg/lib/perl';
 
+use Readonly;
 use Getopt::Long;
 use Data::Dumper;
 use BigIP::iControl;
@@ -95,7 +97,7 @@ sub get_virtual_servers {
 sub get_env_virtual_servers {
     my ( $iControl, $pattern ) = @_;
     my @full_virtual_servers = get_virtual_servers( $iControl );
-    my @virtual_servers = grep /$pattern/, @full_virtual_servers;
+    my @virtual_servers = grep /$pattern/i, @full_virtual_servers;
     return @virtual_servers;
 }
 
@@ -172,15 +174,46 @@ if ( ! defined $envid) {
 # Main
 #
 # TODO add other lba DEV/PE servers
-my $iControl = BigIP::iControl->new(
-                                server => 'srwd00lba042-cl.stubcorp.dev',
-                                username => 'svcacctrelmgt',
-                                password => 'R8bbitSt3w',
-                                port     => 443,
-                                proto    => 'https'
+
+my $env_number = $envid;
+$env_number =~ s/[srwd|srwe|SRWD|SRWE]//g;
+chomp $env_number;
+
+my $internal_bigip_server = qw{};
+my $external_bigip_server = qw{};
+Readonly my $BIGIP_USERNAME => 'svcacctrelmgt';
+Readonly my $BIGIP_PASSWORD => 'R8bbitSt3w';
+Readonly my $BIGIP_PORT     => 443;
+Readonly my $BIGIP_PROTOCOL => 'https';
+
+if ( $env_number >= 76 ) {
+    $internal_bigip_server = 'srwd00lba014.stubcorp.dev';
+    $external_bigip_server = 'srwd00lba042-cl.stubcorp.dev';
+} else {
+    $internal_bigip_server = '10.80.139.232';
+    $external_bigip_server = '10.80.139.242';
+}
+
+my $external_ic = BigIP::iControl->new(
+                                server => "$external_bigip_server",
+                                username => "$BIGIP_USERNAME",
+                                password => "$BIGIP_PASSWORD",
+                                port     => $BIGIP_PORT,
+                                proto    => "$BIGIP_PROTOCOL"
+                            );
+my $internal_ic = BigIP::iControl->new(
+                                server => "$internal_bigip_server",
+                                username => "$BIGIP_USERNAME",
+                                password => "$BIGIP_PASSWORD",
+                                port     => $BIGIP_PORT,
+                                proto    => "$BIGIP_PROTOCOL"
                             );
 
-validate_env_virtual_servers( $iControl, $envid );
-validate_env_default_pool( $iControl, $envid );
+
+#validate_virtual_servers( $internal_ic );
+validate_env_virtual_servers( $external_ic, $envid );
+validate_env_default_pool( $external_ic, $envid );
+validate_env_virtual_servers( $internal_ic, $envid );
+validate_env_default_pool( $internal_ic, $envid );
 
 exit 0;
