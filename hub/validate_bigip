@@ -34,6 +34,9 @@ use Stubhub::P4::Client qw (
                             check_out_perfoce_file
                             clean_perforce_client
                            );
+use Stubhub::BigIP::Virtual::Parser qw (
+                                        parse_virtual_servers
+                                       );
 
 # Get options
 my $show_usage = qw{};
@@ -211,13 +214,15 @@ my $internal_ic = BigIP::iControl->new(
                                 proto    => "$BIGIP_PROTOCOL"
                             );
 
-my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
-    = check_out_perfoce_file("//depot/main/templates/fsroot/etc/stubhub/f5/...");
-clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+#my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
+#    = check_out_perfoce_file("//depot/main/templates/fsroot/etc/stubhub/f5/...");
+#print "$dynamic_perfoce_dir\n";
+parse_virtual_servers('/tmp/p4-dynamic-wc-20130402.024930+0000/depot/main/templates/fsroot/etc/stubhub/f5/virtuals/ext');
+#clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
 
-validate_env_virtual_servers( $external_ic, $envid );
-validate_env_default_pool( $external_ic, $envid );
-validate_env_virtual_servers( $internal_ic, $envid );
-validate_env_default_pool( $internal_ic, $envid );
+#validate_env_virtual_servers( $external_ic, $envid );
+#validate_env_default_pool( $external_ic, $envid );
+#validate_env_virtual_servers( $internal_ic, $envid );
+#validate_env_default_pool( $internal_ic, $envid );
 
 exit 0;
