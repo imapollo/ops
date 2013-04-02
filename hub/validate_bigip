@@ -30,6 +30,10 @@ use Readonly;
 use Getopt::Long;
 use Data::Dumper;
 use BigIP::iControl;
+use Stubhub::P4::Client qw (
+                            check_out_perfoce_file
+                            clean_perforce_client
+                           );
 
 # Get options
 my $show_usage = qw{};
@@ -173,8 +177,6 @@ if ( ! defined $envid) {
 #
 # Main
 #
-# TODO add other lba DEV/PE servers
-
 my $env_number = $envid;
 $env_number =~ s/[srwd|srwe|SRWD|SRWE]//g;
 chomp $env_number;
@@ -209,8 +211,10 @@ my $internal_ic = BigIP::iControl->new(
                                 proto    => "$BIGIP_PROTOCOL"
                             );
 
+my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
+    = check_out_perfoce_file("//depot/main/templates/fsroot/etc/stubhub/f5/...");
+clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
 
-#validate_virtual_servers( $internal_ic );
 validate_env_virtual_servers( $external_ic, $envid );
 validate_env_default_pool( $external_ic, $envid );
 validate_env_virtual_servers( $internal_ic, $envid );
