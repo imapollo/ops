@@ -109,6 +109,25 @@ sub get_env_virtual_servers {
 }
 
 #
+# Get pool list for all the environments.
+#
+sub get_pool_list {
+    my ( $iControl ) = @_;
+    my @pool_list = $iControl->get_pool_list();
+    return sort @pool_list;
+}
+
+#
+# Get environment specific pool list.
+#
+sub get_env_pool_list {
+    my ( $iControl, $pattern ) = @_;
+    my @full_pool_list = get_pool_list( $iControl );
+    my @pool_list = grep /$pattern/i, @full_pool_list;
+    return @pool_list;
+}
+
+#
 # Get the hostname from IP address (nslookup).
 #
 sub get_hostname_from_ip {
@@ -124,7 +143,7 @@ sub get_hostname_from_ip {
 # Validate virtual servers.
 #
 sub validate_virtual_servers {
-    my ( $iControl ) =@_;
+    my ( $iControl ) = @_;
     my @virtual_servers = get_virtual_servers( $iControl );
     foreach my $virtual_server ( @virtual_servers ) {
         my $vs_destination = $iControl->get_vs_destination($virtual_server);
@@ -137,7 +156,7 @@ sub validate_virtual_servers {
 # Validate virtual servers for specified environment.
 #
 sub validate_env_virtual_servers {
-    my ( $iControl, $pattern ) =@_;
+    my ( $iControl, $pattern ) = @_;
     my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
     foreach my $virtual_server ( @virtual_servers ) {
         my $vs_destination = $iControl->get_vs_destination($virtual_server);
@@ -150,7 +169,7 @@ sub validate_env_virtual_servers {
 # Validate default pool for specified environment.
 #
 sub validate_env_default_pool {
-    my ( $iControl, $pattern ) =@_;
+    my ( $iControl, $pattern ) = @_;
     my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
     foreach my $virtual_server ( @virtual_servers ) {
         my $default_pool_name = $iControl->get_default_pool_name($virtual_server);
@@ -165,6 +184,18 @@ sub validate_env_default_pool {
                 print "$hostnames $member\n";
             }
         }
+    }
+}
+
+#
+# Validate Pool status for specific environment.
+#
+sub validate_env_pool_status {
+    my ( $iControl, $pattern ) = @_;
+    my @pool_list = get_env_pool_list( $iControl, $pattern );
+    foreach my $pool ( @pool_list ) {
+        my $status = $iControl->get_ltm_pool_status_as_string( $pool );
+        print "$pool: $status\n";
     }
 }
 
@@ -214,12 +245,15 @@ my $internal_ic = BigIP::iControl->new(
                                 proto    => "$BIGIP_PROTOCOL"
                             );
 
-my $p4_f5_dir = '/depot/main/templates/fsroot/etc/stubhub/f5';
-my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
-    = check_out_perfoce_file("/$p4_f5_dir/...");
-parse_virtual_servers("$dynamic_perfoce_dir$p4_f5_dir/virtuals/ext");
-parse_virtual_servers("$dynamic_perfoce_dir$p4_f5_dir/virtuals/int");
-clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+#my $p4_f5_dir = '/depot/main/templates/fsroot/etc/stubhub/f5';
+#my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
+#    = check_out_perfoce_file("/$p4_f5_dir/...");
+#parse_virtual_servers("$dynamic_perfoce_dir$p4_f5_dir/virtuals/ext");
+#parse_virtual_servers("$dynamic_perfoce_dir$p4_f5_dir/virtuals/int");
+#clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+
+validate_env_pool_status( $external_ic, $envid );
+validate_env_pool_status( $internal_ic, $envid );
 
 #validate_env_virtual_servers( $external_ic, $envid );
 #validate_env_default_pool( $external_ic, $envid );
