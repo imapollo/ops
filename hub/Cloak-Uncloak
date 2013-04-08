@@ -17,6 +17,7 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 use Readonly;
 use Getopt::Long;
 use Net::SSH::Expect;
+use Term::ReadKey;
 
 # Get options
 my $show_usage = qw{};
@@ -140,18 +141,38 @@ sub print_list {
 Readonly my $HOSTNAME => 'srwd00lba040';
 Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubcorp.dev";
 Readonly my $TMSH_EXEC => 'tmsh';
-Readonly my $LBA_LIMITED_USERNAME => 'qzhang8';
-Readonly my $LBA_LIMITED_PASSWORD => 'Martian@1983@';
 Readonly my $LBA_USERNAME => 'root';
 Readonly my $LBA_PASSWORD => 'lumnB0tl';
-
-my $ssh = login_ssh($HOSTNAME_CANONICAL, $LBA_LIMITED_USERNAME, $LBA_LIMITED_PASSWORD);
-my $ssh_unlimited = login_ssh($HOSTNAME_CANONICAL, $LBA_USERNAME, $LBA_PASSWORD);
 
 print "-------------------------------------------------------------------
 | The script helps to configure block/unblock list interactively. |
 -------------------------------------------------------------------
 ";
+
+print "Username: ";
+my $lba_username = <>;
+chomp $lba_username;
+print "Password: ";
+my $lba_password = qw{};
+my $key = 0;
+
+# Hide password on the screen
+ReadMode(4);
+while(ord($key = ReadKey(0)) != 10)
+{
+    if(ord($key) == 127 || ord($key) == 8) {
+        chop($lba_password);
+    } elsif(ord($key) < 32) {
+    } else {
+        $lba_password = $lba_password.$key;
+    }
+}
+chomp $lba_password;
+print "\n";
+ReadMode(0);
+
+my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
+my $ssh_unlimited = login_ssh($HOSTNAME_CANONICAL, $LBA_USERNAME, $LBA_PASSWORD);
 
 while (1) { # begin of while loop
 
