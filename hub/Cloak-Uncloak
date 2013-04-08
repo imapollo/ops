@@ -2,7 +2,7 @@
 #
 # Configure block/unblock list interactively.
 #
-# Usage: cloak-uncloak [options]
+# Usage: Cloak-Uncloak [options]
 #
 # Options:
 #  -h | --help              Show help information.
@@ -234,7 +234,7 @@ if ( $action eq "list" ) {
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
             execute_ssh($ssh, $command);
-            mute_execute_ssh($ssh_unlimited, "tmsh save sys config");
+            mute_execute_ssh($ssh_unlimited, "$TMSH_EXEC save sys config");
             print_list( $ssh, $listname );
         }
     } elsif ( $action eq "delete" ) {
@@ -250,7 +250,7 @@ if ( $action eq "list" ) {
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
             execute_ssh($ssh, $command);
-            mute_execute_ssh($ssh_unlimited, "tmsh save sys config");
+            mute_execute_ssh($ssh_unlimited, "$TMSH_EXEC save sys config");
             print_list( $ssh, $listname );
         }
     }
