@@ -91,7 +91,15 @@ sub close_ssh {
 sub mute_execute_ssh {
     my ( $ssh, $command ) = @_;
     my $output = $ssh->exec($command);
-    return $output;
+    my @original_outputs = split(/\n/, $output);
+    my @outputs;
+    foreach my $line ( @original_outputs ) {
+        if ( $line !~ /tmos/ ) {
+            chomp $line;
+            push(@outputs, $line);
+        }
+    }
+    return @outputs;
 }
 
 #
@@ -99,9 +107,8 @@ sub mute_execute_ssh {
 #
 sub execute_ssh {
     my ( $ssh, $command ) = @_;
-    my $output = mute_execute_ssh( $ssh, $command );
-    # TODO filter the output
-    print $output . "\n";
+    my @outputs = mute_execute_ssh( $ssh, $command );
+    print join "\n", @outputs;
 }
 
 #
@@ -109,23 +116,37 @@ sub execute_ssh {
 #
 sub print_list {
     my ( $ssh, $listname ) =@_;
-    my $output = mute_execute_ssh( $ssh, "list ltm data-gropu $listname records" );
-    print "Current $listname:\n";
-    print "$output\n";
-    # TODO if empty
+    my @outputs = mute_execute_ssh( $ssh, "list ltm data-group $listname records" );
+    my @ip_addresses;
+    foreach my $line ( @outputs ) {
+        if ( $line =~ /{ }/ ) {
+            $line =~ s/^\s*(\S+)\s*{ }\s*$/$1/;
+            push( @ip_addresses, $line );
+        }
+    }
+    if ( defined $ip_addresses[0] ) {
+        print "\n";
+        print "Current $listname:\n";
+        print join "\n", @ip_addresses;
+        print "\n";
+    } else {
+        print "$listname is empty.\n";
+    }
 }
 
 #
 # Main
 #
-Readonly my $HOSTNAME => 'srwd00lba040.stubcorp.dev';
+Readonly my $HOSTNAME => 'srwd00lba040';
+Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubcorp.dev";
 Readonly my $TMSH_EXEC => 'tmsh';
+Readonly my $LBA_LIMITED_USERNAME => 'qzhang8';
+Readonly my $LBA_LIMITED_PASSWORD => 'Martian@1983@';
 Readonly my $LBA_USERNAME => 'root';
 Readonly my $LBA_PASSWORD => 'lumnB0tl';
-# Readonly my $LBA_USERNAME => 'svcacctrelmgt';
-# Readonly my $LBA_PASSWORD => 'R8bbitSt3w';
 
-my $ssh = login_ssh($HOSTNAME, $LBA_USERNAME, $LBA_PASSWORD);
+my $ssh = login_ssh($HOSTNAME_CANONICAL, $LBA_LIMITED_USERNAME, $LBA_LIMITED_PASSWORD);
+my $ssh_unlimited = login_ssh($HOSTNAME_CANONICAL, $LBA_USERNAME, $LBA_PASSWORD);
 
 print "-------------------------------------------------------------------
 | The script helps to configure block/unblock list interactively. |
@@ -145,6 +166,7 @@ chomp $listname;
 
 if ( $listname eq "q" ) {
     close_ssh($ssh);
+    close_ssh($ssh_unlimited);
     exit 0;
 }
 if ( $listname !~ /[12]/ ) {
@@ -169,6 +191,7 @@ my $action = <>;
 chomp $action;
 if ( $action eq "q" ) {
     close_ssh($ssh);
+    close_ssh($ssh_unlimited);
     exit 0;
 }
 if ( $action !~ /[123]/ ) {
@@ -185,22 +208,24 @@ if ( $action !~ /[123]/ ) {
 }
 
 # Do action
+Readonly my $IP_EXAMPLES =>
+"-------------------------------------------------------------------
+| 1.1.1.0/24                                                      |
+| 1.1.1.1                                                         |
+| 1.1.1.1/32                                                      |
+| 1.1.1.0/25 1.1.1.0/26                                           |
+-------------------------------------------------------------------";
+
 if ( $action eq "list" ) {
-    my $output = $ssh->exec("list ltm data-group $listname records");
-    print $output . "\n";
+    print_list( $ssh, $listname );
 } else {
     my $ip_address = qw{};
     my $command = qw{};
     my $confirm = qw{};
     if ( $action eq "add" ) {
-        print "Enter the IP address you want to $action to $listname. For example:
--------------------------------------------------------------------
-| 1.1.1.0/24                                                      |
-| 1.1.1.1                                                         |
-| 1.1.1.1/32                                                      |
-| 1.1.1.0/25 1.1.1.0/26                                           |
--------------------------------------------------------------------
-> ";
+        print "Enter the IP address you want to $action to $listname. For example:\n";
+        print "$IP_EXAMPLES\n";
+        print "> ";
         $ip_address = <>;
         chomp $ip_address;
         $command = "modify ltm data-group $listname records add {$ip_address}";
@@ -209,17 +234,12 @@ if ( $action eq "list" ) {
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
             execute_ssh($ssh, $command);
-            execute_ssh($ssh, "save sys config");
+            mute_execute_ssh($ssh_unlimited, "tmsh save sys config");
             print_list( $ssh, $listname );
         }
     } elsif ( $action eq "delete" ) {
-         print "Enter the IP address you want to $action from $listname. For example:
--------------------------------------------------------------------
-| 1.1.1.0/24                                                      |
-| 1.1.1.1                                                         |
-| 1.1.1.1/32                                                      |
-| 1.1.1.0/25 1.1.1.0/26                                           |
--------------------------------------------------------------------";
+        print "Enter the IP address you want to $action from $listname. For example:\n";
+        print "$IP_EXAMPLES\n";
         print_list( $ssh, $listname );
         print "> ";
         $ip_address = <>;
@@ -230,7 +250,7 @@ if ( $action eq "list" ) {
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
             execute_ssh($ssh, $command);
-            execute_ssh($ssh, "save sys config");
+            mute_execute_ssh($ssh_unlimited, "tmsh save sys config");
             print_list( $ssh, $listname );
         }
     }
@@ -239,4 +259,5 @@ if ( $action eq "list" ) {
 } # end of while loop
 
 close_ssh($ssh);
+close_ssh($ssh_unlimited);
 exit 0;
