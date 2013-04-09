@@ -166,14 +166,23 @@ sub validate_env_virtual_servers {
 }
 
 #
+# Get default pool for specified virtual server.
+#
+sub get_default_pool_for_virtual_server {
+    my ( $iControl, $virtual_server ) = @_;
+    my $default_pool_name = $iControl->get_default_pool_name($virtual_server);
+    my $pool_name = $$default_pool_name[0];
+    return $pool_name;
+}
+
+#
 # Validate default pool for specified environment.
 #
 sub validate_env_default_pool {
     my ( $iControl, $pattern ) = @_;
     my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
     foreach my $virtual_server ( @virtual_servers ) {
-        my $default_pool_name = $iControl->get_default_pool_name($virtual_server);
-        my $pool_name = $$default_pool_name[0];
+        my $pool_name = get_default_pool_for_virtual_server( $iControl, $virtual_server );
         print "$virtual_server: $pool_name\n";
         if ( $pool_name ne "" ) {
             print "Members:\n";
@@ -188,11 +197,38 @@ sub validate_env_default_pool {
 }
 
 #
+# Get valid pools for specific environment.
+#
+sub get_env_valid_pools {
+    my ( $iControl, $pattern ) = @_;
+    my @full_pool_list = get_env_pool_list( $iControl, $pattern );
+    my @pool_list;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $pool_name = get_default_pool_for_virtual_server( $iControl, $virtual_server );
+        if ( $pool_name ne "" and defined $pool_name ) {
+            push @pool_list, $pool_name;
+        }
+    }
+    @pool_list = sort(uniq(@pool_list));
+    return @pool_list;
+}
+
+#
+# Uniq the items in array.
+#
+sub uniq {
+    return keys %{{ map { $_ => 1 } @_ }};
+}
+
+#
 # Validate Pool status for specific environment.
 #
 sub validate_env_pool_status {
     my ( $iControl, $pattern ) = @_;
-    my @pool_list = get_env_pool_list( $iControl, $pattern );
+    # TODO format the output
+    # my @pool_list = get_env_pool_list( $iControl, $pattern );
+    my @pool_list = get_env_valid_pools( $iControl, $pattern );
     foreach my $pool ( @pool_list ) {
         my $status = $iControl->get_ltm_pool_status_as_string( $pool );
         print "$pool: $status\n";
