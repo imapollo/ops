@@ -12,7 +12,7 @@ use strict;
 use warnings;
 
 use lib '/nas/reg/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
+#use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 use Getopt::Long;
@@ -157,7 +157,7 @@ my $lba_password = qw{};
 my $key = 0;
 
 # Hide password on the screen
-ReadMode(4);
+ReadMode(2);
 while(ord($key = ReadKey(0)) != 10)
 {
     if(ord($key) == 127 || ord($key) == 8) {
