@@ -211,14 +211,8 @@ sub get_env_valid_pools {
         }
     }
     @pool_list = sort(uniq(@pool_list));
+    @pool_list = filter_pool_list(@pool_list);
     return @pool_list;
-}
-
-#
-# Uniq the items in array.
-#
-sub uniq {
-    return keys %{{ map { $_ => 1 } @_ }};
 }
 
 #
@@ -226,13 +220,42 @@ sub uniq {
 #
 sub validate_env_pool_status {
     my ( $iControl, $pattern ) = @_;
-    # TODO format the output
     # my @pool_list = get_env_pool_list( $iControl, $pattern );
     my @pool_list = get_env_valid_pools( $iControl, $pattern );
+    my $overall_pass = 1;
     foreach my $pool ( @pool_list ) {
         my $status = $iControl->get_ltm_pool_status_as_string( $pool );
-        print "$pool: $status\n";
+        #print "$pool: $status\n";
+        if ( $status !~ /The pool is available/ ) {
+            printf "%-30s %-20s\n", $pool, "FAIL: $status";
+            $overall_pass = 0;
+        } else {
+            printf "%-30s %-20s\n", $pool, "PASS" if $show_verbose;
+        }
     }
+    return $overall_pass;
+}
+
+#
+# Filter with ignore POOL list.
+#
+sub filter_pool_list {
+    my ( @pool_list ) = @_;
+    my @filtered_pool_list;
+    foreach my $pool_name ( @pool_list ) {
+        if ( $pool_name !~ /SRW[DE][0-9]+-ABX-FTP$/ 
+                and $pool_name !~ /SRW[DE][0-9]+-EHCACHE$/ ) {
+            push @filtered_pool_list, $pool_name;
+        }
+    }
+    return @filtered_pool_list;
+}
+
+#
+# Uniq the items in array.
+#
+sub uniq {
+    return keys %{{ map { $_ => 1 } @_ }};
 }
 
 #
@@ -288,8 +311,17 @@ my $internal_ic = BigIP::iControl->new(
 #parse_virtual_servers("$dynamic_perfoce_dir$p4_f5_dir/virtuals/int");
 #clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
 
-validate_env_pool_status( $external_ic, $envid );
-validate_env_pool_status( $internal_ic, $envid );
+my $external_pass = validate_env_pool_status( $external_ic, $envid );
+my $internal_pass = validate_env_pool_status( $internal_ic, $envid );
+if ( $external_pass and $internal_pass ) {
+    print "=====================================\n" if $show_verbose;
+    print "Overall: PASS\n";
+    exit 0;
+} else {
+    print "=====================================\n";
+    print "Overall: FAIL\n";
+    exit 1;
+}
 
 #validate_env_virtual_servers( $external_ic, $envid );
 #validate_env_default_pool( $external_ic, $envid );
