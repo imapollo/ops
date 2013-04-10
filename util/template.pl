@@ -44,6 +44,7 @@ sub sigIntHandler {
 
 if ( $show_usage ) {
    usage();
+   exit 0;
 }
 
 #
