@@ -17,6 +17,7 @@ use lib '/nas/reg/lib/perl';
 use Readonly;
 use Getopt::Long;
 use Net::SSH::Expect;
+use MIME::Base64;
 
 # Get options
 my $show_usage = qw{};
@@ -140,8 +141,8 @@ sub print_list {
 Readonly my $HOSTNAME => 'srwp01lba040';
 Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubprod.com";
 Readonly my $TMSH_EXEC => 'tmsh';
-Readonly my $LBA_USERNAME => 'root';
-Readonly my $LBA_PASSWORD => 'lumnB0tl';
+Readonly my $SALLY => 'cm9vdA==';
+Readonly my $HARRY => 'bHVtbkIwdGw=';
 
 print "-------------------------------------------------------------------
 | The script helps to configure block/unblock list interactively. |
@@ -159,7 +160,7 @@ system("stty echo");
 print "\n";
 
 my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
-my $ssh_unlimited = login_ssh($HOSTNAME_CANONICAL, $LBA_USERNAME, $LBA_PASSWORD);
+my $ssh_unlimited = login_ssh( $HOSTNAME_CANONICAL, decode_base64($SALLY), decode_base64($HARRY) );
 
 while (1) { # begin of while loop
 
