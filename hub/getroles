@@ -1,0 +1,11 @@
+#!/bin/bash
+
+DEV_QA_HOSTS="/nas/reg/etc/dev-qa-hosts"
+
+envid=$1
+
+if [[ "$envid" == "" ]]; then
+    echo "Error: Please set the environment ID. For example, srwd86"
+fi
+
+grep $envid /nas/reg/etc/dev-qa-hosts
