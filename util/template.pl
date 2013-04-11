@@ -25,9 +25,9 @@ my $show_usage = qw{};
 my $show_verbose = qw{};
 my $another = qw{};
 my $options_okay = GetOptions (
-   'a|another=s' => \$another,
-   'v|verbose'   => \$show_verbose,
-   'h|help'      => \$show_usage,
+    'a|another=s' => \$another,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
 );
 
 #
@@ -43,15 +43,15 @@ sub sigIntHandler {
 }
 
 if ( $show_usage ) {
-   usage();
-   exit 0;
+    usage();
+    exit 0;
 }
 
 #
 # Usage
 #
 sub usage {
-   print <<END_OF_HELP
+    print <<END_OF_HELP
 <copy from header>
 
 END_OF_HELP
