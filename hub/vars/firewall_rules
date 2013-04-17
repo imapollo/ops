@@ -1,3 +1,5 @@
 ${envid}pay001.${envid}.com:tkn.api.${envid}.com:443
 ${envid}rfi001.${envid}.com:tkn.api.${envid}.com:443
 ${envid}tkn001.${envid}.com:mockservice.stubcorp.dev:443
+${envid}api001.${envid}.com:intsvc.api.${envid}.com:443
+${envid}slx001.${envid}.com:intsvc.api.${envid}.com:443
