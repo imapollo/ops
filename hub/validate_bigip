@@ -21,11 +21,15 @@ use strict;
 use warnings;
 
 use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 use Getopt::Long;
 use Data::Dumper;
 use BigIP::iControl;
+use Stubhub::ENV::Info qw (
+                            get_env_branch
+                        );
 use MIME::Base64;
 
 # Get options
@@ -259,6 +263,10 @@ if ( ! defined $envid) {
 my $env_number = $envid;
 $env_number =~ s/[srwd|srwe|SRWD|SRWE]//g;
 chomp $env_number;
+
+my $branch_name = get_env_branch( $envid );
+print "$branch_name\n";
+exit 0;
 
 my $internal_bigip_server = qw{};
 my $external_bigip_server = qw{};
