@@ -170,6 +170,22 @@ function check_mail_dir_new {
 }
 
 #
+# Check if there are DB partition issue on RFI
+#
+function check_rfi_db_partition {
+    RFI_HOST=${envid}rfi001.${envid}.com
+
+    ora_error_log=`ssh $RFI_HOST "grep ORA- /opt/jboss/server/default/log/jboss.*" < /dev/null`
+    if [[ $ora_error_log == "" ]]; then
+        echo "No DB Partition ORA-* error log on RFI:                   PASS"
+    else
+        echo "No DB Partition ORA-* error log on RFI:                   FAIL"
+        _print_debug_msg "[debug] ORA-* error: $ora_error_log"
+        return 1
+    fi
+}
+
+#
 # Main
 #
 
@@ -177,10 +193,10 @@ check_mqm_ifconfig
 check_mqm_queue
 check_mri_passwd
 check_mail_dir_new
+check_rfi_db_partition
 if [[ "$email_address" != "" ]]; then
     query_email_logs_in_db
     query_email_logs_in_job_jboss
 fi
-echo "Check DB partition.";
 
 exit 0
