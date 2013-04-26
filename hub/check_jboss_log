@@ -5,6 +5,7 @@
 # Usage: check_jboss_log [options]
 # Options:
 #  -e | --env=..       Specify the environment to be checked.
+#  -r | --role=..      Specify the role to be checked.
 #  -s | --string=..    Specify the string to be query.
 #  -d | --debug        Print debug messages.
 #
@@ -29,6 +30,7 @@ Check if jboss log contains certain characters.
 Usage: check_jboss_log [options]
 Options:
  -e | --env=..       Specify the environment to be checked.
+ -r | --role=..      Specify the role to be checked.
  -s | --string=..    Specify the string to be query.
  -d | --debug        Print debug messages.
 
@@ -39,7 +41,7 @@ EOF
 #
 # Get options
 #
-OPTS=`getopt -o e:s:d -l env:,string:,debug -- $options`
+OPTS=`getopt -o e:r:s:d -l env:,role:,string:,debug -- $options`
 if [ $? != 0 ]; then
     echo "Error: Unrecognized parameters."
     _usage
@@ -51,6 +53,7 @@ eval set -- "$OPTS"
 while true ; do
     case "$1" in
         -e | --env) envid="${2// }"; shift 2;;
+        -r | --role) role="${2// }"; shift 2;;
         -s | --string) string="${2// }"; shift 2;;
         -d | --debug) debug_level=1; shift;;
         --) shift; break;;
@@ -70,14 +73,23 @@ function _print_debug_msg {
 #
 # Main
 #
-/nas/home/minjzhang/bin/getroles $envid | while read hostname;
-do
-output=`ssh -oPasswordAuthentication=no -ostricthostkeychecking=no $hostname "grep \"$string\" /opt/jboss/server/default/log/jboss.log" < /dev/null 2> /dev/null`
-if [[ $output != "" ]]; then
-    echo "$hostname:"
-    echo $output
-    echo "=================="
+query=""
+if [[ $envid != "" ]]; then
+    query=$envid
+elif [[ $role != "" ]]; then
+    query=$role
+else
+    echo "Error: Either --env or --role need to be set."
+    exit 1
 fi
+/nas/home/minjzhang/bin/getroles $query | while read hostname;
+do
+    output=`ssh -oConnectTimeout=10 -oPasswordAuthentication=no -ostricthostkeychecking=no $hostname "grep \"$string\" /opt/jboss/server/default/log/jboss.log" < /dev/null 2> /dev/null`
+    if [[ $output != "" ]]; then
+        echo "$hostname:"
+        echo $output
+        echo "=================="
+    fi
 done
 
 exit 0
