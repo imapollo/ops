@@ -1,0 +1,354 @@
+#!/usr/bin/perl
+#
+# Deploy F5 BIG-IP resources to the target environment.
+# Following items will be checked:
+#  - Virtual Server
+#  - Pool
+#
+# Usage: deploy_bigip [options]
+#
+# Options:
+#  -e | --env               Specify the environment ID. For example: srwd76.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  deploy_bigip -e srwd76
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+
+use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Readonly;
+use Getopt::Long;
+use Data::Dumper;
+use MIME::Base64;
+use BigIP::iControl;
+use Stubhub::ENV::Info qw (
+                            get_env_branch
+                          );
+use Stubhub::P4::Client qw (
+                            check_out_perfoce_file
+                            clean_perforce_client
+                           );
+use Stubhub::BigIP::Virtual::Parser qw (
+                            parse_virtual_servers
+                           );
+use Stubhub::BigIP::Virtual::ConfigGenerator qw (
+                            generate_vs_config
+                            generate_vs_configs
+                           );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $envid = qw{};
+my $options_okay = GetOptions (
+   'e|env=s'     => \$envid,
+   'v|verbose'   => \$show_verbose,
+   'h|help'      => \$show_usage,
+);
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+   print <<END_OF_HELP
+Deploy F5 BIG-IP resources to the target environment.
+Following items will be checked:
+ - Virtual Server
+ - Pool
+
+Usage: deploy_bigip [options]
+
+Options:
+ -e | --env               Specify the environment ID. For example: srwd76.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ deploy_bigip -e srwd76
+
+END_OF_HELP
+}
+
+#
+# Get all the virtual servers.
+#
+sub get_virtual_servers {
+    my ( $iControl ) = @_;
+    my @virtual_servers = $iControl->get_vs_list();
+    return sort @virtual_servers;
+}
+
+#
+# Get environment specific virtual servers.
+#
+sub get_env_virtual_servers {
+    my ( $iControl, $pattern ) = @_;
+    my @full_virtual_servers = get_virtual_servers( $iControl );
+    my @virtual_servers = grep /$pattern/i, @full_virtual_servers;
+    return @virtual_servers;
+}
+
+#
+# Get pool list for all the environments.
+#
+sub get_pool_list {
+    my ( $iControl ) = @_;
+    my @pool_list = $iControl->get_pool_list();
+    return sort @pool_list;
+}
+
+#
+# Get environment specific pool list.
+#
+sub get_env_pool_list {
+    my ( $iControl, $pattern ) = @_;
+    my @full_pool_list = get_pool_list( $iControl );
+    my @pool_list = grep /$pattern/i, @full_pool_list;
+    return @pool_list;
+}
+
+#
+# Get the hostname from IP address (nslookup).
+#
+sub get_hostname_from_ip {
+    my ( $ip_address ) = @_;
+    $ip_address =~ s/(.*):.*/$1/;
+    my $hostnames = `nslookup $ip_address | grep name | cut -d" " -f3`;
+    chomp $hostnames;
+    $hostnames =~ s/\n/,/g;
+    return $hostnames;
+}
+
+#
+# Validate virtual servers.
+#
+sub validate_virtual_servers {
+    my ( $iControl ) = @_;
+    my @virtual_servers = get_virtual_servers( $iControl );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $vs_destination = $iControl->get_vs_destination($virtual_server);
+        my $vs_hostname = get_hostname_from_ip($vs_destination);
+        print "$virtual_server: $vs_hostname $vs_destination\n";
+    }
+}
+
+#
+# Validate virtual servers for specified environment.
+#
+sub validate_env_virtual_servers {
+    my ( $iControl, $pattern ) = @_;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $vs_destination = $iControl->get_vs_destination($virtual_server);
+        my $vs_hostname = get_hostname_from_ip($vs_destination);
+        print "$virtual_server: $vs_hostname $vs_destination\n";
+    }
+}
+
+#
+# Get default pool for specified virtual server.
+#
+sub get_default_pool_for_virtual_server {
+    my ( $iControl, $virtual_server ) = @_;
+    my $default_pool_name = $iControl->get_default_pool_name($virtual_server);
+    my $pool_name = $$default_pool_name[0];
+    return $pool_name;
+}
+
+#
+# Validate default pool for specified environment.
+#
+sub validate_env_default_pool {
+    my ( $iControl, $pattern ) = @_;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $pool_name = get_default_pool_for_virtual_server( $iControl, $virtual_server );
+        print "$virtual_server: $pool_name\n";
+        if ( $pool_name ne "" ) {
+            print "Members:\n";
+            foreach my $member ( $iControl->get_pool_members($pool_name) ) {
+                my $ip_address = $member;
+                $ip_address =~ s/(.*):.*/$1/;
+                my $hostnames = get_hostname_from_ip($ip_address);
+                print "$hostnames $member\n";
+            }
+        }
+    }
+}
+
+#
+# Get valid pools for specific environment.
+#
+sub get_env_valid_pools {
+    my ( $iControl, $pattern ) = @_;
+    my @full_pool_list = get_env_pool_list( $iControl, $pattern );
+    my @pool_list;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $pool_name = get_default_pool_for_virtual_server( $iControl, $virtual_server );
+        if ( $pool_name ne "" and defined $pool_name ) {
+            push @pool_list, $pool_name;
+        }
+    }
+    @pool_list = sort(uniq(@pool_list));
+    @pool_list = filter_pool_list(@pool_list);
+    return @pool_list;
+}
+
+#
+# Filter with ignore POOL list.
+#
+sub filter_pool_list {
+    my ( @pool_list ) = @_;
+    my @filtered_pool_list;
+    foreach my $pool_name ( @pool_list ) {
+        if ( $pool_name !~ /SRW[DE][0-9]+-ABX-FTP$/ 
+                and $pool_name !~ /SRW[DE][0-9]+-EHCACHE$/ ) {
+            push @filtered_pool_list, $pool_name;
+        }
+    }
+    return @filtered_pool_list;
+}
+
+#
+# Print bigip.conf file.
+#
+sub print_bigip_conf {
+    my ( $iControl ) = @_;
+    print $iControl->download_file('/config/bigip.conf');
+}
+
+#
+# Initiate BIG IP iControl.
+#
+sub init_bigip_icontrol {
+    my ( $bigip_server ) = @_;
+
+    Readonly my $BIGIP_USERNAME => 'svcacctrelmgt';
+    Readonly my $BIGIP_PASSWORD => 'UjhiYml0U3Qzdw==';
+    Readonly my $BIGIP_PORT     => 443;
+    Readonly my $BIGIP_PROTOCOL => 'https';
+
+    my $iControl = BigIP::iControl->new(
+                                server => "$bigip_server",
+                                username => "$BIGIP_USERNAME",
+                                password => decode_base64($BIGIP_PASSWORD),
+                                port     => $BIGIP_PORT,
+                                proto    => "$BIGIP_PROTOCOL"
+                            );
+
+    return $iControl;
+}
+
+#
+# Load configuration into the file.
+#
+sub load_configuration {
+    my ( $iControl, $filename ) = @_;
+    $iControl->load_configuration( $filename, 'LOAD_HIGH_LEVEL_CONFIG' );
+}
+
+#
+# Uniq the items in array.
+#
+sub uniq {
+    return keys %{{ map { $_ => 1 } @_ }};
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $envid) {
+    print "Error: The pamameter '-e' must be set.\n";
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+my $env_number = $envid;
+$env_number =~ s/[srwd|srwe|SRWD|SRWE]//g;
+chomp $env_number;
+
+my $branch_name = get_env_branch( $envid );
+
+my $internal_bigip_server = qw{};
+my $external_bigip_server = qw{};
+
+if ( $env_number >= 76 ) {
+    $internal_bigip_server = 'srwd00lba014.stubcorp.dev';
+    $external_bigip_server = 'srwd00lba042-cl.stubcorp.dev';
+} else {
+    $internal_bigip_server = '10.80.139.232';
+    $external_bigip_server = '10.80.139.242';
+}
+
+my $external_ic = init_bigip_icontrol( $external_bigip_server );
+my $internal_ic = init_bigip_icontrol( $internal_bigip_server );
+
+# test
+my $test_big_ip_server = 'srwd00lba015.stubcorp.dev';
+my $test_ic = init_bigip_icontrol( $test_big_ip_server );
+
+#load_configuration( $test_ic, '/nas/home/minjzhang/test_vs.conf');
+# print_bigip_conf( $test_ic );
+
+# my @internal_servers = get_env_virtual_servers($internal_ic, $envid);
+# my @external_servers = get_env_virtual_servers($external_ic, $envid);
+# print "Internal:\n";
+# foreach my $internal_server ( @internal_servers ) {
+#     print $internal_server . "\n";
+# }
+# print "External:\n";
+# foreach my $external_server ( @external_servers ) {
+#     print $external_server . "\n";
+# }
+# exit;
+
+# TODO test pb branch.
+$branch_name = 'pb_f5_automate';
+my $p4_f5_dir = qw{};
+if ( $branch_name eq "main" ) {
+    $p4_f5_dir = "/depot/main/templates/fsroot/etc/stubhub/f5";
+} elsif ( $branch_name =~ m/^rb_/ ) {
+    $p4_f5_dir = "/depot/release/$branch_name/templates/fsroot/etc/stubhub/f5";
+} elsif ( $branch_name =~ m/^pb_/ ) {
+    $p4_f5_dir = "/depot/project/$branch_name/templates/fsroot/etc/stubhub/f5";
+} else {
+    print "Error: Branch name $branch_name doesn't look good.\n";
+    exit 1;
+}
+my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
+    = check_out_perfoce_file("/$p4_f5_dir/...");
+#parse_virtual_servers("$dynamic_perfoce_dir$p4_f5_dir/virtuals/ext");
+#parse_virtual_servers("$dynamic_perfoce_dir$p4_f5_dir/virtuals/int");
+generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/int", $envid );
+#clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+
+exit 0;
