@@ -258,6 +258,8 @@ sub init_bigip_icontrol {
                                 server => "$bigip_server",
                                 username => "$BIGIP_USERNAME",
                                 password => decode_base64($BIGIP_PASSWORD),
+                                #username => "root",
+                                #password => "lumnB0tl",
                                 port     => $BIGIP_PORT,
                                 proto    => "$BIGIP_PROTOCOL"
                             );
@@ -266,11 +268,12 @@ sub init_bigip_icontrol {
 }
 
 #
-# Load configuration into the file.
+# Upload file into the file.
 #
-sub load_configuration {
-    my ( $iControl, $filename ) = @_;
-    $iControl->load_configuration( $filename, 'LOAD_HIGH_LEVEL_CONFIG' );
+sub upload_file {
+    my ( $iControl, $remote_file_name, $local_file_name ) = @_;
+    my $success = $iControl->upload_file( $remote_file_name, $local_file_name);
+    return $success;
 }
 
 #
@@ -316,8 +319,9 @@ my $internal_ic = init_bigip_icontrol( $internal_bigip_server );
 my $test_big_ip_server = 'srwd00lba015.stubcorp.dev';
 my $test_ic = init_bigip_icontrol( $test_big_ip_server );
 
-#load_configuration( $test_ic, '/nas/home/minjzhang/test_vs.conf');
-# print_bigip_conf( $test_ic );
+upload_file( $test_ic, '/config/minjzhang.conf', '/nas/home/minjzhang/full.conf');
+#print_bigip_conf( $test_ic );
+exit 0;
 
 # my @internal_servers = get_env_virtual_servers($internal_ic, $envid);
 # my @external_servers = get_env_virtual_servers($external_ic, $envid);
