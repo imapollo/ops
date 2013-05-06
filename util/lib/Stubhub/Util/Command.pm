@@ -36,7 +36,7 @@ sub run_cmd {
 }
 
 #
-# SSH to the host and run external command.
+# SSH to the host and run external command without password.
 #
 sub ssh_cmd {
   my ( $server, $command ) = @_;

@@ -29,6 +29,12 @@ use Getopt::Long;
 use Data::Dumper;
 use MIME::Base64;
 use BigIP::iControl;
+use Stubhub::Util::SSH qw (
+                            login_ssh
+                            close_ssh
+                            execute_ssh
+                            mute_execute_ssh
+                          );
 use Stubhub::ENV::Info qw (
                             get_env_branch
                           );
@@ -227,7 +233,7 @@ sub filter_pool_list {
     my ( @pool_list ) = @_;
     my @filtered_pool_list;
     foreach my $pool_name ( @pool_list ) {
-        if ( $pool_name !~ /SRW[DE][0-9]+-ABX-FTP$/ 
+        if ( $pool_name !~ /SRW[DE][0-9]+-ABX-FTP$/
                 and $pool_name !~ /SRW[DE][0-9]+-EHCACHE$/ ) {
             push @filtered_pool_list, $pool_name;
         }
@@ -277,10 +283,68 @@ sub upload_file {
 }
 
 #
+# Delete virtual servers.
+#
+sub delete_env_virtual_servers {
+    my ( $iControl, $pattern ) = @_;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    $iControl->delete_virtual_servers( \@virtual_servers );
+}
+
+#
+# Deploy configurations to the remote server.
+#
+sub deploy_configuration {
+    my ( $ssh, $file_name ) = @_;
+    execute_ssh( $ssh, "b merge /config/deploy/$file_name" );
+    mute_execute_ssh( $ssh, "tmsh save sys config" );
+    mute_execute_ssh( $ssh, "rm -f /config/deploy/$file_name" );
+}
+
+#
+# Init SSH connection.
+#
+sub init_ssh {
+    my ( $server ) = @_;
+    Readonly my $BIGIP_USERNAME => 'svcacctrelmgt';
+    Readonly my $BIGIP_PASSWORD => 'UjhiYml0U3Qzdw==';
+
+    my $ssh = login_ssh( $server, $BIGIP_USERNAME, decode_base64($BIGIP_PASSWORD) );
+    return $ssh;
+}
+
+#
 # Uniq the items in array.
 #
 sub uniq {
     return keys %{{ map { $_ => 1 } @_ }};
+}
+
+#
+# Generate configuration file based on the template,
+# including virtual server, pool.
+#
+sub generate_vs_configuration {
+    # TODO test pb branch.
+    my ( $env_id, $branch_name ) = @_;
+    $branch_name = 'pb_f5_automate';
+    my $p4_f5_dir = qw{};
+    if ( $branch_name eq "main" ) {
+        $p4_f5_dir = "/depot/main/templates/fsroot/etc/stubhub/f5";
+    } elsif ( $branch_name =~ m/^rb_/ ) {
+        $p4_f5_dir = "/depot/release/$branch_name/templates/fsroot/etc/stubhub/f5";
+    } elsif ( $branch_name =~ m/^pb_/ ) {
+        $p4_f5_dir = "/depot/project/$branch_name/templates/fsroot/etc/stubhub/f5";
+    } else {
+        print "Error: Branch name $branch_name doesn't look good.\n";
+        exit 1;
+    }
+    my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
+        = check_out_perfoce_file("/$p4_f5_dir/...");
+    
+    my $configuration_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/int", $envid, "/nas/home/minjzhang/temp" );
+    clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+    return $configuration_file;
 }
 
 #
@@ -319,40 +383,13 @@ my $internal_ic = init_bigip_icontrol( $internal_bigip_server );
 my $test_big_ip_server = 'srwd00lba015.stubcorp.dev';
 my $test_ic = init_bigip_icontrol( $test_big_ip_server );
 
-upload_file( $test_ic, '/config/minjzhang.conf', '/nas/home/minjzhang/full.conf');
-#print_bigip_conf( $test_ic );
-exit 0;
+my $configuration_file = generate_vs_configuration( $envid, "" );
 
-# my @internal_servers = get_env_virtual_servers($internal_ic, $envid);
-# my @external_servers = get_env_virtual_servers($external_ic, $envid);
-# print "Internal:\n";
-# foreach my $internal_server ( @internal_servers ) {
-#     print $internal_server . "\n";
-# }
-# print "External:\n";
-# foreach my $external_server ( @external_servers ) {
-#     print $external_server . "\n";
-# }
-# exit;
+upload_file( $test_ic, '/config/deploy/minjzhang.conf', $configuration_file);
+delete_env_virtual_servers( $test_ic, $envid );
 
-# TODO test pb branch.
-$branch_name = 'pb_f5_automate';
-my $p4_f5_dir = qw{};
-if ( $branch_name eq "main" ) {
-    $p4_f5_dir = "/depot/main/templates/fsroot/etc/stubhub/f5";
-} elsif ( $branch_name =~ m/^rb_/ ) {
-    $p4_f5_dir = "/depot/release/$branch_name/templates/fsroot/etc/stubhub/f5";
-} elsif ( $branch_name =~ m/^pb_/ ) {
-    $p4_f5_dir = "/depot/project/$branch_name/templates/fsroot/etc/stubhub/f5";
-} else {
-    print "Error: Branch name $branch_name doesn't look good.\n";
-    exit 1;
-}
-my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
-    = check_out_perfoce_file("/$p4_f5_dir/...");
-#parse_virtual_servers("$dynamic_perfoce_dir$p4_f5_dir/virtuals/ext");
-#parse_virtual_servers("$dynamic_perfoce_dir$p4_f5_dir/virtuals/int");
-generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/int", $envid );
-#clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+my $ssh = init_ssh( $test_big_ip_server );
+deploy_configuration( $ssh, "minjzhang.conf" );
+close_ssh( $ssh );
 
 exit 0;

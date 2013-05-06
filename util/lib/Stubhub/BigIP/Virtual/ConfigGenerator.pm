@@ -35,28 +35,28 @@ our @EXPORT_OK;
 # under a folder.
 #
 sub generate_vs_configs {
-    my ( $templates_dir, $envid ) = @_;
+    my ( $templates_dir, $envid, $output_dir ) = @_;
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
     my @template_files = grep { ! -d } readdir DH;
     closedir DH;
+    my $output_file = "$output_dir/virtual_server_$envid.conf";
     foreach my $virtual_server_template ( @template_files ) {
-        print generate_vs_config( "$templates_dir/$virtual_server_template", $envid );
+        generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid );
     }
+    return $output_file;
 }
 
 #
 # Generate virtual server configuration file based on template.
 #
 sub generate_vs_config {
-    my ( $template_file_path, $envid ) = @_;
-
-    my $target_file_path = $template_file_path . ".out";
+    my ( $target_file_path, $template_file_path, $envid ) = @_;
 
     Readonly my $ENVID_TOKEN => '#{env_id}';
     Readonly my $IPADDR_TOKEN => '#{.*\.env_id\.com}';
 
     open TEMPLATE_FH, "<$template_file_path" or die $!;
-    open TARGET_FH, ">$target_file_path" or die $!;
+    open TARGET_FH, ">>$target_file_path" or die $!;
 
     while ( my $line = <TEMPLATE_FH> ) {
         if ( $line =~ /$ENVID_TOKEN/ ) {
