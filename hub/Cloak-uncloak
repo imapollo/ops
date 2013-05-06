@@ -17,7 +17,6 @@ use lib '/nas/reg/lib/perl';
 use Readonly;
 use Getopt::Long;
 use Net::SSH::Expect;
-use MIME::Base64;
 
 # Get options
 my $show_usage = qw{};
@@ -67,12 +66,19 @@ sub login_ssh {
     my $ssh = Net::SSH::Expect->new(
         host => "$hostname",
         user => "$username",
-        password => "$password",
         raw_pty => 1
     );
-    my $login_output = $ssh->login();
-    if ( $login_output !~ /Last login/ ) {
-        die "Login has failed. Login output was $login_output";
+
+    my $prompt = "[Pp]assword";
+    $ssh->run_ssh();
+    $ssh->waitfor('qr/\(yes\/no\)\?$/',2);
+    $ssh->send("yes\n");
+    $ssh->waitfor('qr/$prompt:\s*$/',5);
+    $ssh->send("$password\n");
+    my $login_welcome = $ssh->exec("show sys version");
+
+    if ( $login_welcome !~ m/Last login/ ) {
+        die "Login has failed. Login output was $login_welcome";
     }
 
     return $ssh;
@@ -116,7 +122,7 @@ sub execute_ssh {
 # Show current list
 #
 sub print_list {
-    my ( $ssh, $listname ) =@_;
+    my ( $ssh, $listname ) = @_;
     my @outputs = mute_execute_ssh( $ssh, "list ltm data-group $listname records" );
     my @ip_addresses;
     foreach my $line ( @outputs ) {
@@ -141,8 +147,6 @@ sub print_list {
 Readonly my $HOSTNAME => 'srwp01lba040';
 Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubprod.com";
 Readonly my $TMSH_EXEC => 'tmsh';
-Readonly my $SALLY => 'cm9vdA==';
-Readonly my $HARRY => 'bHVtbkIwdGw=';
 
 print "-------------------------------------------------------------------
 | The script helps to configure block/unblock list interactively. |
@@ -152,6 +156,7 @@ print "-------------------------------------------------------------------
 print "Username: ";
 my $lba_username = <>;
 chomp $lba_username;
+#print "Enter your password (type your password in line below):\n";
 print "Password: ";
 system("stty -echo");
 my $lba_password = <>;
@@ -160,7 +165,6 @@ system("stty echo");
 print "\n";
 
 my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
-my $ssh_unlimited = login_ssh( $HOSTNAME_CANONICAL, decode_base64($SALLY), decode_base64($HARRY) );
 
 while (1) { # begin of while loop
 
@@ -175,7 +179,6 @@ chomp $listname;
 
 if ( $listname eq "q" ) {
     close_ssh($ssh);
-    close_ssh($ssh_unlimited);
     exit 0;
 }
 if ( $listname !~ /[12]/ ) {
@@ -200,7 +203,6 @@ my $action = <>;
 chomp $action;
 if ( $action eq "q" ) {
     close_ssh($ssh);
-    close_ssh($ssh_unlimited);
     exit 0;
 }
 if ( $action !~ /[123]/ ) {
@@ -219,10 +221,8 @@ if ( $action !~ /[123]/ ) {
 # Do action
 Readonly my $IP_EXAMPLES =>
 "-------------------------------------------------------------------
-| 1.1.1.0/24                                                      |
 | 1.1.1.1                                                         |
-| 1.1.1.1/32                                                      |
-| 1.1.1.0/25 1.1.1.0/26                                           |
+| 1.1.1.1 2.2.2.2                                                 |
 -------------------------------------------------------------------";
 
 if ( $action eq "list" ) {
@@ -243,7 +243,6 @@ if ( $action eq "list" ) {
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
             execute_ssh($ssh, $command);
-            mute_execute_ssh($ssh_unlimited, "$TMSH_EXEC save sys config");
             print_list( $ssh, $listname );
         }
     } elsif ( $action eq "delete" ) {
@@ -259,7 +258,6 @@ if ( $action eq "list" ) {
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
             execute_ssh($ssh, $command);
-            mute_execute_ssh($ssh_unlimited, "$TMSH_EXEC save sys config");
             print_list( $ssh, $listname );
         }
     }
@@ -268,5 +266,4 @@ if ( $action eq "list" ) {
 } # end of while loop
 
 close_ssh($ssh);
-close_ssh($ssh_unlimited);
 exit 0;
