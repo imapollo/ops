@@ -17,7 +17,7 @@ BEGIN {
   use Exporter();
   our ( $VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS );
 
-  $VERSION = do { my @r = (q$Revision: 1.1 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
+  $VERSION = do { my @r = (q$Revision: 1.0 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
 
   @ISA          = qw( Exporter );
   @EXPORT       = qw();
@@ -52,6 +52,7 @@ sub generate_vs_configs {
 sub generate_vs_config {
     my ( $target_file_path, $template_file_path, $envid ) = @_;
 
+    Readonly my $UC_ENVID_TOKEN => '#{uc_env_id}';
     Readonly my $ENVID_TOKEN => '#{env_id}';
     Readonly my $IPADDR_TOKEN => '#{.*\.env_id\.com}';
 
@@ -61,6 +62,9 @@ sub generate_vs_config {
     while ( my $line = <TEMPLATE_FH> ) {
         if ( $line =~ /$ENVID_TOKEN/ ) {
             $line =~ s/$ENVID_TOKEN/$envid/;
+        }
+        if ( $line =~ /$UC_ENVID_TOKEN/ ) {
+            $line =~ s/$UC_ENVID_TOKEN/uc($envid)/eg;
         }
         if ( $line =~ /$IPADDR_TOKEN/ ) {
             my $ip_address = _replace_token_hostname_by_ip( $line, $envid );

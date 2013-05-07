@@ -49,7 +49,7 @@ sub login_ssh {
     $ssh->send("yes\n");
     $ssh->waitfor('qr/$prompt:\s*$/',5);
     $ssh->send("$password\n");
-    my $login_welcome = $ssh->exec("show sys version");
+    my $login_welcome = $ssh->exec("tmsh show sys version");
 
     if ( $login_welcome !~ m/Last login/ ) {
         die "Login has failed. Login output was $login_welcome";

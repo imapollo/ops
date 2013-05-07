@@ -49,6 +49,10 @@ use Stubhub::BigIP::Virtual::ConfigGenerator qw (
                             generate_vs_config
                             generate_vs_configs
                            );
+use Stubhub::BigIP::Pool::ConfigGenerator qw (
+                            generate_pool_config
+                            generate_pool_configs
+                           );
 
 # Get options
 my $show_usage = qw{};
@@ -98,6 +102,25 @@ Examples:
  deploy_bigip -e srwd76
 
 END_OF_HELP
+}
+
+#
+# Get all the rules.
+#
+sub get_rules {
+    my ( $iControl ) = @_;
+    my @rules = $iControl->get_rule_list();
+    return sort @rules;
+}
+
+#
+# Get rules for specified environments.
+#
+sub get_env_rules {
+    my ( $iControl, $pattern ) = @_;
+    my @full_rules = get_rules( $iControl );
+    my @rules = grep /$pattern/i, @full_rules;
+    return @rules;
 }
 
 #
@@ -292,13 +315,31 @@ sub delete_env_virtual_servers {
 }
 
 #
+# Delete pools.
+#
+sub delete_env_pools {
+    my ( $iControl, $pattern ) = @_;
+    my @pools = get_env_pool_list( $iControl, $pattern );
+    $iControl->delete_pools( \@pools );
+}
+
+#
+# Delete rules.
+#
+sub delete_env_rules {
+    my ( $iControl, $pattern ) = @_;
+    my @rules = get_env_rules( $iControl, $pattern );
+    $iControl->delete_rules( \@rules );
+}
+
+#
 # Deploy configurations to the remote server.
 #
 sub deploy_configuration {
     my ( $ssh, $file_name ) = @_;
-    execute_ssh( $ssh, "b merge /config/deploy/$file_name" );
+    execute_ssh( $ssh, "b merge $file_name" );
     mute_execute_ssh( $ssh, "tmsh save sys config" );
-    mute_execute_ssh( $ssh, "rm -f /config/deploy/$file_name" );
+    mute_execute_ssh( $ssh, "rm -f $file_name" );
 }
 
 #
@@ -324,7 +365,7 @@ sub uniq {
 # Generate configuration file based on the template,
 # including virtual server, pool.
 #
-sub generate_vs_configuration {
+sub generate_configuration {
     # TODO test pb branch.
     my ( $env_id, $branch_name ) = @_;
     $branch_name = 'pb_f5_automate';
@@ -342,9 +383,10 @@ sub generate_vs_configuration {
     my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
         = check_out_perfoce_file("/$p4_f5_dir/...");
     
-    my $configuration_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/int", $envid, "/nas/home/minjzhang/temp" );
+    my $vs_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/int", $envid, "/nas/home/minjzhang/temp" );
+    my $pool_file = generate_pool_configs( "$dynamic_perfoce_dir$p4_f5_dir/pools/int", $envid, "/nas/home/minjzhang/temp" );
     clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
-    return $configuration_file;
+    return ( $vs_file, $pool_file );
 }
 
 #
@@ -383,13 +425,20 @@ my $internal_ic = init_bigip_icontrol( $internal_bigip_server );
 my $test_big_ip_server = 'srwd00lba015.stubcorp.dev';
 my $test_ic = init_bigip_icontrol( $test_big_ip_server );
 
-my $configuration_file = generate_vs_configuration( $envid, "" );
 
-upload_file( $test_ic, '/config/deploy/minjzhang.conf', $configuration_file);
+my $internal_vs_file = "/config/deploy/virtual_server_$envid.conf";
+my $internal_pool_file = "/config/deploy/pool_$envid.conf";
+
 delete_env_virtual_servers( $test_ic, $envid );
+delete_env_rules( $test_ic, $envid );
+delete_env_pools( $test_ic, $envid );
 
+my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, "" );
+upload_file( $test_ic, $internal_vs_file, $internal_vs_conf );
+upload_file( $test_ic, $internal_pool_file, $internal_pool_conf );
 my $ssh = init_ssh( $test_big_ip_server );
-deploy_configuration( $ssh, "minjzhang.conf" );
+deploy_configuration( $ssh, $internal_pool_file );
+deploy_configuration( $ssh, $internal_vs_file );
 close_ssh( $ssh );
 
 exit 0;
