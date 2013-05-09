@@ -1,0 +1,173 @@
+#!/usr/bin/perl
+#
+# Convert the firewall rules.
+#
+# Usage: convert_firewall_rule [options]
+#
+# Options:
+#  -f | --file              Another parameter.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  convert_firewall_rule -f firewall_rule.lst
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $source_file = qw{};
+my $options_okay = GetOptions (
+    'f|file=s'    => \$source_file,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+
+Convert the firewall rules.
+
+Usage: convert_firewall_rule [options]
+
+Options:
+ -f | --file              Another parameter.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ convert_firewall_rule -f firewall_rule.lst
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $source_file) {
+    print "Error: The pamameter '-f' must be set.\n";
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+
+my $target_file = "$source_file.out";
+
+open SOURCE_FH, "<$source_file" or die "Error: Cannot open file $source_file: $!";
+open TARGET_FH, ">$target_file" or die "Error: Cannot open file $target_file: $!";
+
+my @source_addresses;
+my @destination_addresses;
+my @applications;
+while ( my $line = <SOURCE_FH> ) {
+    if ( $line !~ /\sthen\s/ ) {
+        if ( $line =~ /\ssource-address\s/ ) {
+            $line =~ s/.*source-address\s+(.*)/$1/;
+            chomp $line;
+            if ( $line =~ /^srw[de][0-9]+([a-z]+)[0-9]+/ ) {
+                $line =~ s/^srw[de][0-9]+([a-z]+)[0-9]+/$1/;
+                $line = "\${envid}" . $line . "001.\${envid}.com";
+                push @source_addresses, $line;
+            } else {
+                print "Ignored: source-address $line.\n";
+            }
+        } elsif ( $line =~ /\sdestination-address\s/ ) {
+            $line =~ s/.*destination-address\s+(.*)/$1/;
+            chomp $line;
+            if ( $line =~ /^D[0-9]+/ ) {
+                print "Ignored: destination-address $line.\n";
+            } elsif ( $line =~ /^srw[de][0-9]+([a-z]+)[0-9]+/ ) {
+                $line =~ s/^srw[de][0-9]+([a-z]+)[0-9]+/$1/;
+                $line = "\${envid}" . $line . "001.\${envid}.com";
+                push @destination_addresses, $line;
+            } elsif ( $line eq 'UPS_SRVS' ) {
+                push @destination_addresses, "184.85.49.242";
+                push @destination_addresses, "96.6.209.242";
+                push @destination_addresses, "184.87.145.242";
+                push @destination_addresses, "184.30.241.242";
+            } else {
+                if ( $line =~ /.*\.srw[de][0-9]+\..*/ ) {
+                    $line =~ s/(.*\.)srw[de][0-9]+(\..*)/$1\${envid}$2/;
+                }
+                push @destination_addresses, $line;
+            }
+        } elsif ( $line =~ /\sapplication\s/ ) {
+            $line =~ s/.*application\s+(.*)/$1/;
+            chomp $line;
+            if ( $line eq 'junos-https' ) {
+                push @applications, "443";
+            } elsif ( $line eq 'junos-http' ) {
+                push @applications, "80";
+            } elsif ( $line =~ /\S+_[0-9]+$/ ) {
+                $line =~ s/\S+_([0-9]+)$/$1/;
+                push @applications, $line;
+            } elsif ( $line eq 'BPM_APPS' ) {
+                push @applications, "1088";
+                push @applications, "1099";
+                push @applications, "1100";
+                push @applications, "1101";
+                push @applications, "1103";
+                push @applications, "4444";
+                push @applications, "4447";
+                push @applications, "8081";
+                push @applications, "8082";
+                push @applications, "8093";
+                push @applications, "9444";
+                push @applications, "9445";
+            } elsif ( $line eq 'EHCACHE_APPS' ) {
+                push @applications, "9530";
+                push @applications, "9630";
+                push @applications, "9510";
+                push @applications, "9610";
+            }
+        }
+    } else {
+        foreach my $source ( @source_addresses ) {
+            foreach my $destination ( @destination_addresses ) {
+                foreach my $application ( @applications ) {
+                    print TARGET_FH "$source:$destination:$application\n";
+                }
+            }
+        }
+        @source_addresses = ();
+        $#source_addresses = -1;
+        @destination_addresses = ();
+        $#destination_addresses = -1;
+        @applications = ();
+        $#applications = -1;
+    }
+}
+
+close SOURCE_FH;
+close TARGET_FH;
+
+exit 0;
