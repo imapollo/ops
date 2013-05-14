@@ -1,0 +1,283 @@
+#!/usr/bin/perl
+
+
+use strict;
+use warnings;
+
+use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Cwd;
+use File::Basename;
+use File::Path;
+use Getopt::Long qw( :config no_ignore_case bundling );
+use List::Util qw( first );
+use Log::Transcript;
+use Readonly;
+use REG::P4::Util qw(
+                      $P4OPTS
+                      branch_path
+                      is_valid_branch
+                      logged_in
+                      p4cmd
+                    );
+use REG::Util qw(
+                  make_lock_directory
+                  mktmpdir
+                  ql
+                  refchk
+                  value_echo
+                );
+use Stubhub::P4::Client qw (
+                  check_out_perfoce_file
+                  clean_perforce_client
+                );
+use REG::RedeemTokens qw ( redeem_tokens );
+use Sys::Hostname;
+
+$|++;
+
+$ENV{ PATH } = '/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin';
+$ENV{ PATH } .= ':/opt/java/bin:/opt/ant/bin';
+
+$ENV{ JAVA_HOME } = '/opt/java';
+
+     # install signal handlers
+$SIG{ HUP }  = \&catch_signal;
+$SIG{ INT }  = \&catch_signal;
+$SIG{ TERM } = \&catch_signal;
+
+sub clean_die ( @ ) ;
+
+my $pgm = basename $0;
+
+     # capture command line information and create a string
+     # representing the original arguments to this program
+Readonly my @ORIGINAL_ARGV => @ARGV;
+Readonly my $ORIGINAL_ARGV => ql( @ARGV );
+
+
+my $usage = << "_END_OF_USAGE_";
+usage: $pgm options
+
+options:
+
+  -b,--branch Branch     branch 
+  -e,--environment Env   environment 
+  -h,--help              List usage
+  -v,--verbose           Select verbose output mode.
+_END_OF_USAGE_
+
+Readonly my $BATCHMODE => not ( -t );
+
+not @ARGV and clean_die $usage;
+
+my $optargs;
+
+if ( not GetOptions (
+           'b|branch=s'          => \$optargs->{ branch },
+           'h|help'              => \$optargs->{ help },
+           'e|environment=s'     => \$optargs->{ environment },
+           'v|verbose'           => \$optargs->{ verbose },
+         )
+   )
+{
+       # otherwise log the command line args and die, sending email in
+       # batchmode
+
+  $BATCHMODE and clean_die "cmdline => $ORIGINAL_ARGV\n$usage";
+  die "cmdline => $ORIGINAL_ARGV\n$usage";
+} # if
+
+$optargs->{ help } and warn $usage and exit 0;
+
+Readonly my $VERBOSE         => defined $optargs->{ verbose };
+Readonly my $BRANCH          => $optargs->{ branch };
+Readonly my $ENVIRONMENT     => $optargs->{ environment };
+
+value_echo( 'cmd',      "$pgm @ORIGINAL_ARGV");
+defined $BRANCH         and value_echo( 'branch',      $BRANCH );
+defined $ENVIRONMENT    and value_echo( 'environment', $ENVIRONMENT );
+
+my $env = uc $ENVIRONMENT;
+
+my $globalResult=0;
+
+my $iruleDir = qw{};
+if ( -d "/nas/release/$env/$BRANCH/config-f5/conf/etc/stubhub/f5/irules" ) {
+  $iruleDir = get_irule_from_build_label( $env, $BRANCH );
+} else {
+  $iruleDir = get_irule_from_p4( $env, $BRANCH );
+}
+
+#foreach my $intExt ("int", "ext") {
+foreach my $intExt ("int") {
+  logwarn "Irules dir not found: $iruleDir" && exit 0 unless -d $iruleDir;
+    
+  my $iruleFiles = `/bin/ls -1 $iruleDir/$intExt/*`;
+  $VERBOSE && value_echo( 'iruleFiles', $iruleFiles );
+  logwarn "No Irules in $iruleDir" && exit 0 unless $iruleFiles;
+  
+  foreach my $iRuleFile (split /\n/, $iruleFiles) {
+    my $foundIruleSuccess=0;
+    next unless $iRuleFile;
+    logecho "===================================";
+    my $cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
+    $cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
+    #$cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
+
+    value_echo('cmd', $cmd);
+
+    open my $CMD, "$cmd 2>&1 |"
+      or clean_die "cmd => '$cmd': can't open command: $!";
+
+    while ( <$CMD> ) {
+      logecho "output: $_";
+      #iRule srwd51-www successfully created
+      $foundIruleSuccess++ if /iRule.*successfully (created|updated)/;
+    } 
+    unless ($foundIruleSuccess) {
+      logwarn "loading irule FAILED: cmd: $cmd";
+      $globalResult++;
+    }
+
+    close $CMD;
+  }
+  system("/bin/rm p4_dynamic_dir -rf");
+}
+
+exit $globalResult;
+
+#------------------------------------------------------------------------
+# Get irule configuration files from build label.
+sub get_irule_from_build_label {
+  my ( $env, $build_label ) = @_;
+  return "/nas/release/$env/$build_label/config-f5/conf/etc/stubhub/f5/irules";
+}
+
+#------------------------------------------------------------------------
+# Get irule configuration files from P4 depot.
+sub get_irule_from_p4 {
+  my ( $env, $branch_name ) = @_;
+  my $env_id = lc($env);
+
+  my $irule_subdir = "templates/fsroot/etc/stubhub/f5/irules";
+
+  my $p4_irule_dir = qw{};
+  if ( $branch_name eq "main" ) {
+    $p4_irule_dir = "/depot/main/$irule_subdir";
+  } elsif ( $branch_name =~ m/^rb_/ ) {
+    $p4_irule_dir = "/depot/release/$branch_name/$irule_subdir";
+  } elsif ( $branch_name =~ m/^pb_/ ) {
+    $p4_irule_dir = "/depot/project/$branch_name/$irule_subdir";
+  } else {
+    print "Error: Branch name $branch_name doesn't exist in depot.\n";
+    exit 1;
+  }
+  my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
+    = check_out_perfoce_file("/$p4_irule_dir/...");
+  system("/bin/chmod u+w $dynamic_perfoce_dir -R");
+
+  foreach my $intExt ("int", "ext") {
+    my $iruleDir = "$dynamic_perfoce_dir$p4_irule_dir/$intExt";
+    logwarn "Irules dir not found: $iruleDir" && exit 0 unless -d $iruleDir;
+
+    my $iruleFiles = `/bin/ls -1 $iruleDir/*`;
+    $VERBOSE && value_echo( 'iruleFiles', $iruleFiles );
+    logwarn "No Irules in $iruleDir" && exit 0 unless $iruleFiles;
+    
+    foreach my $iRuleFile (split /\n/, $iruleFiles) {
+      redeem_config_tokens( $iRuleFile, $env_id);
+    }
+  }
+
+  my $uc_env_id = uc( $env_id );
+  my $dest_file_dir = "/nas/release/$uc_env_id/irules";
+  system("/usr/bin/sudo /bin/cp -rf $dynamic_perfoce_dir/$p4_irule_dir $dest_file_dir");
+
+  clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+
+  return ( $dest_file_dir );
+}
+
+#------------------------------------------------------------------------
+# Redeem configuration tokens
+sub redeem_config_tokens {
+  my ( $config_file_path, $envid ) = @_;
+
+  open my $CONFIG_FILE_FH, '<', $config_file_path
+    or clean_die "redeem_config_tokens(): can't open config file for detokenization;",
+                 " path => '$config_file_path': $!";
+  my $config_file_lines = [ <$CONFIG_FILE_FH> ];
+
+  Readonly my $TOKEN_TABLE_BASED_FILE => "token-table-env-based";
+  Readonly my $TOKEN_TABLE_BASED_DEPOT_PATH => "/internal/dev/properties/tokenization/$TOKEN_TABLE_BASED_FILE";
+
+  my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
+    = check_out_perfoce_file("/$TOKEN_TABLE_BASED_DEPOT_PATH");
+  system("/bin/chmod u+w $dynamic_perfoce_dir -R");
+  my $token_table_fspath = "$dynamic_perfoce_dir$TOKEN_TABLE_BASED_DEPOT_PATH";
+
+  open my $TOKEN_TABLE_FH, '<', $token_table_fspath
+    or clean_die "redeem_config_tokens(): can't open token table for detokenization;",
+                 " path => '$token_table_fspath': $!";
+  my $token_table_lines = [ <$TOKEN_TABLE_FH> ];
+  close $TOKEN_TABLE_FH
+    or clean_die
+         "redeem_config_tokens(): can't close token table file after reading for for",
+         " detokenization; path => '$config_file_path': $!";
+
+  my $redemption_values = {};
+  my $redemption_id = lc $envid;
+
+  my $redeem_results = redeem_tokens ({
+                          template_data     => $config_file_lines,
+                          token_table       => $token_table_lines,
+                          redemption_values => $redemption_values,
+                          redeem_for        => $redemption_id,
+                          show_token_identifiers_and_values => 0,
+                        });
+  exists $redeem_results->{ error }
+    and clean_die "error redeeming tokens; file => '$config_file_path';",
+                  " redeeming for '$redemption_id' ;",
+                  " redeem results => '$redeem_results->{ error }'";
+
+  my $detokenized_data  = $redeem_results->{ detokenized_lines };
+  $redemption_values = $redeem_results->{ redemption_values };
+
+  open my $FH, '>', $config_file_path
+      or clean_die "redeem_config_tokens(): can't open '$config_file_path'",
+                   " for writing: $!";
+  for my $line ( @$detokenized_data ) {
+    print $FH $line;
+  }
+
+  close $FH
+    or logwarn "redeem_config_tokens(): can't close '$config_file_path'",
+               " after writing: $!";
+
+}
+
+#------------------------------------------------------------------------
+ # call logdie() with all arguments; call cleanup subroutine;
+ # exit with a die return code
+sub clean_die ( @ ) {
+
+  cleanup();
+
+       # now we fall on our sword...
+  logdie( @_ );
+} # clean_die
+
+#-----------------------------------------------------------------------
+sub cleanup {
+
+  return;
+} # cleanup
+
+#-----------------------------------------------------------------------
+     # handle signals; print signal name and then cleanly die
+sub catch_signal {
+  my $signame = shift;
+  clean_die "caught SIG$signame";
+} # catch_signal

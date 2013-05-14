@@ -337,7 +337,8 @@ sub delete_env_rules {
 #
 sub deploy_configuration {
     my ( $ssh, $file_name ) = @_;
-    execute_ssh( $ssh, "b merge $file_name" );
+    #execute_ssh( $ssh, "b merge $file_name" );
+    execute_ssh( $ssh, "merge $file_name" );
     mute_execute_ssh( $ssh, "tmsh save sys config" );
     mute_execute_ssh( $ssh, "rm -f $file_name" );
 }
@@ -438,6 +439,8 @@ upload_file( $test_ic, $internal_vs_file, $internal_vs_conf );
 upload_file( $test_ic, $internal_pool_file, $internal_pool_conf );
 my $ssh = init_ssh( $test_big_ip_server );
 deploy_configuration( $ssh, $internal_pool_file );
+# call deploy-irules
+system("/nas/home/minjzhang/bin/deploy-irules -e srwd95 -b rb_ecomm_13_6");
 deploy_configuration( $ssh, $internal_vs_file );
 close_ssh( $ssh );
 
