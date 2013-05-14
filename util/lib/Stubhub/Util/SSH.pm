@@ -72,15 +72,19 @@ sub close_ssh {
 sub mute_execute_ssh {
     my ( $ssh, $command ) = @_;
     my $output = $ssh->exec($command);
-    my @original_outputs = split(/\n/, $output);
-    my @outputs;
-    foreach my $line ( @original_outputs ) {
-        if ( $line !~ /tmos/ ) {
-            chomp $line;
-            push(@outputs, $line);
+    if ( defined $output ) {
+        my @original_outputs = split(/\n/, $output);
+        my @outputs;
+        foreach my $line ( @original_outputs ) {
+            if ( $line !~ /tmos/ ) {
+                chomp $line;
+                push(@outputs, $line);
+            }
         }
+        return @outputs;
+    } else {
+        return;
     }
-    return @outputs;
 }
 
 #
