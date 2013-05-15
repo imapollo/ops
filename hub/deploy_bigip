@@ -28,6 +28,7 @@ use Readonly;
 use Getopt::Long;
 use Data::Dumper;
 use MIME::Base64;
+use File::Temp;
 use BigIP::iControl;
 use Stubhub::Util::SSH qw (
                             login_ssh
@@ -287,8 +288,6 @@ sub init_bigip_icontrol {
                                 server => "$bigip_server",
                                 username => "$BIGIP_USERNAME",
                                 password => decode_base64($BIGIP_PASSWORD),
-                                #username => "root",
-                                #password => "lumnB0tl",
                                 port     => $BIGIP_PORT,
                                 proto    => "$BIGIP_PROTOCOL"
                             );
@@ -368,7 +367,7 @@ sub uniq {
 #
 sub generate_configuration {
     # TODO test pb branch.
-    my ( $env_id, $branch_name ) = @_;
+    my ( $env_id, $branch_name, $tmpdir ) = @_;
     $branch_name = 'pb_f5_automate';
     my $p4_f5_dir = qw{};
     if ( $branch_name eq "main" ) {
@@ -384,8 +383,8 @@ sub generate_configuration {
     my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
         = check_out_perfoce_file("/$p4_f5_dir/...");
     
-    my $vs_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/int", $envid, "/nas/home/minjzhang/temp" );
-    my $pool_file = generate_pool_configs( "$dynamic_perfoce_dir$p4_f5_dir/pools/int", $envid, "/nas/home/minjzhang/temp" );
+    my $vs_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/int", $envid, "$tmpdir" );
+    my $pool_file = generate_pool_configs( "$dynamic_perfoce_dir$p4_f5_dir/pools/int", $envid, "$tmpdir" );
     clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
     return ( $vs_file, $pool_file );
 }
@@ -434,7 +433,8 @@ delete_env_virtual_servers( $test_ic, $envid );
 delete_env_rules( $test_ic, $envid );
 delete_env_pools( $test_ic, $envid );
 
-my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, "" );
+my $tmpdir = File::Temp->newdir();
+my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, "", $tmpdir );
 upload_file( $test_ic, $internal_vs_file, $internal_vs_conf );
 upload_file( $test_ic, $internal_pool_file, $internal_pool_conf );
 my $ssh = init_ssh( $test_big_ip_server );
