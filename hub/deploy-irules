@@ -110,6 +110,7 @@ if ( -d "/nas/release/$env/$BRANCH/config-f5/conf/etc/stubhub/f5/irules" ) {
   $iruleDir = get_irule_from_p4( $env, $BRANCH );
 }
 
+# TODO for testing, only enable internal
 #foreach my $intExt ("int", "ext") {
 foreach my $intExt ("int") {
   logwarn "Irules dir not found: $iruleDir" && exit 0 unless -d $iruleDir;
@@ -122,9 +123,9 @@ foreach my $intExt ("int") {
     my $foundIruleSuccess=0;
     next unless $iRuleFile;
     logecho "===================================";
+    # TODO for testing
     my $cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
     $cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
-    #$cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
 
     value_echo('cmd', $cmd);
 

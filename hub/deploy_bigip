@@ -1,19 +1,21 @@
 #!/usr/bin/perl
 #
 # Deploy F5 BIG-IP resources to the target environment.
-# Following items will be checked:
+# Following items will be deployed:
 #  - Virtual Server
 #  - Pool
+#  - iRule
 #
 # Usage: deploy_bigip [options]
 #
 # Options:
 #  -e | --env               Specify the environment ID. For example: srwd76.
+#  -b | --branch            Specify the branch name. For example: rb_ecomm_13_6.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
 # Examples:
-#  deploy_bigip -e srwd76
+#  deploy_bigip -e srwd76 -b rb_ecomm_13_6
 #
 # Author: minjzhang
 #
@@ -29,6 +31,7 @@ use Getopt::Long;
 use Data::Dumper;
 use MIME::Base64;
 use File::Temp;
+use Log::Transcript;
 use BigIP::iControl;
 use Stubhub::Util::SSH qw (
                             login_ssh
@@ -59,8 +62,10 @@ use Stubhub::BigIP::Pool::ConfigGenerator qw (
 my $show_usage = qw{};
 my $show_verbose = qw{};
 my $envid = qw{};
+my $branch = qw{};
 my $options_okay = GetOptions (
    'e|env=s'     => \$envid,
+   'b|branch=s'  => \$branch,
    'v|verbose'   => \$show_verbose,
    'h|help'      => \$show_usage,
 );
@@ -88,14 +93,16 @@ if ( $show_usage ) {
 sub usage {
    print <<END_OF_HELP
 Deploy F5 BIG-IP resources to the target environment.
-Following items will be checked:
+Following items will be deployed:
  - Virtual Server
  - Pool
+ - iRule
 
 Usage: deploy_bigip [options]
 
 Options:
  -e | --env               Specify the environment ID. For example: srwd76.
+ -b | --branch            Specify the branch name. For example: rb_ecomm_13_6.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
@@ -183,7 +190,7 @@ sub validate_virtual_servers {
     foreach my $virtual_server ( @virtual_servers ) {
         my $vs_destination = $iControl->get_vs_destination($virtual_server);
         my $vs_hostname = get_hostname_from_ip($vs_destination);
-        print "$virtual_server: $vs_hostname $vs_destination\n";
+        logecho "$virtual_server: $vs_hostname $vs_destination\n";
     }
 }
 
@@ -196,7 +203,7 @@ sub validate_env_virtual_servers {
     foreach my $virtual_server ( @virtual_servers ) {
         my $vs_destination = $iControl->get_vs_destination($virtual_server);
         my $vs_hostname = get_hostname_from_ip($vs_destination);
-        print "$virtual_server: $vs_hostname $vs_destination\n";
+        logecho "$virtual_server: $vs_hostname $vs_destination\n";
     }
 }
 
@@ -218,14 +225,14 @@ sub validate_env_default_pool {
     my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
     foreach my $virtual_server ( @virtual_servers ) {
         my $pool_name = get_default_pool_for_virtual_server( $iControl, $virtual_server );
-        print "$virtual_server: $pool_name\n";
+        logecho "$virtual_server: $pool_name\n";
         if ( $pool_name ne "" ) {
-            print "Members:\n";
+            logecho "Members:\n";
             foreach my $member ( $iControl->get_pool_members($pool_name) ) {
                 my $ip_address = $member;
                 $ip_address =~ s/(.*):.*/$1/;
                 my $hostnames = get_hostname_from_ip($ip_address);
-                print "$hostnames $member\n";
+                logecho "$hostnames $member\n";
             }
         }
     }
@@ -337,7 +344,17 @@ sub delete_env_rules {
 sub deploy_configuration {
     my ( $ssh, $file_name ) = @_;
     #execute_ssh( $ssh, "b merge $file_name" );
-    execute_ssh( $ssh, "merge $file_name" );
+    my @merge_output = mute_execute_ssh( $ssh, "merge $file_name" );
+    if ( grep /error/i, @merge_output ) {
+        foreach my $line ( @merge_output ) {
+            logecho $line;
+        }
+        exit 1;
+    } elsif ( $show_verbose ) {
+        foreach my $line ( @merge_output ) {
+            logecho $line;
+        }
+    }
     mute_execute_ssh( $ssh, "tmsh save sys config" );
     mute_execute_ssh( $ssh, "rm -f $file_name" );
 }
@@ -366,18 +383,17 @@ sub uniq {
 # including virtual server, pool.
 #
 sub generate_configuration {
-    # TODO test pb branch.
     my ( $env_id, $branch_name, $tmpdir ) = @_;
-    $branch_name = 'pb_f5_automate';
     my $p4_f5_dir = qw{};
+    my $p4_f5_subdir = "templates/fsroot/etc/stubhub/f5";
     if ( $branch_name eq "main" ) {
-        $p4_f5_dir = "/depot/main/templates/fsroot/etc/stubhub/f5";
+        $p4_f5_dir = "/depot/main/$p4_f5_subdir";
     } elsif ( $branch_name =~ m/^rb_/ ) {
-        $p4_f5_dir = "/depot/release/$branch_name/templates/fsroot/etc/stubhub/f5";
+        $p4_f5_dir = "/depot/release/$branch_name/$p4_f5_subdir";
     } elsif ( $branch_name =~ m/^pb_/ ) {
-        $p4_f5_dir = "/depot/project/$branch_name/templates/fsroot/etc/stubhub/f5";
+        $p4_f5_dir = "/depot/project/$branch_name/$p4_f5_subdir";
     } else {
-        print "Error: Branch name $branch_name doesn't look good.\n";
+        logecho "Error: Branch name $branch_name doesn't look good.\n";
         exit 1;
     }
     my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
@@ -392,8 +408,8 @@ sub generate_configuration {
 #
 # Parameter validation
 #
-if ( ! defined $envid) {
-    print "Error: The pamameter '-e' must be set.\n";
+if ( ! defined $envid or ! defined $branch) {
+    logecho "Error: The pamameter '-e' and '-b' must be set.\n";
     usage();
     exit 1;
 }
@@ -421,26 +437,34 @@ if ( $env_number >= 76 ) {
 my $external_ic = init_bigip_icontrol( $external_bigip_server );
 my $internal_ic = init_bigip_icontrol( $internal_bigip_server );
 
-# test
+# TODO for testing
 my $test_big_ip_server = 'srwd00lba015.stubcorp.dev';
 my $test_ic = init_bigip_icontrol( $test_big_ip_server );
 
-
-my $internal_vs_file = "/config/deploy/virtual_server_$envid.conf";
-my $internal_pool_file = "/config/deploy/pool_$envid.conf";
-
+# Remove the virtual servers, rules and pools for specific environment.
+logecho "Deleting virtual servers for $envid ...\n" if $show_verbose;
 delete_env_virtual_servers( $test_ic, $envid );
+logecho "Deleting rules for $envid ...\n" if $show_verbose;
 delete_env_rules( $test_ic, $envid );
+logecho "Deleting pools for $envid ...\n" if $show_verbose;
 delete_env_pools( $test_ic, $envid );
 
+# Deploy virtual servers, rules and pools for specific environment.
 my $tmpdir = File::Temp->newdir();
-my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, "", $tmpdir );
+logecho "Generating virtual server, pool configuration files ...\n" if $show_verbose;
+my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $tmpdir );
+my $internal_vs_file = "/config/deploy/virtual_server_$envid.conf";
+my $internal_pool_file = "/config/deploy/pool_$envid.conf";
+logecho "Uploading virtual server, pool configuration files ...\n" if $show_verbose;
 upload_file( $test_ic, $internal_vs_file, $internal_vs_conf );
 upload_file( $test_ic, $internal_pool_file, $internal_pool_conf );
+logecho "Deploying pools for $envid ...\n" if $show_verbose;
 my $ssh = init_ssh( $test_big_ip_server );
+logecho "Deploying irules for $envid ...\n" if $show_verbose;
 deploy_configuration( $ssh, $internal_pool_file );
-# call deploy-irules
-system("/nas/home/minjzhang/bin/deploy-irules -e srwd95 -b rb_ecomm_13_6");
+# TODO for testing
+system("/nas/home/minjzhang/bin/deploy-irules -e srwd95 -b $branch");
+logecho "Deploying virtual servers for $envid ...\n" if $show_verbose;
 deploy_configuration( $ssh, $internal_vs_file );
 close_ssh( $ssh );
 
