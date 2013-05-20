@@ -21,6 +21,7 @@ use strict;
 use warnings;
 
 use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 use Getopt::Long;
@@ -159,8 +160,7 @@ sub validate_env_virtual_servers {
 sub get_default_pool_for_virtual_server {
     my ( $iControl, $virtual_server ) = @_;
     my $default_pool_name = $iControl->get_default_pool_name($virtual_server);
-    my $pool_name = $$default_pool_name[0];
-    return $pool_name;
+    return $default_pool_name;
 }
 
 #
@@ -219,6 +219,10 @@ sub validate_env_pool_status {
             printf "%-30s %-20s\n", $pool, "PASS" if $show_verbose;
         }
     }
+    if ( scalar @pool_list == 0 ) {
+        printf "Error: No pools found for $pattern\n";
+        return 0;
+    }
     return $overall_pass;
 }
 
@@ -235,6 +239,15 @@ sub filter_pool_list {
         }
     }
     return @filtered_pool_list;
+}
+
+#
+# Set active paration.
+#
+sub set_partition {
+    my ( $iControl, $partition_name ) = @_;
+    $iControl->set_active_partition( $partition_name );
+    return;
 }
 
 #
@@ -257,8 +270,14 @@ if ( ! defined $envid) {
 # Main
 #
 my $env_number = $envid;
-$env_number =~ s/[srwd|srwe|SRWD|SRWE]//g;
+my $env_prefix = $envid;
+$env_number =~ s/[srwd|srwe|srwq|SRWD|SRWE|SRWQ]//g;
+$env_prefix =~ s/(srw[dqe]).*/$1/g;
 chomp $env_number;
+chomp $env_prefix;
+
+my $internal_partition = "Common";
+my $external_partition = "Common";
 
 my $internal_bigip_server = qw{};
 my $external_bigip_server = qw{};
@@ -267,9 +286,13 @@ Readonly my $BIGIP_PASSWORD => 'UjhiYml0U3Qzdw==';
 Readonly my $BIGIP_PORT     => 443;
 Readonly my $BIGIP_PROTOCOL => 'https';
 
-if ( $env_number >= 76 ) {
+if ( $env_number >= 76 or $env_prefix =~ /srwq/i ) {
     $internal_bigip_server = 'srwd00lba014.stubcorp.dev';
     $external_bigip_server = 'srwd00lba042-cl.stubcorp.dev';
+    if ( $env_prefix =~ /srwq/i ) {
+        $internal_partition = "Noconly";
+        $external_partition = "data-group";
+    }
 } else {
     $internal_bigip_server = '10.80.139.232';
     $external_bigip_server = '10.80.139.242';
@@ -289,6 +312,9 @@ my $internal_ic = BigIP::iControl->new(
                                 port     => $BIGIP_PORT,
                                 proto    => "$BIGIP_PROTOCOL"
                             );
+
+set_partition( $external_ic, $external_partition );
+set_partition( $internal_ic, $internal_partition );
 
 my $external_pass = validate_env_pool_status( $external_ic, $envid );
 my $internal_pass = validate_env_pool_status( $internal_ic, $envid );
