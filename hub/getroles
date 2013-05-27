@@ -3,9 +3,29 @@
 DEV_QA_HOSTS="/nas/reg/etc/dev-qa-hosts"
 
 envid=$1
+only_hardware=$2
 
 if [[ "$envid" == "" ]]; then
     echo "Error: Please set the environment ID. For example, srwd86"
 fi
 
-grep $envid /nas/reg/etc/dev-qa-hosts
+if [[ "$only_hardware" == "-h" ]]; then
+    grep $envid /nas/reg/etc/dev-qa-hosts | while read line
+    do
+        physical_console=`echo $line | awk -F. '{ print $1 "m1." $2 "." $3 }'`
+        if host $physical_console | grep -q "is an alias for"; then
+            echo $line
+        fi
+    done
+elif [[ "$only_hardware" == "-s" ]]; then
+    grep $envid /nas/reg/etc/dev-qa-hosts | while read line
+    do
+        physical_console=`echo $line | awk -F. '{ print $1 "m1." $2 "." $3 }'`
+        if ! host $physical_console | grep -q "is an alias for"; then
+            echo $line
+        fi
+    done
+else
+    grep $envid /nas/reg/etc/dev-qa-hosts
+fi
+

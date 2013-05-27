@@ -103,6 +103,22 @@ sub filter_variables {
             $envid =~ s/srw[de]([0-9]+)/$1/;
             $line =~ s/\$<delphix_db_prefix_19>$envid/<DELPHIX_SID>/;
         }
+    } elsif ( $env_type eq "srwq" ) {
+        if ( $db_host_id == "08" ) {
+            $line =~ s/\$<delphix_host01>/<DELPHIX_HOST>/;
+            $envid =~ s/srw[deq]([0-9]+)/$1/;
+            $line =~ s/\$<delphix_dbq_prefix>$envid/<DELPHIX_SID>/;
+        }
+        if ( $db_host_id == "16" ) {
+            $line =~ s/\$<delphix_host02>/<DELPHIX_HOST>/;
+            $envid =~ s/srw[deq]([0-9]+)/$1/;
+            $line =~ s/\$<delphix_dbq_prefix_16>$envid/<DELPHIX_SID>/;
+        }
+        if ( $db_host_id == "19" ) {
+            $line =~ s/\$<delphix_host03>/<DELPHIX_HOST>/;
+            $envid =~ s/srw[deq]([0-9]+)/$1/;
+            $line =~ s/\$<delphix_dbq_prefix_19>$envid/<DELPHIX_SID>/;
+        }
     } elsif ( $env_type eq "srwe" ) {
         if ( $envid eq "srwe01" ) {
             $line =~ s/\$<db17_pe>/<DELPHIX_SID>/;
@@ -143,8 +159,8 @@ sub get_env_type {
     my ( $envid ) = @_;
     my $env_type = qw{};
 
-    if ( $envid !~ m/srw[de].*/ ) {
-        print "Error: the environment id is wrong: $envid";
+    if ( $envid !~ m/srw[deq].*/ ) {
+        print "Error: the environment id is wrong: $envid\n";
         usage();
         exit 1;
     } else {
@@ -153,6 +169,9 @@ sub get_env_type {
             return $env_type;
         } elsif ( $envid =~ m/srwe.*/ ) {
             $env_type = "srwe";
+            return $env_type;
+        } elsif ( $envid =~ m/srwq.*/ ) {
+            $env_type = "srwq";
             return $env_type;
         }
     }
@@ -170,7 +189,11 @@ sub get_db_connection {
     } elsif ( $env_type eq "srwe" ) {
         $envid =~ s/srwe([0-9]+)/$1/;
         $db_instance = "PE$envid";
+    } elsif ( $env_type eq "srwq" ) {
+        $envid =~ s/srwq([0-9]+)/$1/;
+        $db_instance = "QE$envid";
     }
+
 
     my $tnsnames="/nas/home/oracle/OraHome/network/admin/tnsnames.ora";
     open TNSNAMES_FH, "<$tnsnames" or die $!;
