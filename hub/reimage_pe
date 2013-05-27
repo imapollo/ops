@@ -1,0 +1,22 @@
+#!/bin/sh
+
+file=$1
+
+if [[ "$file" == "" ]]; then
+    echo "Error: parameter must be specified for file path."
+    exit 1
+fi
+
+machines=0
+cat $file | while read line
+do
+    let "machines++"
+    echo "reimaging $line"
+    ipmitool -H $line -U ADMIN -P ADMIN -I lan chassis bootdev pxe
+    sleep 4
+    ipmitool -H $line -U ADMIN -P ADMIN -I lan power cycle
+    if [[ "$machines" == 3 ]]; then
+        sleep 900
+        machines=0
+    fi
+done
