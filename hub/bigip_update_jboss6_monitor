@@ -1,0 +1,153 @@
+#!/usr/bin/perl
+#
+# Update the monitor for jboss 6.
+#
+# Usage: bigip_update_jboss6_monitor [options]
+#
+# Options:
+#  -e | --env               Specify the environment id to be updated. For example: srwd76.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  bigip_update_jboss6_monitor -e srwd76
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $envid = qw{};
+my $options_okay = GetOptions (
+    'e|env=s'     => \$envid,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+Update the monitor for jboss 6.
+
+Usage: bigip_update_jboss6_monitor [options]
+
+Options:
+ -e | --env               Specify the environment id to be updated. For example: srwd76.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ bigip_update_jboss6_monitor -e srwd76
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $envid) {
+    print "Error: The pamameter '-e' must be set.\n";
+    usage();
+    exit 1;
+}
+
+#
+# Uniq the items in array.
+#
+sub uniq {
+    return keys %{{ map { $_ => 1 } @_ }};
+}
+
+#
+# Get the pools need to be updated.
+#
+sub get_update_pools {
+    my ( $envid ) = @_;
+
+    my $pools = `/nas/home/minjzhang/bin/bigip_get_pools -e $envid`;
+    my @bigip_pools = split "\n", $pools;
+
+    my $jboss6_list_file = "/nas/home/minjzhang/temp/jboss6.lst";
+    open JBOSS6_LST_FH, "<$jboss6_list_file"
+        or die "Cannot open file $jboss6_list_file: $!";
+    my @jboss6_server_list = <JBOSS6_LST_FH>;
+    chomp @jboss6_server_list;
+    my %jboss6_servers = map { $_ => 1 } @jboss6_server_list;
+
+    my %jboss6_pools;
+    foreach my $pool ( @bigip_pools ) {
+        my $blade = $pool;
+        $blade =~ s/.*:srw[deq][0-9]{2}([a-z]{3}).*/$1/;
+        if ( exists( $jboss6_servers{$blade} ) ) {
+            $pool =~ s/(.*):.*/$1/;
+            $jboss6_pools{"$pool"} = 1;
+        }
+    }
+
+    close JBOSS6_LST_FH;
+
+    return %jboss6_pools;
+}
+
+#
+# Main
+#
+
+my %update_pools = get_update_pools( $envid );
+
+my $bigip_conf_file_path = "/nas/home/minjzhang/temp/bigip.conf";
+my $bigip_conf_file_dest = "/nas/home/minjzhang/temp/bigip.conf.dest";
+open BIGIP_CONF_FH, "<$bigip_conf_file_path"
+    or die "Cannot open file $bigip_conf_file_path: $!";
+open BIGIP_CONF_DEST_FH, ">$bigip_conf_file_dest"
+    or die "Cannot open file $bigip_conf_file_dest: $!";
+
+my $inpool = 0;
+while ( my $line = <BIGIP_CONF_FH> ) {
+    if ( $inpool ) {
+        chomp $line;
+        if ( $line =~ /^}$/ ) {
+            $inpool = 0;
+        }
+        $line =~ s/JBoss-JMX-GET_SSL_443/Jboss6-JMX-GET_SSL_443/;
+        $line =~ s/JBoss-JMX-GET_8080/Jboss6-JMX-GET_8080/;
+        $line =~ s/JBoss-JMX-GET/Jboss6-JMX-GET/;
+        print "$line\n";
+    }
+    if ( $line =~ /^pool\s+.*\s+{\s*/ ) {
+        $line =~ s/^pool\s+(.*)\s+{\s*/$1/;
+        if ( exists( $update_pools{$line} ) ) {
+            $inpool = 1;
+            print "$line\n";
+        }
+    }
+}
+
+close BIGIP_CONF_FH;
+close BIGIP_CONF_DEST_FH;
+
+exit 0;
