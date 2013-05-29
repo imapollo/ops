@@ -1,0 +1,309 @@
+#!/usr/bin/perl
+#
+# Get a mapping between pool names and pool members
+#
+# Usage: bigip_get_pools [options]
+#
+# Options:
+#  -e | --env               Specify the environment ID. For example: srwd76.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  bigip_get_pools -e srwd76
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+
+use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Readonly;
+use Getopt::Long;
+use Data::Dumper;
+use BigIP::iControl;
+use MIME::Base64;
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $envid = qw{};
+my $options_okay = GetOptions (
+   'e|env=s'     => \$envid,
+   'v|verbose'   => \$show_verbose,
+   'h|help'      => \$show_usage,
+);
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+   print <<END_OF_HELP
+Get a mapping between pool names and pool members
+
+Usage: bigip_get_pools [options]
+
+Options:
+ -e | --env               Specify the environment ID. For example: srwd76.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ bigip_get_pools -e srwd76
+
+END_OF_HELP
+}
+
+#
+# Get all the virtual servers.
+#
+sub get_virtual_servers {
+    my ( $iControl ) = @_;
+    my @virtual_servers = $iControl->get_vs_list();
+    return sort @virtual_servers;
+}
+
+#
+# Get environment specific virtual servers.
+#
+sub get_env_virtual_servers {
+    my ( $iControl, $pattern ) = @_;
+    my @full_virtual_servers = get_virtual_servers( $iControl );
+    my @virtual_servers = grep /$pattern/i, @full_virtual_servers;
+    return @virtual_servers;
+}
+
+#
+# Get pool list for all the environments.
+#
+sub get_pool_list {
+    my ( $iControl ) = @_;
+    my @pool_list = $iControl->get_pool_list();
+    return sort @pool_list;
+}
+
+#
+# Get environment specific pool list.
+#
+sub get_env_pool_list {
+    my ( $iControl, $pattern ) = @_;
+    my @full_pool_list = get_pool_list( $iControl );
+    my @pool_list = grep /$pattern/i, @full_pool_list;
+    return @pool_list;
+}
+
+#
+# Get the hostname from IP address (nslookup).
+#
+sub get_hostname_from_ip {
+    my ( $ip_address ) = @_;
+    $ip_address =~ s/(.*):.*/$1/;
+    my $hostnames = `nslookup $ip_address | grep name | cut -d" " -f3`;
+    chomp $hostnames;
+    $hostnames =~ s/\n/,/g;
+    $hostnames =~ s/\.$//;
+    return $hostnames;
+}
+
+#
+# Validate virtual servers.
+#
+sub validate_virtual_servers {
+    my ( $iControl ) = @_;
+    my @virtual_servers = get_virtual_servers( $iControl );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $vs_destination = $iControl->get_vs_destination($virtual_server);
+        my $vs_hostname = get_hostname_from_ip($vs_destination);
+        print "$virtual_server: $vs_hostname $vs_destination\n";
+    }
+}
+
+#
+# Validate virtual servers for specified environment.
+#
+sub validate_env_virtual_servers {
+    my ( $iControl, $pattern ) = @_;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $vs_destination = $iControl->get_vs_destination($virtual_server);
+        my $vs_hostname = get_hostname_from_ip($vs_destination);
+        print "$virtual_server: $vs_hostname $vs_destination\n";
+    }
+}
+
+#
+# Get default pool for specified virtual server.
+#
+sub get_default_pool_for_virtual_server {
+    my ( $iControl, $virtual_server ) = @_;
+    my $default_pool_name = $iControl->get_default_pool_name($virtual_server);
+    return $default_pool_name;
+}
+
+#
+# Validate default pool for specified environment.
+#
+sub validate_env_default_pool {
+    my ( $iControl, $pattern ) = @_;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $pool_name = get_default_pool_for_virtual_server( $iControl, $virtual_server );
+        print "$virtual_server: $pool_name\n";
+        if ( $pool_name ne "" ) {
+            print "Members:\n";
+            foreach my $member ( $iControl->get_pool_members($pool_name) ) {
+                my $ip_address = $member;
+                $ip_address =~ s/(.*):.*/$1/;
+                my $hostnames = get_hostname_from_ip($ip_address);
+                print "$hostnames $member\n";
+            }
+        }
+    }
+}
+
+#
+# Get valid pools for specific environment.
+#
+sub get_env_valid_pools {
+    my ( $iControl, $pattern ) = @_;
+    my @pool_list;
+    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $pool_name = get_default_pool_for_virtual_server( $iControl, $virtual_server );
+        if ( $pool_name ne "" and defined $pool_name ) {
+            push @pool_list, $pool_name;
+        }
+    }
+    @pool_list = sort(uniq(@pool_list));
+    @pool_list = filter_pool_list(@pool_list);
+    return @pool_list;
+}
+
+#
+# Print pool names and members.
+#
+sub print_pool_names_members {
+    my ( $iControl, $pattern ) = @_;
+    my @pool_list = get_env_valid_pools( $iControl, $pattern );
+    foreach my $pool ( @pool_list ) {
+        foreach my $member ($iControl->get_pool_members($pool)) {
+            $member =~ s/(.*):.*/$1/;
+            print $pool . ":" . get_hostname_from_ip( $member ) . "\n";
+        }
+    }
+}
+
+#
+# Filter with ignere POOL list.
+#
+sub filter_pool_list {
+    my ( @pool_list ) = @_;
+    my @filtered_pool_list;
+    foreach my $pool_name ( @pool_list ) {
+        if ( $pool_name !~ /SRW[DE][0-9]+-ABX-FTP$/ 
+                and $pool_name !~ /SRW[DE][0-9]+-EHCACHE$/ ) {
+            push @filtered_pool_list, $pool_name;
+        }
+    }
+    return @filtered_pool_list;
+}
+
+#
+# Set active paration.
+#
+sub set_partition {
+    my ( $iControl, $partition_name ) = @_;
+    $iControl->set_active_partition( $partition_name );
+    return;
+}
+
+#
+# Uniq the items in array.
+#
+sub uniq {
+    return keys %{{ map { $_ => 1 } @_ }};
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $envid) {
+    print "Error: The pamameter '-e' must be set.\n";
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+my $env_number = $envid;
+my $env_prefix = $envid;
+$env_number =~ s/[srwd|srwe|srwq|SRWD|SRWE|SRWQ]//g;
+$env_prefix =~ s/(srw[dqe]).*/$1/g;
+chomp $env_number;
+chomp $env_prefix;
+
+my $internal_partition = "Common";
+my $external_partition = "Common";
+
+my $internal_bigip_server = qw{};
+my $external_bigip_server = qw{};
+Readonly my $BIGIP_USERNAME => 'svcacctrelmgt';
+Readonly my $BIGIP_PASSWORD => 'UjhiYml0U3Qzdw==';
+Readonly my $BIGIP_PORT     => 443;
+Readonly my $BIGIP_PROTOCOL => 'https';
+
+if ( $env_number >= 76 or $env_prefix =~ /srwq/i ) {
+    $internal_bigip_server = 'srwd00lba014.stubcorp.dev';
+    $external_bigip_server = 'srwd00lba042-cl.stubcorp.dev';
+    if ( $env_prefix =~ /srwq/i ) {
+        $internal_partition = "Noconly";
+        $external_partition = "data-group";
+    }
+} else {
+    $internal_bigip_server = '10.80.139.232';
+    $external_bigip_server = '10.80.139.242';
+}
+
+my $external_ic = BigIP::iControl->new(
+                                server => "$external_bigip_server",
+                                username => "$BIGIP_USERNAME",
+                                password => decode_base64($BIGIP_PASSWORD),
+                                port     => $BIGIP_PORT,
+                                proto    => "$BIGIP_PROTOCOL"
+                            );
+my $internal_ic = BigIP::iControl->new(
+                                server => "$internal_bigip_server",
+                                username => "$BIGIP_USERNAME",
+                                password => decode_base64($BIGIP_PASSWORD),
+                                port     => $BIGIP_PORT,
+                                proto    => "$BIGIP_PROTOCOL"
+                            );
+
+set_partition( $external_ic, $external_partition );
+set_partition( $internal_ic, $internal_partition );
+
+my $external_pass = print_pool_names_members( $external_ic, $envid );
+my $internal_pass = print_pool_names_members( $internal_ic, $envid );
+
+exit 0;
