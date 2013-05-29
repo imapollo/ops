@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# Do sanity check for the environment.
+# - BigIP Pool Validation
+# - Main Page
+# - Menus
+# - LCS index
+#
+# Usage: sanity_check [options]
+#
+# Options:
+#  -e | --env=..       Specify the environment ID.
+#  -d | --debug        Print debug messages.
+#
+# Author: minjzhang
+#
+
+options=$@
+
+envid=""
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+
+sanity_check $options
+$*
+Do sanity check for the environment.
+- BigIP Pool Validation
+- Main Page
+- Menus
+- LCS index
+
+Usage: sanity_check [options]
+
+Options:
+ -e | --env=..       Specify the environment ID.
+ -d | --debug        Print debug messages.
+
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o e:d -l env:,debug -- $options`
+if [ $? != 0 ]; then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -e | --env) envid=${2// }; shift 2;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+if [[ "$envid" == "" ]]; then
+    echo "Error: Parameter '-e' must be set for environment ID."
+    _usage
+    exit 1
+fi
+
+#
+# Validate the BigIP pool status.
+#
+/nas/reg/bin/validate_bigip -e $envid
+echo $?
+
+#
+# Validate the main page.
+#
+curl http://www.$envid.com | grep -iq ""
+
+
+exit 0
