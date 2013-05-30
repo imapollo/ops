@@ -208,18 +208,21 @@ sub get_env_valid_pools {
 #
 sub validate_env_pool_status {
     my ( $iControl, $pattern ) = @_;
-    my @pool_list = get_env_valid_pools( $iControl, $pattern );
+    my @pool_list = get_env_pool_list( $iControl, $pattern );
+    my @filtered_pool_list = filter_pool_list( @pool_list );
     my $overall_pass = 1;
-    foreach my $pool ( @pool_list ) {
+    foreach my $pool ( @filtered_pool_list ) {
         my $status = $iControl->get_ltm_pool_status_as_string( $pool );
-        if ( $status !~ /The pool is available/ ) {
+        if ( $status =~ /either don't have service checking enabled/ ) {
+            printf "%-30s %-20s\n", $pool, "WARN: $status";
+        } elsif ( $status !~ /The pool is available/ ) {
             printf "%-30s %-20s\n", $pool, "FAIL: $status";
             $overall_pass = 0;
         } else {
             printf "%-30s %-20s\n", $pool, "PASS" if $show_verbose;
         }
     }
-    if ( scalar @pool_list == 0 ) {
+    if ( scalar @filtered_pool_list == 0 ) {
         printf "Error: No pools found for $pattern\n";
         return 0;
     }
@@ -233,8 +236,11 @@ sub filter_pool_list {
     my ( @pool_list ) = @_;
     my @filtered_pool_list;
     foreach my $pool_name ( @pool_list ) {
-        if ( $pool_name !~ /SRW[DE][0-9]+-ABX-FTP$/ 
-                and $pool_name !~ /SRW[DE][0-9]+-EHCACHE$/ ) {
+        if ( $pool_name !~ /SRW[QDE][0-9]+-ABX-FTP$/ 
+                and $pool_name !~ /SRW[QDE][0-9]+-ABX$/
+                and $pool_name !~ /SRW[QDE][0-9]+-GEN3APPS$/
+                and $pool_name !~ /SRW[QDE][0-9]+-REST$/
+                and $pool_name !~ /SRW[QDE][0-9]+-EHCACHE$/ ) {
             push @filtered_pool_list, $pool_name;
         }
     }
