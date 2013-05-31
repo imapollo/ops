@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# Fix the ilog rules version based on rule engine versions.
+#
+# Usage: fix_ilog_rule_version [options]
+#
+# Options:
+#  -e | --env=..       Specify the environment need to be fixed. For example: srwd76.
+#  -b | --branch=..    Specify the branch name. For example: 13.8.0-SNAPSHOT.
+#  -d | --debug        Print debug messages.
+#
+# Author: minjzhang
+#
+
+options=$@
+
+another_option=0
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+
+fix_ilog_rule_version $options
+$*
+Usage: fix_ilog_rule_version [options]
+
+Options:
+  -e | --env=..       Specify the environment need to be fixed. For example: srwd76.
+  -b | --branch=..    Specify the branch name. For example: 13.8.0-SNAPSHOT.
+  -d | --debug        Print debug messages.
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o e:b:d -l env:,branch:,debug -- $options`
+if [ $? != 0 ]; then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -e | --env) envid=${2// }; shift 2;;
+        -b | --branch) branch=${2// }; shift 2;;
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Main
+#
+ILOG_SID=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.url /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*SERVICE_NAME\s*=\s*\([A-Z0-9]\+\).*/\1/'" < /dev/null`
+ILOG_USER=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.username /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
+ILOG_PASSWD=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.password /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
+
+ILOG_QUERY="$(mktemp)"
+ILOG_QUERY_RESULT="$(mktemp)"
+ILOG_STUB_PROPERTY_UPDATE="$(mktemp)"
+echo "set linesize 3000
+set wrap off
+select NAME, MAJOR_VERSION, MINOR_VERSION from RULESETS;" > $ILOG_QUERY
+
+. /nas/home/minjzhang/bin/setora
+
+sqlplus $ILOG_USER/$ILOG_PASSWD@$ILOG_SID < $ILOG_QUERY | grep -e "^[A-Za-z]\+\s*[0-9]\+\s*[0-9]\+\s*" | awk '{ print $1 ":" $2 ":" $3}' > $ILOG_QUERY_RESULT
+cat $ILOG_QUERY_RESULT | while read line
+do
+    echo $line | sed "s/\(.*\):\(.*\):\(.*\)/update stub_property set property_value=\'\/\1\/1.0\/\1\/\2.\3\' where property_value like \'\/\1\/1.0\/\1\/%\' and description=\'$branch\';/" >> $ILOG_STUB_PROPERTY_UPDATE
+done
+echo "commit;" >> $ILOG_STUB_PROPERTY_UPDATE
+
+echo "Updating:"
+cat $ILOG_STUB_PROPERTY_UPDATE
+
+grep ${envid}ilg /nas/reg/etc/dev-qa-hosts | while read line
+do
+    echo $line
+done
+
+exit 0
