@@ -6,7 +6,7 @@
 #
 # Options:
 #  -e | --env=..       Specify the environment need to be fixed. For example: srwd76.
-#  -b | --branch=..    Specify the branch name. For example: 13.8.0-SNAPSHOT.
+#  -b | --branch=..    Specify the branch name if needed. For example: 13.8.0-SNAPSHOT.
 #  -d | --debug        Print debug messages.
 #
 # Author: minjzhang
@@ -29,7 +29,7 @@ Usage: fix_ilog_rule_version [options]
 
 Options:
   -e | --env=..       Specify the environment need to be fixed. For example: srwd76.
-  -b | --branch=..    Specify the branch name. For example: 13.8.0-SNAPSHOT.
+  -b | --branch=..    Specify the branch name if needed. For example: 13.8.0-SNAPSHOT.
   -d | --debug        Print debug messages.
 EOF
 }
@@ -81,6 +81,10 @@ select NAME, MAJOR_VERSION, MINOR_VERSION from RULESETS;" > $ILOG_QUERY
 
 . /nas/home/minjzhang/bin/setora
 
+if [[ "$branch" == "" ]]; then
+    branch=`ssh ${envid}ilg001.${envid}.com "ls -l /opt/jboss/server/default/deploy/stubhub" | awk '{ print $11 }' | awk -F/ '{ print $4 }' | sed 's/\(.*\)-[0-9\.]\+-[0-9]\+/\1/'`
+fi
+
 sqlplus $ILOG_USER/$ILOG_PASSWD@$ILOG_SID < $ILOG_QUERY | grep -e "^[A-Za-z]\+\s*[0-9]\+\s*[0-9]\+\s*" | awk '{ print $1 ":" $2 ":" $3}' > $ILOG_QUERY_RESULT
 cat $ILOG_QUERY_RESULT | while read line
 do
@@ -88,12 +92,11 @@ do
 done
 echo "commit;" >> $ILOG_STUB_PROPERTY_UPDATE
 
-echo "Updating:"
-cat $ILOG_STUB_PROPERTY_UPDATE
+sqlplus stub/dstub@$ILOG_SID < $ILOG_STUB_PROPERTY_UPDATE
 
 grep ${envid}ilg /nas/reg/etc/dev-qa-hosts | while read line
 do
-    echo $line
+    curl -s -X POST --data "action=invokeOp&name=Stubhub-Properties-StubhubRulesApps%3Aname%3DStubHub+Properties&methodIndex=1" http://${line}/jmx-console/HtmlAdaptor > /dev/null
 done
 
 exit 0
