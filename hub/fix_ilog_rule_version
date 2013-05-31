@@ -68,6 +68,10 @@ function _print_debug_msg {
 #
 # Main
 #
+
+#
+# Get the ilog rules version from rule engine tables
+#
 ILOG_SID=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.url /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*SERVICE_NAME\s*=\s*\([A-Z0-9]\+\).*/\1/'" < /dev/null`
 ILOG_USER=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.username /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
 ILOG_PASSWD=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.password /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
@@ -85,6 +89,9 @@ if [[ "$branch" == "" ]]; then
     branch=`ssh ${envid}ilg001.${envid}.com "ls -l /opt/jboss/server/default/deploy/stubhub" | awk '{ print $11 }' | awk -F/ '{ print $4 }' | sed 's/\(.*\)-[0-9\.]\+-[0-9]\+/\1/'`
 fi
 
+#
+# Update the ilog rule versions in stub_property
+#
 sqlplus $ILOG_USER/$ILOG_PASSWD@$ILOG_SID < $ILOG_QUERY | grep -e "^[A-Za-z]\+\s*[0-9]\+\s*[0-9]\+\s*" | awk '{ print $1 ":" $2 ":" $3}' > $ILOG_QUERY_RESULT
 cat $ILOG_QUERY_RESULT | while read line
 do
@@ -94,6 +101,9 @@ echo "commit;" >> $ILOG_STUB_PROPERTY_UPDATE
 
 sqlplus stub/dstub@$ILOG_SID < $ILOG_STUB_PROPERTY_UPDATE
 
+#
+# Invoke ilg stubhub properties refresh
+#
 grep ${envid}ilg /nas/reg/etc/dev-qa-hosts | while read line
 do
     curl -s -X POST --data "action=invokeOp&name=Stubhub-Properties-StubhubRulesApps%3Aname%3DStubHub+Properties&methodIndex=1" http://${line}/jmx-console/HtmlAdaptor > /dev/null
