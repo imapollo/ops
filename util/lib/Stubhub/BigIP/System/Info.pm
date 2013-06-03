@@ -54,8 +54,8 @@ sub _get_bigip_server_partition {
     my ( $envid, $int_ext ) = @_;
     my $internal_bigip_server = qw{};
     my $external_bigip_server = qw{};
-    my $internal_partition = qw{};
-    my $external_partition = qw{};
+    my $internal_partition = "Common";
+    my $external_partition = "Common";
 
     my $env_number = $envid;
     my $env_prefix = $envid;
@@ -73,6 +73,9 @@ sub _get_bigip_server_partition {
         $internal_bigip_server = '10.80.139.232';
         $external_bigip_server = '10.80.139.242';
     }
+    # TODO For test
+    $internal_bigip_server = 'srwd00lba015.stubcorp.dev';
+    $external_bigip_server = 'srwd00lba015.stubcorp.dev';
 
     if ( $int_ext =~ /int/ ) {
         return ( $internal_bigip_server, $internal_partition );

@@ -17,7 +17,16 @@
 
 use strict;
 use warnings;
+
+use lib '/nas/home/minjzhang/ops/util/lib';
+
 use Getopt::Long;
+use Stubhub::BigIP::System::Util qw (
+                                    deploy_configuration
+                                    download_configuration
+                                    get_icontrol
+                                );
+
 
 # Get options
 my $show_usage = qw{};
@@ -119,8 +128,13 @@ sub get_update_pools {
 
 my %update_pools = get_update_pools( $envid );
 
+my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
+
 my $bigip_conf_file_path = "/nas/home/minjzhang/temp/bigip.conf";
 my $bigip_conf_file_dest = "/nas/home/minjzhang/temp/bigip.conf.dest";
+
+download_configuration( $internal_ic, "/config/bigip.conf", "$bigip_conf_file_path");
+
 open BIGIP_CONF_FH, "<$bigip_conf_file_path"
     or die "Cannot open file $bigip_conf_file_path: $!";
 open BIGIP_CONF_DEST_FH, ">$bigip_conf_file_dest"
@@ -133,21 +147,24 @@ while ( my $line = <BIGIP_CONF_FH> ) {
         if ( $line =~ /^}$/ ) {
             $inpool = 0;
         }
-        $line =~ s/JBoss-JMX-GET_SSL_443/Jboss6-JMX-GET_SSL_443/;
-        $line =~ s/JBoss-JMX-GET_8080/Jboss6-JMX-GET_8080/;
-        $line =~ s/JBoss-JMX-GET/Jboss6-JMX-GET/;
-        print "$line\n";
+        $line =~ s/\bJBoss-JMX-GET_SSL_443\b/Jboss6-JMX-GET_SSL_443/;
+        # $line =~ s/JBoss-JMX-GET_8080/Jboss6-JMX-GET_8080/;
+        $line =~ s/\bJBoss-JMX-GET\b/JBoss6-JMX-GET/;
+        print BIGIP_CONF_DEST_FH "$line\n";
     }
     if ( $line =~ /^pool\s+.*\s+{\s*/ ) {
-        $line =~ s/^pool\s+(.*)\s+{\s*/$1/;
-        if ( exists( $update_pools{$line} ) ) {
+        my $pool = $line;
+        $pool =~ s/^pool\s+(.*)\s+{\s*/$1/;
+        if ( exists( $update_pools{$pool} ) ) {
             $inpool = 1;
-            print "$line\n";
+            print BIGIP_CONF_DEST_FH "$line\n";
         }
     }
 }
 
 close BIGIP_CONF_FH;
 close BIGIP_CONF_DEST_FH;
+
+deploy_configuration( $envid, "int", $internal_ic, $bigip_conf_file_dest, $show_verbose);
 
 exit 0;
