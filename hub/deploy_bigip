@@ -33,12 +33,6 @@ use MIME::Base64;
 use File::Temp;
 use Log::Transcript;
 use BigIP::iControl;
-use Stubhub::Util::SSH qw (
-                            login_ssh
-                            close_ssh
-                            execute_ssh
-                            mute_execute_ssh
-                          );
 use Stubhub::ENV::Info qw (
                             get_env_branch
                           );
@@ -46,16 +40,24 @@ use Stubhub::P4::Client qw (
                             check_out_perfoce_file
                             clean_perforce_client
                            );
-use Stubhub::BigIP::Virtual::Parser qw (
-                            parse_virtual_servers
-                           );
 use Stubhub::BigIP::Virtual::ConfigGenerator qw (
-                            generate_vs_config
                             generate_vs_configs
                            );
 use Stubhub::BigIP::Pool::ConfigGenerator qw (
-                            generate_pool_config
                             generate_pool_configs
+                           );
+use Stubhub::BigIP::System::Util qw (
+                            get_icontrol
+                            deploy_configuration
+                           );
+use Stubhub::BigIP::Virtual::Handler qw (
+                            delete_env_virtual_servers
+                           );
+use Stubhub::BigIP::Rule::Handler qw (
+                            delete_env_rules
+                           );
+use Stubhub::BigIP::Pool::Handler qw (
+                            delete_env_pools
                            );
 
 # Get options
@@ -107,268 +109,9 @@ Options:
  -h | --help              Show help information.
 
 Examples:
- deploy_bigip -e srwd76
+ deploy_bigip -e srwd76 -b rb_ecomm_13_6
 
 END_OF_HELP
-}
-
-#
-# Get all the rules.
-#
-sub get_rules {
-    my ( $iControl ) = @_;
-    my @rules = $iControl->get_rule_list();
-    return sort @rules;
-}
-
-#
-# Get rules for specified environments.
-#
-sub get_env_rules {
-    my ( $iControl, $pattern ) = @_;
-    my @full_rules = get_rules( $iControl );
-    my @rules = grep /$pattern/i, @full_rules;
-    return @rules;
-}
-
-#
-# Get all the virtual servers.
-#
-sub get_virtual_servers {
-    my ( $iControl ) = @_;
-    my @virtual_servers = $iControl->get_vs_list();
-    return sort @virtual_servers;
-}
-
-#
-# Get environment specific virtual servers.
-#
-sub get_env_virtual_servers {
-    my ( $iControl, $pattern ) = @_;
-    my @full_virtual_servers = get_virtual_servers( $iControl );
-    my @virtual_servers = grep /$pattern/i, @full_virtual_servers;
-    return @virtual_servers;
-}
-
-#
-# Get pool list for all the environments.
-#
-sub get_pool_list {
-    my ( $iControl ) = @_;
-    my @pool_list = $iControl->get_pool_list();
-    return sort @pool_list;
-}
-
-#
-# Get environment specific pool list.
-#
-sub get_env_pool_list {
-    my ( $iControl, $pattern ) = @_;
-    my @full_pool_list = get_pool_list( $iControl );
-    my @pool_list = grep /$pattern/i, @full_pool_list;
-    return @pool_list;
-}
-
-#
-# Get the hostname from IP address (nslookup).
-#
-sub get_hostname_from_ip {
-    my ( $ip_address ) = @_;
-    $ip_address =~ s/(.*):.*/$1/;
-    my $hostnames = `nslookup $ip_address | grep name | cut -d" " -f3`;
-    chomp $hostnames;
-    $hostnames =~ s/\n/,/g;
-    return $hostnames;
-}
-
-#
-# Validate virtual servers.
-#
-sub validate_virtual_servers {
-    my ( $iControl ) = @_;
-    my @virtual_servers = get_virtual_servers( $iControl );
-    foreach my $virtual_server ( @virtual_servers ) {
-        my $vs_destination = $iControl->get_vs_destination($virtual_server);
-        my $vs_hostname = get_hostname_from_ip($vs_destination);
-        logecho "$virtual_server: $vs_hostname $vs_destination\n";
-    }
-}
-
-#
-# Validate virtual servers for specified environment.
-#
-sub validate_env_virtual_servers {
-    my ( $iControl, $pattern ) = @_;
-    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
-    foreach my $virtual_server ( @virtual_servers ) {
-        my $vs_destination = $iControl->get_vs_destination($virtual_server);
-        my $vs_hostname = get_hostname_from_ip($vs_destination);
-        logecho "$virtual_server: $vs_hostname $vs_destination\n";
-    }
-}
-
-#
-# Get default pool for specified virtual server.
-#
-sub get_default_pool_for_virtual_server {
-    my ( $iControl, $virtual_server ) = @_;
-    my $default_pool_name = $iControl->get_default_pool_name($virtual_server);
-    my $pool_name = $$default_pool_name[0];
-    return $pool_name;
-}
-
-#
-# Validate default pool for specified environment.
-#
-sub validate_env_default_pool {
-    my ( $iControl, $pattern ) = @_;
-    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
-    foreach my $virtual_server ( @virtual_servers ) {
-        my $pool_name = get_default_pool_for_virtual_server( $iControl, $virtual_server );
-        logecho "$virtual_server: $pool_name\n";
-        if ( $pool_name ne "" ) {
-            logecho "Members:\n";
-            foreach my $member ( $iControl->get_pool_members($pool_name) ) {
-                my $ip_address = $member;
-                $ip_address =~ s/(.*):.*/$1/;
-                my $hostnames = get_hostname_from_ip($ip_address);
-                logecho "$hostnames $member\n";
-            }
-        }
-    }
-}
-
-#
-# Get valid pools for specific environment.
-#
-sub get_env_valid_pools {
-    my ( $iControl, $pattern ) = @_;
-    my @full_pool_list = get_env_pool_list( $iControl, $pattern );
-    my @pool_list;
-    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
-    foreach my $virtual_server ( @virtual_servers ) {
-        my $pool_name = get_default_pool_for_virtual_server( $iControl, $virtual_server );
-        if ( $pool_name ne "" and defined $pool_name ) {
-            push @pool_list, $pool_name;
-        }
-    }
-    @pool_list = sort(uniq(@pool_list));
-    @pool_list = filter_pool_list(@pool_list);
-    return @pool_list;
-}
-
-#
-# Filter with ignore POOL list.
-#
-sub filter_pool_list {
-    my ( @pool_list ) = @_;
-    my @filtered_pool_list;
-    foreach my $pool_name ( @pool_list ) {
-        if ( $pool_name !~ /SRW[DE][0-9]+-ABX-FTP$/
-                and $pool_name !~ /SRW[DE][0-9]+-EHCACHE$/ ) {
-            push @filtered_pool_list, $pool_name;
-        }
-    }
-    return @filtered_pool_list;
-}
-
-#
-# Print bigip.conf file.
-#
-sub print_bigip_conf {
-    my ( $iControl ) = @_;
-    print $iControl->download_file('/config/bigip.conf');
-}
-
-#
-# Initiate BIG IP iControl.
-#
-sub init_bigip_icontrol {
-    my ( $bigip_server ) = @_;
-
-    Readonly my $BIGIP_USERNAME => 'svcacctrelmgt';
-    Readonly my $BIGIP_PASSWORD => 'UjhiYml0U3Qzdw==';
-    Readonly my $BIGIP_PORT     => 443;
-    Readonly my $BIGIP_PROTOCOL => 'https';
-
-    my $iControl = BigIP::iControl->new(
-                                server => "$bigip_server",
-                                username => "$BIGIP_USERNAME",
-                                password => decode_base64($BIGIP_PASSWORD),
-                                port     => $BIGIP_PORT,
-                                proto    => "$BIGIP_PROTOCOL"
-                            );
-
-    return $iControl;
-}
-
-#
-# Upload file into the file.
-#
-sub upload_file {
-    my ( $iControl, $remote_file_name, $local_file_name ) = @_;
-    my $success = $iControl->upload_file( $remote_file_name, $local_file_name);
-    return $success;
-}
-
-#
-# Delete virtual servers.
-#
-sub delete_env_virtual_servers {
-    my ( $iControl, $pattern ) = @_;
-    my @virtual_servers = get_env_virtual_servers( $iControl, $pattern );
-    $iControl->delete_virtual_servers( \@virtual_servers );
-}
-
-#
-# Delete pools.
-#
-sub delete_env_pools {
-    my ( $iControl, $pattern ) = @_;
-    my @pools = get_env_pool_list( $iControl, $pattern );
-    $iControl->delete_pools( \@pools );
-}
-
-#
-# Delete rules.
-#
-sub delete_env_rules {
-    my ( $iControl, $pattern ) = @_;
-    my @rules = get_env_rules( $iControl, $pattern );
-    $iControl->delete_rules( \@rules );
-}
-
-#
-# Deploy configurations to the remote server.
-#
-sub deploy_configuration {
-    my ( $ssh, $file_name ) = @_;
-    #execute_ssh( $ssh, "b merge $file_name" );
-    my @merge_output = mute_execute_ssh( $ssh, "merge $file_name" );
-    if ( grep /error/i, @merge_output ) {
-        foreach my $line ( @merge_output ) {
-            logecho $line;
-        }
-        exit 1;
-    } elsif ( $show_verbose ) {
-        foreach my $line ( @merge_output ) {
-            logecho $line;
-        }
-    }
-    mute_execute_ssh( $ssh, "tmsh save sys config" );
-    mute_execute_ssh( $ssh, "rm -f $file_name" );
-}
-
-#
-# Init SSH connection.
-#
-sub init_ssh {
-    my ( $server ) = @_;
-    Readonly my $BIGIP_USERNAME => 'svcacctrelmgt';
-    Readonly my $BIGIP_PASSWORD => 'UjhiYml0U3Qzdw==';
-
-    my $ssh = login_ssh( $server, $BIGIP_USERNAME, decode_base64($BIGIP_PASSWORD) );
-    return $ssh;
 }
 
 #
@@ -417,55 +160,25 @@ if ( ! defined $envid or ! defined $branch) {
 #
 # Main
 #
-my $env_number = $envid;
-$env_number =~ s/[srwd|srwe|SRWD|SRWE]//g;
-chomp $env_number;
-
-my $branch_name = get_env_branch( $envid );
-
-my $internal_bigip_server = qw{};
-my $external_bigip_server = qw{};
-
-if ( $env_number >= 76 ) {
-    $internal_bigip_server = 'srwd00lba014.stubcorp.dev';
-    $external_bigip_server = 'srwd00lba042-cl.stubcorp.dev';
-} else {
-    $internal_bigip_server = '10.80.139.232';
-    $external_bigip_server = '10.80.139.242';
-}
-
-my $external_ic = init_bigip_icontrol( $external_bigip_server );
-my $internal_ic = init_bigip_icontrol( $internal_bigip_server );
-
-# TODO for testing
-my $test_big_ip_server = 'srwd00lba015.stubcorp.dev';
-my $test_ic = init_bigip_icontrol( $test_big_ip_server );
+my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
 
 # Remove the virtual servers, rules and pools for specific environment.
-logecho "Deleting virtual servers for $envid ...\n" if $show_verbose;
-delete_env_virtual_servers( $test_ic, $envid );
-logecho "Deleting rules for $envid ...\n" if $show_verbose;
-delete_env_rules( $test_ic, $envid );
-logecho "Deleting pools for $envid ...\n" if $show_verbose;
-delete_env_pools( $test_ic, $envid );
+logecho "Deleting virtual servers for $envid ...\n";
+delete_env_virtual_servers( $internal_ic, $envid );
+logecho "Deleting rules for $envid ...\n";
+delete_env_rules( $internal_ic, $envid );
+logecho "Deleting pools for $envid ...\n";
+delete_env_pools( $internal_ic, $envid );
 
 # Deploy virtual servers, rules and pools for specific environment.
 my $tmpdir = File::Temp->newdir();
-logecho "Generating virtual server, pool configuration files ...\n" if $show_verbose;
+logecho "Generating virtual server, pool configuration files ...\n";
 my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $tmpdir );
-my $internal_vs_file = "/config/deploy/virtual_server_$envid.conf";
-my $internal_pool_file = "/config/deploy/pool_$envid.conf";
-logecho "Uploading virtual server, pool configuration files ...\n" if $show_verbose;
-upload_file( $test_ic, $internal_vs_file, $internal_vs_conf );
-upload_file( $test_ic, $internal_pool_file, $internal_pool_conf );
-logecho "Deploying pools for $envid ...\n" if $show_verbose;
-my $ssh = init_ssh( $test_big_ip_server );
-logecho "Deploying irules for $envid ...\n" if $show_verbose;
-deploy_configuration( $ssh, $internal_pool_file );
+logecho "Deploying pools for $envid ...\n";
+deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf, $show_verbose);
 # TODO for testing
-system("/nas/home/minjzhang/bin/deploy-irules -e srwd95 -b $branch");
-logecho "Deploying virtual servers for $envid ...\n" if $show_verbose;
-deploy_configuration( $ssh, $internal_vs_file );
-close_ssh( $ssh );
+system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
+logecho "Deploying virtual servers for $envid ...\n";
+deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf, $show_verbose);
 
 exit 0;
