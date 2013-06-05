@@ -295,10 +295,6 @@ Readonly my $BIGIP_PROTOCOL => 'https';
 if ( $env_number >= 76 or $env_prefix =~ /srwq/i ) {
     $internal_bigip_server = 'srwd00lba014.stubcorp.dev';
     $external_bigip_server = 'srwd00lba042-cl.stubcorp.dev';
-    if ( $env_prefix =~ /srwq/i ) {
-        $internal_partition = "Noconly";
-        $external_partition = "data-group";
-    }
 } else {
     $internal_bigip_server = '10.80.139.232';
     $external_bigip_server = '10.80.139.242';
