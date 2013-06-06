@@ -38,6 +38,7 @@ BEGIN {
                         &download_configuration
                         &get_icontrol
                         &set_partition
+                        &save_configuration
                     );
   %EXPORT_TAGS  = ();
 }
@@ -129,6 +130,13 @@ sub deploy_configuration {
     }
 }
 
+#
+# Save configuration on BigIP server.
+#
+sub save_configuration {
+    my ( $iControl ) = @_;
+    $iControl->save_configuration( 'today' );
+}
 
 #
 # Upload file onto BigIP server.

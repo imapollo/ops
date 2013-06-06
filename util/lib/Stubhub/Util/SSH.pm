@@ -45,13 +45,13 @@ sub login_ssh {
 
     my $prompt = "[Pp]assword";
     $ssh->run_ssh();
-    $ssh->waitfor('qr/\(yes\/no\)\?$/',2);
+    $ssh->waitfor('qr/\(yes\/no\)\?$/',3);
     $ssh->send("yes\n");
-    $ssh->waitfor('qr/$prompt:\s*$/',5);
+    $ssh->waitfor('qr/$prompt:\s*$/',30);
     $ssh->send("$password\n");
-    my $login_welcome = $ssh->exec("tmsh show sys version");
+    my $login_welcome = $ssh->read_all(20);
 
-    if ( $login_welcome !~ m/Last login/ ) {
+    if ( $login_welcome !~ m/hello/ and $login_welcome !~ /Last login/ ) {
         die "Login has failed. Login output was $login_welcome";
     }
 

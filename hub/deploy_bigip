@@ -49,6 +49,11 @@ use Stubhub::BigIP::Pool::ConfigGenerator qw (
 use Stubhub::BigIP::System::Util qw (
                             get_icontrol
                             deploy_configuration
+                            save_configuration
+                            download_configuration
+                           );
+use Stubhub::BigIP::System::Info qw (
+                            get_bigip_server
                            );
 use Stubhub::BigIP::Virtual::Handler qw (
                             delete_env_virtual_servers
@@ -158,9 +163,23 @@ if ( ! defined $envid or ! defined $branch) {
 }
 
 #
+# Get the timestamp.
+#
+sub get_timestamp {
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
+    my $timestamp = sprintf ( "%04d%02d%02d%02d%02d",
+        $year+1900,$mon+1,$mday,$hour,$min);
+    return $timestamp;
+}
+
+#
 # Main
 #
 my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
+
+# Backup the configuration file.
+my $internal_bigip_server = get_bigip_server( $envid, "int" );
+download_configuration( $internal_ic, '/config/bigip.conf', "/nas/home/minjzhang/temp/$internal_bigip_server-internal-bigip.conf." . get_timestamp() );
 
 # Remove the virtual servers, rules and pools for specific environment.
 logecho "Deleting virtual servers for $envid ...\n";
@@ -180,5 +199,7 @@ deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf, $show_ve
 system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
 logecho "Deploying virtual servers for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf, $show_verbose);
+
+save_configuration( $internal_ic );
 
 exit 0;
