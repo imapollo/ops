@@ -193,10 +193,11 @@ sub get_irule_from_p4 {
   }
 
   my $uc_env_id = uc( $env_id );
-  my $dest_file_dir = "/nas/release/$uc_env_id/irules";
+  my $dest_file_dir = "/nas/release/$uc_env_id";
   system("/usr/bin/sudo /bin/cp -rf $dynamic_perfoce_dir/$p4_irule_dir $dest_file_dir");
 
   clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+  $dest_file_dir = "$dest_file_dir/irules";
 
   return ( $dest_file_dir );
 }
