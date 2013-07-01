@@ -110,9 +110,7 @@ if ( -d "/nas/release/$env/$BRANCH/config-f5/conf/etc/stubhub/f5/irules" ) {
   $iruleDir = get_irule_from_p4( $env, $BRANCH );
 }
 
-# TODO for testing, only enable internal
-#foreach my $intExt ("int", "ext") {
-foreach my $intExt ("int") {
+foreach my $intExt ("int", "ext") {
   logwarn "Irules dir not found: $iruleDir" && exit 0 unless -d $iruleDir;
     
   my $iruleFiles = `/bin/ls -1 $iruleDir/$intExt/*`;

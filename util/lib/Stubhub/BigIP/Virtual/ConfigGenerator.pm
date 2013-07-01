@@ -12,6 +12,9 @@ use lib '/nas/reg/lib/perl';
 use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
+use Stubhub::Util::Host qw (
+                           get_ip_by_hostname 
+                        );
 
 BEGIN {
   use Exporter();
@@ -54,12 +57,25 @@ sub generate_vs_config {
 
     Readonly my $UC_ENVID_TOKEN => '#{uc_env_id}';
     Readonly my $ENVID_TOKEN => '#{env_id}';
-    Readonly my $IPADDR_TOKEN => '#{.*\.env_id\.com}';
+    Readonly my $IPADDR_TOKEN => '#{\S*env_id\S*\.com}';
 
     open TEMPLATE_FH, "<$template_file_path" or die $!;
     open TARGET_FH, ">>$target_file_path" or die $!;
 
-    while ( my $line = <TEMPLATE_FH> ) {
+    my @lines = <TEMPLATE_FH>;
+    my @destination_line = grep /$IPADDR_TOKEN/, @lines;
+    my $destination_size = @destination_line;
+    if ( $destination_size > 0 ) {
+        my $destination_ip = $destination_line[0];
+        $destination_ip =~ s/.*{(\S*env_id\S*\.com)}.*/$1/;
+        $destination_ip =~ s/(\S*)env_id(\S*)\.com/$1$envid$2.com/;
+        chomp $destination_ip;
+        if ( get_ip_by_hostname( $destination_ip ) eq "" ) {
+            return $target_file_path;
+        }
+    }
+
+    foreach my $line ( @lines ) {
         if ( $line =~ /$ENVID_TOKEN/ ) {
             $line =~ s/$ENVID_TOKEN/$envid/;
         }
@@ -86,23 +102,9 @@ sub generate_vs_config {
 sub _replace_token_hostname_by_ip {
     my ( $line, $envid ) = @_;
 
-    Readonly my $DNS_COMMAND => '/usr/bin/host';
-
-    $line =~ s/.*{(.*\.env_id\.com)}.*/$1/;
-    $line =~ s/(.*)\.env_id\.com/$1.$envid.com/;
+    $line =~ s/.*{(.*env_id.*\.com)}.*/$1/;
+    $line =~ s/(.*)env_id(.*)\.com/$1$envid$2.com/;
     chomp $line;
 
-    my $ip_address = `$DNS_COMMAND $line`;
-    $ip_address =~ s/.* has address (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/$1/;
-    chomp $ip_address;
-
-    my $reverse_dns = `$DNS_COMMAND $ip_address`;
-    if ( $reverse_dns !~ /$line/ ) {
-        print "Error: Reverse DNS for host $line is wrong:\n";
-        print "\$ host $ip_address\n";
-        system("host $ip_address");
-        exit 1;
-    }
-
-    return $ip_address;
+    return get_ip_by_hostname( $line );
 }

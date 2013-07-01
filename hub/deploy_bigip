@@ -131,7 +131,7 @@ sub uniq {
 # including virtual server, pool.
 #
 sub generate_configuration {
-    my ( $env_id, $branch_name, $tmpdir ) = @_;
+    my ( $env_id, $branch_name, $tmpdir, $intext ) = @_;
     my $p4_f5_dir = qw{};
     my $p4_f5_subdir = "templates/fsroot/etc/stubhub/f5";
     if ( $branch_name eq "main" ) {
@@ -147,8 +147,8 @@ sub generate_configuration {
     my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
         = check_out_perfoce_file("/$p4_f5_dir/...");
     
-    my $vs_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/int", $envid, "$tmpdir" );
-    my $pool_file = generate_pool_configs( "$dynamic_perfoce_dir$p4_f5_dir/pools/int", $envid, "$tmpdir" );
+    my $vs_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir" );
+    my $pool_file = generate_pool_configs( "$dynamic_perfoce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir" );
     clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
     return ( $vs_file, $pool_file );
 }
@@ -179,27 +179,37 @@ my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
 
 # Backup the configuration file.
 my $internal_bigip_server = get_bigip_server( $envid, "int" );
+my $external_bigip_server = get_bigip_server( $envid, "int" );
 download_configuration( $internal_ic, '/config/bigip.conf', "/nas/home/minjzhang/temp/$internal_bigip_server-internal-bigip.conf." . get_timestamp() );
+download_configuration( $external_ic, '/config/bigip.conf', "/nas/home/minjzhang/temp/$external_bigip_server-external-bigip.conf." . get_timestamp() );
 
 # Remove the virtual servers, rules and pools for specific environment.
 logecho "Deleting virtual servers for $envid ...\n";
 delete_env_virtual_servers( $internal_ic, $envid );
+delete_env_virtual_servers( $external_ic, $envid );
 logecho "Deleting rules for $envid ...\n";
 delete_env_rules( $internal_ic, $envid );
+delete_env_rules( $external_ic, $envid );
 logecho "Deleting pools for $envid ...\n";
 delete_env_pools( $internal_ic, $envid );
+delete_env_pools( $external_ic, $envid );
 
 # Deploy virtual servers, rules and pools for specific environment.
-my $tmpdir = File::Temp->newdir();
+my $int_tmpdir = File::Temp->newdir();
+my $ext_tmpdir = File::Temp->newdir();
 logecho "Generating virtual server, pool configuration files ...\n";
-my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $tmpdir );
+my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int" );
+my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext" );
 logecho "Deploying pools for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf, $show_verbose);
+deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf, $show_verbose);
 # TODO for testing
 system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
 logecho "Deploying virtual servers for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf, $show_verbose);
+deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf, $show_verbose);
 
 save_configuration( $internal_ic );
+save_configuration( $external_ic );
 
 exit 0;

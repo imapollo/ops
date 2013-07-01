@@ -74,8 +74,8 @@ sub _get_bigip_server_partition {
         $external_bigip_server = '10.80.139.242';
     }
     # TODO For test
-    $internal_bigip_server = 'srwd00lba015.stubcorp.dev';
-    $external_bigip_server = 'srwd00lba015.stubcorp.dev';
+    $internal_bigip_server = 'srwd00lba013.stubcorp.dev';
+    $external_bigip_server = 'srwd00lba041.stubcorp.dev';
 
     if ( $int_ext =~ /int/ ) {
         return ( $internal_bigip_server, $internal_partition );

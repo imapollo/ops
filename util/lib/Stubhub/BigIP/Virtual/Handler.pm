@@ -46,7 +46,7 @@ sub get_virtual_servers {
 sub get_env_virtual_servers {
     my ( $iControl, $pattern ) = @_;
     my @full_virtual_servers = get_virtual_servers( $iControl );
-    my @virtual_servers = grep /$pattern/i, @full_virtual_servers;
+    my @virtual_servers = grep /^$pattern/i, @full_virtual_servers;
     return @virtual_servers;
 }
 

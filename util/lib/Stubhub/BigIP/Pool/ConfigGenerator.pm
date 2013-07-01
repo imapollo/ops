@@ -13,6 +13,9 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 use Log::Transcript;
+use Stubhub::Util::Host qw (
+                            get_ip_by_hostname
+                        );
 
 BEGIN {
   use Exporter();
@@ -124,29 +127,8 @@ sub _get_ip_by_hostname_token {
     while ( my $line = <DEVQA_HOSTS_FH> ) {
         if ( $line =~ /^$envid$token/ ) {
             chomp $line;
-            push @ip_addresses, _get_ip_by_hostname( $line );
+            push @ip_addresses, get_ip_by_hostname( $line );
         }
     }
     return @ip_addresses;
-}
-
-#
-# Get IP address from hostname.
-#
-sub _get_ip_by_hostname {
-    my ( $hostname ) = @_;
-    Readonly my $DNS_COMMAND => '/usr/bin/host';
-    my $ip_address = `$DNS_COMMAND $hostname`;
-    $ip_address =~ s/.* has address (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/$1/;
-    chomp $ip_address;
-
-    my $reverse_dns = `$DNS_COMMAND $ip_address`;
-    if ( $reverse_dns !~ /$hostname/ ) {
-        print "Error: Reverse DNS for host $hostname is wrong:\n";
-        print "\$ host $ip_address\n";
-        system("host $ip_address");
-        exit 1;
-    }
-
-    return $ip_address;
 }
