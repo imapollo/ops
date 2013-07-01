@@ -37,6 +37,11 @@ sub get_ip_by_hostname {
     $ip_address =~ s/.* has address (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/$1/;
     chomp $ip_address;
 
+    if ( $ip_address !~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/ ) {
+        print "Error: Cannot get IP address for $hostname.\n";
+        return "";
+    }
+
     my $is_alias = 0;
     my $dns_result = `$DNS_COMMAND $hostname`;
     if ( $dns_result =~ /alias/ ) {
@@ -45,7 +50,7 @@ sub get_ip_by_hostname {
 
     my $reverse_dns = `$DNS_COMMAND $ip_address`;
     if ( $reverse_dns !~ /$hostname/ and ! $is_alias ) {
-        print "Error: Reverse DNS for host $hostname is wrong:\n";
+        print "Error: Reverse DNS for host $hostname is wrong.\n";
         return "";
     }
 
