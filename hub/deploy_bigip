@@ -42,6 +42,7 @@ use Stubhub::P4::Client qw (
                            );
 use Stubhub::BigIP::Virtual::ConfigGenerator qw (
                             generate_vs_configs
+                            generate_pub_vs_configs
                            );
 use Stubhub::BigIP::Pool::ConfigGenerator qw (
                             generate_pool_configs
@@ -147,7 +148,13 @@ sub generate_configuration {
     my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
         = check_out_perfoce_file("/$p4_f5_dir/...");
     
-    my $vs_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir" );
+    my $vs_file;
+    if ( $intext eq "ext" ) {
+        # TODO testing
+        $vs_file = generate_pub_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/$intext",
+            "/nas/home/minjzhang/temp/public-ip", $envid, "$tmpdir" );
+    }
+    $vs_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir" );
     my $pool_file = generate_pool_configs( "$dynamic_perfoce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir" );
     clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
     return ( $vs_file, $pool_file );
@@ -198,8 +205,8 @@ delete_env_pools( $external_ic, $envid );
 my $int_tmpdir = File::Temp->newdir();
 my $ext_tmpdir = File::Temp->newdir();
 logecho "Generating virtual server, pool configuration files ...\n";
-my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int" );
 my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext" );
+my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int" );
 logecho "Deploying pools for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf, $show_verbose);
 deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf, $show_verbose);

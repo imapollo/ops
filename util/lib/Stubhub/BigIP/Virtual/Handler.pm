@@ -25,6 +25,7 @@ BEGIN {
                         &delete_env_virtual_servers
                         &get_virtual_servers
                         &get_env_virtual_servers
+                        &get_pub_env_virtual_servers
                     );
   %EXPORT_TAGS  = ();
 }
@@ -51,11 +52,23 @@ sub get_env_virtual_servers {
 }
 
 #
+# Get environment specific virtual servers.
+#
+sub get_pub_env_virtual_servers {
+    my ( $iControl, $pattern ) = @_;
+    my @full_virtual_servers = get_virtual_servers( $iControl );
+    my @virtual_servers = grep /^pub-$pattern/i, @full_virtual_servers;
+    return @virtual_servers;
+}
+
+#
 # Delete virtual servers.
 #
 sub delete_env_virtual_servers {
     my ( $iControl, $envid ) = @_;
     my @virtual_servers = get_env_virtual_servers( $iControl, $envid );
     $iControl->delete_virtual_servers( \@virtual_servers );
+    my @pub_virtual_servers = get_pub_env_virtual_servers( $iControl, $envid );
+    $iControl->delete_virtual_servers( \@pub_virtual_servers );
 }
 

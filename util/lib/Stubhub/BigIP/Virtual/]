@@ -40,8 +40,8 @@ our @EXPORT_OK;
 #
 sub generate_pub_vs_configs {
     my ( $templates_dir, $public_ip_list, $envid, $output_dir ) = @_;
-    my $public_vs = _get_env_public_ip( $public_ip_list, $envid );
-    my $public_vs_number = scalar keys %$public_vs;
+    my %public_vs = _get_env_public_ip( $public_ip_list, $envid );
+    my $public_vs_number = scalar keys %public_vs;
     my $output_file = "$output_dir/virtual_server_$envid.conf";
     if ( $public_vs_number == 0 ) {
         return $output_file;
@@ -52,9 +52,9 @@ sub generate_pub_vs_configs {
     foreach my $virtual_server_template ( @template_files ) {
         my $vs_template_filename = $virtual_server_template;
         $vs_template_filename =~ s/.*\/(.*)/$1/;
-        if ( exists $public_vs->{ "pub-$envid-$vs_template_filename" } ) {
+        if ( exists $public_vs{ "pub-$envid-$vs_template_filename" } ) {
             generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid,
-                $public_vs->{ "pub-$envid-$vs_template_filename" } );
+                $public_vs{ "pub-$envid-$vs_template_filename" } );
         }
     }
     return $output_file;
@@ -160,9 +160,7 @@ sub _get_env_public_ip {
         my $virtual_server_ip   = $virtual_server_line;
         $virtual_server_name =~ s/(.*) .*/$1/;
         $virtual_server_ip   =~ s/.* (.*)/$1/;
-        chomp $virtual_server_name;
-        chomp $virtual_server_ip;
-        $env_public_vs{ $virtual_server_name } = $virtual_server_ip;
+        $env_public_vs->{ $virtual_server_name } = $virtual_server_ip;
     }
     return \%env_public_vs;
 }
