@@ -14,7 +14,6 @@
 
 options=$@
 
-another_option=0
 debug_level=0
 
 #
@@ -75,6 +74,7 @@ function _print_debug_msg {
 ILOG_SID=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.url /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*SERVICE_NAME\s*=\s*\([A-Z0-9]\+\).*/\1/'" < /dev/null`
 ILOG_USER=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.username /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
 ILOG_PASSWD=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.password /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
+ILOG_PASSWD="d$ILOG_USER";
 
 ILOG_QUERY="$(mktemp)"
 ILOG_QUERY_RESULT="$(mktemp)"
