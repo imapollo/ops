@@ -46,7 +46,7 @@ sub get_pool_list {
 sub get_env_pool_list {
     my ( $iControl, $pattern ) = @_;
     my @full_pool_list = get_pool_list( $iControl );
-    my @pool_list = grep /$pattern/i, @full_pool_list;
+    my @pool_list = grep /^$pattern/i, @full_pool_list;
     return @pool_list;
 }
 

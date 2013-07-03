@@ -89,10 +89,11 @@ sub generate_pool_config {
             }
             foreach my $pool_member ( @pool_members ) {
                 foreach my $foreach_line ( @foreach_lines ) {
-                    if ( $foreach_line =~ /$IPADDR_TOKEN/ ) {
-                        $foreach_line =~ s/$IPADDR_TOKEN/$pool_member/;
+                    my $replacing_line = $foreach_line;
+                    if ( $replacing_line =~ /$IPADDR_TOKEN/ ) {
+                        $replacing_line =~ s/$IPADDR_TOKEN/$pool_member/;
                     }
-                    print TARGET_FH $foreach_line;
+                    print TARGET_FH $replacing_line;
                 }
             }
             next;

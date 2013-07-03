@@ -145,18 +145,22 @@ sub generate_configuration {
         logecho "Error: Branch name $branch_name doesn't look good.\n";
         exit 1;
     }
-    my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
-        = check_out_perfoce_file("/$p4_f5_dir/...");
-    
+    my ( $dynamic_perforce_client, $dynamic_perforce_dir )
+        = check_out_perfoce_file( "/$p4_f5_dir/..." );
+
+    Readonly my $PUBLIC_IP_LIST => '/internal/devops/network/bigip/public_virtual_server_ip.lst';
+    my ( $public_ip_chkout_client, $public_ip_list_dir )
+        = check_out_perfoce_file( "/$PUBLIC_IP_LIST" );
+
     my $vs_file;
     if ( $intext eq "ext" ) {
-        # TODO testing
-        $vs_file = generate_pub_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/$intext",
-            "/nas/home/minjzhang/temp/public-ip", $envid, "$tmpdir" );
+        $vs_file = generate_pub_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext",
+            "$public_ip_list_dir$PUBLIC_IP_LIST", $envid, "$tmpdir" );
     }
-    $vs_file = generate_vs_configs( "$dynamic_perfoce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir" );
-    my $pool_file = generate_pool_configs( "$dynamic_perfoce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir" );
-    clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+    $vs_file = generate_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir" );
+    my $pool_file = generate_pool_configs( "$dynamic_perforce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir" );
+    clean_perforce_client( $dynamic_perforce_client, $dynamic_perforce_dir );
+    clean_perforce_client( $public_ip_chkout_client, $public_ip_list_dir);
     return ( $vs_file, $pool_file );
 }
 
@@ -186,7 +190,7 @@ my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
 
 # Backup the configuration file.
 my $internal_bigip_server = get_bigip_server( $envid, "int" );
-my $external_bigip_server = get_bigip_server( $envid, "int" );
+my $external_bigip_server = get_bigip_server( $envid, "ext" );
 download_configuration( $internal_ic, '/config/bigip.conf', "/nas/home/minjzhang/temp/$internal_bigip_server-internal-bigip.conf." . get_timestamp() );
 download_configuration( $external_ic, '/config/bigip.conf', "/nas/home/minjzhang/temp/$external_bigip_server-external-bigip.conf." . get_timestamp() );
 

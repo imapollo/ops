@@ -46,7 +46,7 @@ sub get_rules {
 sub get_env_rules {
     my ( $iControl, $pattern ) = @_;
     my @full_rules = get_rules( $iControl );
-    my @rules = grep /$pattern/i, @full_rules;
+    my @rules = grep /^$pattern/i, @full_rules;
     return @rules;
 }
 
