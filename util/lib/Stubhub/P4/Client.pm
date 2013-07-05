@@ -7,8 +7,8 @@ package Stubhub::P4::Client;
 use strict;
 use warnings;
 
+use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/reg/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 use REG::P4::Util qw( $P4OPTS delete_dynamic_client dynamic_client logged_in p4cmd );

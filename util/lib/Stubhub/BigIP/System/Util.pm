@@ -7,8 +7,8 @@ package Stubhub::BigIP::System::Util;
 use strict;
 use warnings;
 
+use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/reg/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 use MIME::Base64;

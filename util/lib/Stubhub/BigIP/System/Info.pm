@@ -7,8 +7,8 @@ package Stubhub::BigIP::System::Info;
 use strict;
 use warnings;
 
+use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/reg/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 
@@ -60,22 +60,22 @@ sub _get_bigip_server_partition {
     my $env_number = $envid;
     my $env_prefix = $envid;
     $env_number =~ s/srw[deq]//ig;
-    $env_prefix =~ s/(srw[dqe]).*/$1/ig;
+    $env_prefix =~ s/(srw[deq]).*/$1/ig;
     chomp $env_number;
     if ( $env_number >= 76 or $env_prefix =~ /srwq/i ) {
         $internal_bigip_server = 'srwd00lba014.stubcorp.dev';
         $external_bigip_server = 'srwd00lba042-cl.stubcorp.dev';
-        if ( $env_prefix =~ /srwq/i ) {
-            $internal_partition = "Noconly";
-            $external_partition = "data-group";
-        }
+        # if ( $env_prefix =~ /srwq/i ) {
+        #     $internal_partition = "Noconly";
+        #     $external_partition = "data-group";
+        # }
     } else {
         $internal_bigip_server = '10.80.139.232';
         $external_bigip_server = '10.80.139.242';
     }
     # TODO For test
-    $internal_bigip_server = 'srwd00lba013.stubcorp.dev';
-    $external_bigip_server = 'srwd00lba041.stubcorp.dev';
+    # $internal_bigip_server = 'srwd00lba013.stubcorp.dev';
+    # $external_bigip_server = 'srwd00lba041.stubcorp.dev';
 
     if ( $int_ext =~ /int/ ) {
         return ( $internal_bigip_server, $internal_partition );

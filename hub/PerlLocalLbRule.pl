@@ -65,8 +65,8 @@ if ( $env_num >= 76 ) {
 }
 
 # TODO Test server
-$sHost = "srwd00lba041.stubcorp.dev";
-$sHost = "srwd00lba013.stubcorp.dev" if $intExt =~ /int/;
+# $sHost = "srwd00lba041.stubcorp.dev";
+# $sHost = "srwd00lba013.stubcorp.dev" if $intExt =~ /int/;
 
 #============================================================================
 sub usage()

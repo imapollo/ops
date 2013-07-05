@@ -4,8 +4,8 @@
 use strict;
 use warnings;
 
+use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/reg/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Cwd;
 use File::Basename;
@@ -121,9 +121,8 @@ foreach my $intExt ("int", "ext") {
     my $foundIruleSuccess=0;
     next unless $iRuleFile;
     logecho "===================================";
-    # TODO for testing
-    my $cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
-    $cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
+    my $cmd = "/nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
+    $cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
 
     value_echo('cmd', $cmd);
 

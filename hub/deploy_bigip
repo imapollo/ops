@@ -17,14 +17,12 @@
 # Examples:
 #  deploy_bigip -e srwd76 -b rb_ecomm_13_6
 #
-# Author: minjzhang
-#
 
 use strict;
 use warnings;
 
+use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/reg/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 use Getopt::Long;
@@ -191,8 +189,10 @@ my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
 # Backup the configuration file.
 my $internal_bigip_server = get_bigip_server( $envid, "int" );
 my $external_bigip_server = get_bigip_server( $envid, "ext" );
-download_configuration( $internal_ic, '/config/bigip.conf', "/nas/home/minjzhang/temp/$internal_bigip_server-internal-bigip.conf." . get_timestamp() );
-download_configuration( $external_ic, '/config/bigip.conf', "/nas/home/minjzhang/temp/$external_bigip_server-external-bigip.conf." . get_timestamp() );
+system("/usr/bin/sudo /bin/mkdir -p /var/log/bigip");
+system("/usr/bin/sudo /bin/chmod ugo+w /var/log/bigip");
+download_configuration( $internal_ic, '/config/bigip.conf', "/var/log/bigip/$internal_bigip_server-int-bigip.conf." . get_timestamp() );
+download_configuration( $external_ic, '/config/bigip.conf', "/var/log/bigip/$external_bigip_server-ext-bigip.conf." . get_timestamp() );
 
 # Remove the virtual servers, rules and pools for specific environment.
 logecho "Deleting virtual servers for $envid ...\n";
@@ -214,8 +214,7 @@ my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $b
 logecho "Deploying pools for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf, $show_verbose);
 deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf, $show_verbose);
-# TODO for testing
-system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
+system("/nas/utl/devops/bin/deploy-irules -e $envid -b $branch");
 logecho "Deploying virtual servers for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf, $show_verbose);
 deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf, $show_verbose);
