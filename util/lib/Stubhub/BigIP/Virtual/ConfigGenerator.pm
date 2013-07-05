@@ -8,7 +8,7 @@ package Stubhub::BigIP::Virtual::ConfigGenerator;
 use strict;
 use warnings;
 
-use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
 
 use Readonly;
