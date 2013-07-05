@@ -7,7 +7,7 @@
 #
 # Options:
 #  -a | --another=..   Another option.
-#  -d | --debug        Print debug messages.
+#  -v | --verbose      Print verbose messages.
 #
 # Author: <email address>
 #
@@ -15,7 +15,7 @@
 options=$@
 
 another_option=0
-debug_level=0
+verbose=0
 
 #
 # Usage
@@ -29,14 +29,14 @@ Usage: <script> [options]
 
 Options:
   -a | --another=..   Another option.
-  -d | --debug        Print debug messages.
+  -v | --verbose      Print verbose messages.
 EOF
 }
 
 #
 # Get options
 #
-OPTS=`getopt -o a:d -l another:,debug -- $options`
+OPTS=`getopt -o a:v -l another:,verbose -- $options`
 if [ $? != 0 ]; then
     echo "Error: Unrecognized parameters."
     _usage
@@ -48,18 +48,18 @@ eval set -- "$OPTS"
 while true ; do
     case "$1" in
         -a | --another) echo "Got a, arg: ${2// }"; shift 2;;
-        -d | --debug) debug_level=1; shift;;
+        -v | --verbose) verbose=1; shift;;
         --) shift; break;;
     esac
 done
 
 #
-# Print debug message
+# Print verbose message
 #
-function _print_debug_msg {
-    debug_message=$1
-    if [[ "$debug_level" == 1 ]]; then
-        echo $debug_message
+function _print_verbose_msg {
+    verbose_message=$1
+    if [[ "$verbose" == 1 ]]; then
+        echo $verbose_message
     fi
 }
 
