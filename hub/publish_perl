@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# Publish perl scripts/modules from git repository to devops PATH.
+#
+# Usage: publish_perl [options]
+#
+# Options:
+#  -d | --debug        Print debug messages.
+#
+# Author: minjzhang
+#
+
+options=$@
+
+debug_level=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+
+<script> $options
+$*
+Usage: <script> [options]
+
+Options:
+  -d | --debug        Print debug messages.
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o d -l debug -- $options`
+if [ $? != 0 ]; then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -d | --debug) debug_level=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print debug message
+#
+function _print_debug_msg {
+    debug_message=$1
+    if [[ "$debug_level" == 1 ]]; then
+        echo $debug_message
+    fi
+}
+
+#
+# Replace the perl lib path for scripts
+#
+function replace_perl_lib_path {
+    file_path=$1
+    cat $file_path | sed 's/\/nas\/home\/minjzhang\/ops\/util\/lib/\/nas\/utl\/devops\/lib\/perl/' > $file_path.tmp
+    mv $file_path.tmp $file_path
+    chmod ugo+x $file_path
+}
+
+#
+# Main
+#
+. /nas/home/minjzhang/bin/base
+PERL_RELEASE_LIST="$VARS/release_perl.lst"
+cat $PERL_RELEASE_LIST | while read line
+do
+    if [ -d $line ]; then
+        find $line -type f | while read perl_file
+        do
+            replace_perl_lib_path $perl_file
+        done
+    else
+        replace_perl_lib_path $line
+    fi
+done
+
+exit 0
