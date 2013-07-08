@@ -26,6 +26,7 @@ BEGIN {
                         &get_virtual_servers
                         &get_env_virtual_servers
                         &get_pub_env_virtual_servers
+                        &delete_not_excluded_env_virtual_servers
                     );
   %EXPORT_TAGS  = ();
 }
@@ -70,5 +71,42 @@ sub delete_env_virtual_servers {
     $iControl->delete_virtual_servers( \@virtual_servers );
     my @pub_virtual_servers = get_pub_env_virtual_servers( $iControl, $envid );
     $iControl->delete_virtual_servers( \@pub_virtual_servers );
+}
+
+#
+# Delete virtual servers, not including the excluded virtual servers.
+#
+sub delete_not_excluded_env_virtual_servers {
+    my ( $iControl, $envid, @exclude_virtual_servers ) = @_;
+
+    my @virtual_servers = get_env_virtual_servers( $iControl, $envid );
+    my @filtered_virtual_servers;
+    foreach my $virtual_server ( @virtual_servers ) {
+        my $exclude = 0;
+        foreach my $excluding_virtual_server ( @exclude_virtual_servers ) {
+            if ( $virtual_server =~ /^$envid-$excluding_virtual_server$/i ) {
+                $exclude = 1;
+            }
+        }
+        if ( ! $exclude ) {
+            push @filtered_virtual_servers, $virtual_server;
+        }
+    }
+    $iControl->delete_virtual_servers( \@filtered_virtual_servers );
+
+    my @pub_virtual_servers = get_pub_env_virtual_servers( $iControl, $envid );
+    my @pub_filtered_virtual_servers;
+    foreach my $virtual_server ( @pub_virtual_servers ) {
+        my $exclude = 0;
+        foreach my $excluding_virtual_server ( @exclude_virtual_servers ) {
+            if ( $virtual_server =~ /^pub-$envid-$excluding_virtual_server$/i ) {
+                $exclude = 1;
+            }
+        }
+        if ( ! $exclude ) {
+            push @pub_filtered_virtual_servers, $virtual_server;
+        }
+    }
+    $iControl->delete_virtual_servers( \@pub_filtered_virtual_servers );
 }
 

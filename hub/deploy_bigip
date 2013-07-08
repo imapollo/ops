@@ -41,6 +41,8 @@ use Stubhub::P4::Client qw (
 use Stubhub::BigIP::Virtual::ConfigGenerator qw (
                             generate_vs_configs
                             generate_pub_vs_configs
+                            generate_not_excluded_vs_configs
+                            generate_pub_not_excluded_vs_configs
                            );
 use Stubhub::BigIP::Pool::ConfigGenerator qw (
                             generate_pool_configs
@@ -53,15 +55,18 @@ use Stubhub::BigIP::System::Util qw (
                            );
 use Stubhub::BigIP::System::Info qw (
                             get_bigip_server
+                            get_exclude_list
                            );
 use Stubhub::BigIP::Virtual::Handler qw (
                             delete_env_virtual_servers
+                            delete_not_excluded_env_virtual_servers
                            );
 use Stubhub::BigIP::Rule::Handler qw (
                             delete_env_rules
                            );
 use Stubhub::BigIP::Pool::Handler qw (
                             delete_env_pools
+                            delete_not_excluded_env_pools
                            );
 
 # Get options
@@ -130,7 +135,7 @@ sub uniq {
 # including virtual server, pool.
 #
 sub generate_configuration {
-    my ( $env_id, $branch_name, $tmpdir, $intext ) = @_;
+    my ( $env_id, $branch_name, $tmpdir, $intext, @excluded_vs ) = @_;
     my $p4_f5_dir = qw{};
     my $p4_f5_subdir = "templates/fsroot/etc/stubhub/f5";
     if ( $branch_name eq "main" ) {
@@ -152,10 +157,10 @@ sub generate_configuration {
 
     my $vs_file;
     if ( $intext eq "ext" ) {
-        $vs_file = generate_pub_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext",
-            "$public_ip_list_dir$PUBLIC_IP_LIST", $envid, "$tmpdir" );
+        $vs_file = generate_pub_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext",
+            "$public_ip_list_dir$PUBLIC_IP_LIST", $envid, "$tmpdir", @excluded_vs );
     }
-    $vs_file = generate_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir" );
+    $vs_file = generate_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir", @excluded_vs );
     my $pool_file = generate_pool_configs( "$dynamic_perforce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir" );
     clean_perforce_client( $dynamic_perforce_client, $dynamic_perforce_dir );
     clean_perforce_client( $public_ip_chkout_client, $public_ip_list_dir);
@@ -194,27 +199,31 @@ system("/usr/bin/sudo /bin/chmod ugo+w /var/log/bigip");
 download_configuration( $internal_ic, '/config/bigip.conf', "/var/log/bigip/$internal_bigip_server-int-bigip.conf." . get_timestamp() );
 download_configuration( $external_ic, '/config/bigip.conf', "/var/log/bigip/$external_bigip_server-ext-bigip.conf." . get_timestamp() );
 
+my @internal_excluded_vs = get_exclude_list( $envid, "internal", "virtual" );
+my @external_excluded_vs = get_exclude_list( $envid, "external", "virtual" );
+
 # Remove the virtual servers, rules and pools for specific environment.
 logecho "Deleting virtual servers for $envid ...\n";
-delete_env_virtual_servers( $internal_ic, $envid );
-delete_env_virtual_servers( $external_ic, $envid );
+delete_not_excluded_env_virtual_servers( $external_ic, $envid, @external_excluded_vs );
+delete_not_excluded_env_virtual_servers( $internal_ic, $envid, @internal_excluded_vs );
 logecho "Deleting rules for $envid ...\n";
 delete_env_rules( $internal_ic, $envid );
 delete_env_rules( $external_ic, $envid );
 logecho "Deleting pools for $envid ...\n";
-delete_env_pools( $internal_ic, $envid );
 delete_env_pools( $external_ic, $envid );
+delete_env_pools( $internal_ic, $envid );
 
 # Deploy virtual servers, rules and pools for specific environment.
 my $int_tmpdir = File::Temp->newdir();
 my $ext_tmpdir = File::Temp->newdir();
 logecho "Generating virtual server, pool configuration files ...\n";
-my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext" );
-my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int" );
+my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int", @internal_excluded_vs );
+my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext", @external_excluded_vs );
 logecho "Deploying pools for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf, $show_verbose);
 deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf, $show_verbose);
-system("/nas/utl/devops/bin/deploy-irules -e $envid -b $branch");
+#system("/nas/utl/devops/bin/deploy-irules -e $envid -b $branch");
+system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
 logecho "Deploying virtual servers for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf, $show_verbose);
 deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf, $show_verbose);

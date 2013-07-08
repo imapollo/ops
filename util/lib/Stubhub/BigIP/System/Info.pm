@@ -11,6 +11,9 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
 
 use Readonly;
+use YAML qw( LoadFile );
+use Log::Transcript;
+use Data::Dumper;
 
 BEGIN {
   use Exporter();
@@ -23,6 +26,7 @@ BEGIN {
   @EXPORT_OK    = qw(
                         &get_bigip_server
                         &get_bigip_partition
+                        &get_exclude_list
                     );
   %EXPORT_TAGS  = ();
 }
@@ -48,6 +52,27 @@ sub get_bigip_server {
 }
 
 #
+# Get the exclude list for the specific environment.
+# Param: pool, rule or virtual.
+#
+sub get_exclude_list {
+    my ( $envid, $intext, $object_type ) = @_;
+    if ( $object_type ne "pool"
+            and $object_type ne "rule"
+            and $object_type ne "virtual" ) {
+        logecho "Error: parameter object type must be 'pool', 'rule' or 'virtual'.\n";
+        exit 1;
+    }
+    my $exclude_settings = LoadFile("/nas/home/minjzhang/temp/exclude.lst");
+    my $object_list = $exclude_settings->{$envid}->{$intext}->{$object_type};
+    my @objects;
+    if ( defined $object_list ) {
+        @objects = split ",", $object_list;
+    }
+    return @objects;
+}
+
+#
 # Get BigIP server and partition.
 #
 sub _get_bigip_server_partition {
@@ -65,17 +90,13 @@ sub _get_bigip_server_partition {
     if ( $env_number >= 76 or $env_prefix =~ /srwq/i ) {
         $internal_bigip_server = 'srwd00lba014.stubcorp.dev';
         $external_bigip_server = 'srwd00lba042-cl.stubcorp.dev';
-        # if ( $env_prefix =~ /srwq/i ) {
-        #     $internal_partition = "Noconly";
-        #     $external_partition = "data-group";
-        # }
     } else {
         $internal_bigip_server = '10.80.139.232';
         $external_bigip_server = '10.80.139.242';
     }
     # TODO For test
-    # $internal_bigip_server = 'srwd00lba013.stubcorp.dev';
-    # $external_bigip_server = 'srwd00lba041.stubcorp.dev';
+    $internal_bigip_server = 'srwd00lba013.stubcorp.dev';
+    $external_bigip_server = 'srwd00lba041.stubcorp.dev';
 
     if ( $int_ext =~ /int/ ) {
         return ( $internal_bigip_server, $internal_partition );

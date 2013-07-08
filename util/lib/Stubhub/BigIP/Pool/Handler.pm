@@ -25,6 +25,7 @@ BEGIN {
                         &delete_env_pools
                         &get_pools
                         &get_env_pools
+                        &delete_not_excluded_env_pools
                     );
   %EXPORT_TAGS  = ();
 }
@@ -57,4 +58,26 @@ sub delete_env_pools {
     my ( $iControl, $pattern ) = @_;
     my @pools = get_env_pool_list( $iControl, $pattern );
     $iControl->delete_pools( \@pools );
+}
+
+#
+# Delete pools with exclude list.
+#
+sub delete_not_excluded_env_pools {
+    my ( $iControl, $pattern, @exclude_pools ) = @_;
+    my @pools = get_env_pool_list( $iControl, $pattern );
+    my @filtered_pools;
+    foreach my $pool ( @pools ) {
+        my $exclude = 0;
+        foreach my $excluding_pool ( @exclude_pools ) {
+            if ( $pool =~ /^$pattern-$excluding_pool$/i ) {
+                $exclude = 1;
+            }
+        }
+        if ( ! $exclude ) {
+            push @filtered_pools, $pool;
+        }
+    }
+    $iControl->delete_pools( \@filtered_pools );
+    exit;
 }

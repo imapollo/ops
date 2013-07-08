@@ -27,11 +27,75 @@ BEGIN {
   @EXPORT_OK    = qw(
                       &generate_vs_configs
                       &generate_pub_vs_configs
+                      &generate_not_excluded_vs_configs
+                      &generate_pub_not_excluded_vs_configs
                     );
   %EXPORT_TAGS  = ();
 }
 
 our @EXPORT_OK;
+
+#
+# Generate public virtual server configuration file bsed on
+# templates, not including the exlucded virtual servers.
+# Return empty string if no public ip for the environment.
+#
+sub generate_pub_not_excluded_vs_configs {
+    my ( $templates_dir, $public_ip_list, $envid, $output_dir, @excluded_virtual_servers ) = @_;
+    my $public_vs = _get_env_public_ip( $public_ip_list, $envid );
+    my $public_vs_number = scalar keys %$public_vs;
+    my $output_file = "$output_dir/virtual_server_$envid.conf";
+    if ( $public_vs_number == 0 ) {
+        return $output_file;
+    }
+    opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
+    my @template_files = grep { ! -d } readdir DH;
+    closedir DH;
+    foreach my $virtual_server_template ( @template_files ) {
+        my $vs_template_filename = $virtual_server_template;
+        $vs_template_filename =~ s/.*\/(.*)/$1/;
+        my $excluded = 0;
+        foreach my $excluded_virtual_server ( @excluded_virtual_servers ) {
+            if ( $excluded_virtual_server eq $vs_template_filename ) {
+                $excluded = 1;
+                last;
+            }
+        }
+        next if $excluded;
+        if ( exists $public_vs->{ "pub-$envid-$vs_template_filename" } ) {
+            generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid,
+                $public_vs->{ "pub-$envid-$vs_template_filename" } );
+        }
+    }
+    return $output_file;
+}
+
+#
+# Generate virtual server configuration files based on templates
+# under a folder.
+#
+sub generate_not_excluded_vs_configs {
+    my ( $templates_dir, $envid, $output_dir, @excluded_virtual_servers ) = @_;
+    opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
+    my @template_files = grep { ! -d } readdir DH;
+    closedir DH;
+    my $output_file = "$output_dir/virtual_server_$envid.conf";
+    foreach my $virtual_server_template ( @template_files ) {
+        my $vs_template_filename = $virtual_server_template;
+        $vs_template_filename =~ s/.*\/(.*)/$1/;
+        my $excluded = 0;
+        foreach my $excluded_virtual_server ( @excluded_virtual_servers ) {
+            if ( $excluded_virtual_server eq $vs_template_filename ) {
+                $excluded = 1;
+                last;
+            }
+        }
+        next if $excluded;
+        generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid, "" );
+    }
+    return $output_file;
+}
+
 
 #
 # Generate public virtual server configuration file bsed on
