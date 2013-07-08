@@ -11,11 +11,16 @@
 # Options:
 #  -e | --env               Specify the environment ID. For example: srwd76.
 #  -b | --branch            Specify the branch name. For example: rb_ecomm_13_6.
+#  -p | --includepool       Specify which of the pools need to be included for deployment.
+#                           Multiple pools need to be separated by comma.
+#  -s | --includevs         Specify which of the virtual servers need to be included for deployment.
+#                           Multiple virtuals need to be separated by comma.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
 # Examples:
 #  deploy_bigip -e srwd76 -b rb_ecomm_13_6
+#  deploy_bigip -e srwd76 -b rb_ecomm_13_6 -s cti,cti-ssl
 #
 
 use strict;
@@ -74,11 +79,15 @@ my $show_usage = qw{};
 my $show_verbose = qw{};
 my $envid = qw{};
 my $branch = qw{};
+my $including_vs = qw{};
+my $including_pool = qw{};
 my $options_okay = GetOptions (
-   'e|env=s'     => \$envid,
-   'b|branch=s'  => \$branch,
-   'v|verbose'   => \$show_verbose,
-   'h|help'      => \$show_usage,
+   'e|env=s'         => \$envid,
+   'b|branch=s'      => \$branch,
+   'p|includepool=s' => \$including_pool,
+   's|includevs=s'   => \$including_vs,
+   'v|verbose'       => \$show_verbose,
+   'h|help'          => \$show_usage,
 );
 
 #
@@ -114,11 +123,16 @@ Usage: deploy_bigip [options]
 Options:
  -e | --env               Specify the environment ID. For example: srwd76.
  -b | --branch            Specify the branch name. For example: rb_ecomm_13_6.
+ -p | --includepool       Specify which of the pools need to be included for deployment.
+                          Multiple pools need to be separated by comma.
+ -s | --includevs         Specify which of the virtual servers need to be included for deployment.
+                          Multiple virtuals need to be separated by comma.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
 Examples:
  deploy_bigip -e srwd76 -b rb_ecomm_13_6
+ deploy_bigip -e srwd76 -b rb_ecomm_13_6 -s cti,cti-ssl
 
 END_OF_HELP
 }
@@ -187,6 +201,26 @@ sub get_timestamp {
 }
 
 #
+# Filter the including array list.
+#
+sub filter_list {
+    my ( $include_array_ref, $exclude_array_ref ) = @_;
+    my @final_list;
+    foreach my $excluded ( @{ $exclude_array_ref } ) {
+        my $include = 0;
+        foreach my $included ( @{ $include_array_ref } ) {
+            if ( $included eq $excluded ) {
+                $include = 1;
+            }
+        }
+        if ( ! $include ) {
+            push @final_list, $excluded;
+        }
+    }
+    return @final_list;
+}
+
+#
 # Main
 #
 my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
@@ -202,10 +236,14 @@ download_configuration( $external_ic, '/config/bigip.conf', "/var/log/bigip/$ext
 my @internal_excluded_vs = get_exclude_list( $envid, "internal", "virtual" );
 my @external_excluded_vs = get_exclude_list( $envid, "external", "virtual" );
 
+my @include_vs = split ",", $including_vs if defined $including_vs;
+my @final_internal_excluded_vs = filter_list( \@include_vs, \@internal_excluded_vs );
+my @final_external_excluded_vs = filter_list( \@include_vs, \@external_excluded_vs );
+
 # Remove the virtual servers, rules and pools for specific environment.
 logecho "Deleting virtual servers for $envid ...\n";
-delete_not_excluded_env_virtual_servers( $external_ic, $envid, @external_excluded_vs );
-delete_not_excluded_env_virtual_servers( $internal_ic, $envid, @internal_excluded_vs );
+delete_not_excluded_env_virtual_servers( $external_ic, $envid, @final_external_excluded_vs );
+delete_not_excluded_env_virtual_servers( $internal_ic, $envid, @final_internal_excluded_vs );
 logecho "Deleting rules for $envid ...\n";
 delete_env_rules( $internal_ic, $envid );
 delete_env_rules( $external_ic, $envid );
@@ -217,8 +255,8 @@ delete_env_pools( $internal_ic, $envid );
 my $int_tmpdir = File::Temp->newdir();
 my $ext_tmpdir = File::Temp->newdir();
 logecho "Generating virtual server, pool configuration files ...\n";
-my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int", @internal_excluded_vs );
-my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext", @external_excluded_vs );
+my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int", @final_internal_excluded_vs );
+my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext", @final_external_excluded_vs );
 logecho "Deploying pools for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf, $show_verbose);
 deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf, $show_verbose);
