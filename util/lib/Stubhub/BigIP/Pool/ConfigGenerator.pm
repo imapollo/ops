@@ -28,11 +28,37 @@ BEGIN {
   @EXPORT_OK    = qw(
                       &generate_pool_config
                       &generate_pool_configs
+                      &generate_not_excluded_pool_configs
                     );
   %EXPORT_TAGS  = ();
 }
 
 our @EXPORT_OK;
+#
+# Generate pool configuration files based on templates
+# under a folder, including not excluded pools.
+#
+sub generate_not_excluded_pool_configs {
+    my ( $templates_dir, $envid, $output_dir, @excluded_pools ) = @_;
+    opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
+    my @template_files = grep { ! -d } readdir DH;
+    closedir DH;
+    my $output_file = "$output_dir/pool_$envid.conf";
+    foreach my $pool_template ( @template_files ) {
+        my $pool_template_filename = $pool_template;
+        $pool_template_filename =~ s/.*\/(.*)/$1/;
+        my $excluded = 0;
+        foreach my $excluded_pool ( @excluded_pools ) {
+            if ( $excluded_pool =~ /^$pool_template_filename$/i ) {
+                $excluded = 1;
+                last;
+            }
+        }
+        next if $excluded;
+        generate_pool_config( $output_file, "$templates_dir/$pool_template", $envid );
+    }
+    return $output_file;
+}
 
 #
 # Generate pool configuration files based on templates

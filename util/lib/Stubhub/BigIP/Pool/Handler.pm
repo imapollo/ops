@@ -79,5 +79,4 @@ sub delete_not_excluded_env_pools {
         }
     }
     $iControl->delete_pools( \@filtered_pools );
-    exit;
 }
