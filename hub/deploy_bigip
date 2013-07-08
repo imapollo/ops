@@ -275,4 +275,17 @@ deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf, $show_verb
 save_configuration( $internal_ic );
 save_configuration( $external_ic );
 
+if ( scalar @final_internal_excluded_vs > 0
+        or scalar @final_external_excluded_vs > 0
+        or scalar @final_internal_excluded_pool > 0
+        or scalar @final_external_excluded_pool > 0) {
+    logecho "===================================";
+    logecho "Following BigIP objects are excluded during the deployment.";
+    logecho "Please use '-p' or '-s' option to deploy them:";
+    logecho "Internal virtual servers: " . join(',', @final_internal_excluded_vs) if scalar @final_internal_excluded_vs > 0;
+    logecho "External virtual servers: " . join(',', @final_external_excluded_vs) if scalar @final_external_excluded_vs > 0;
+    logecho "Internal pools: " . join(',', @final_internal_excluded_pool) if scalar @final_internal_excluded_pool > 0;
+    logecho "External pools: " . join(',', @final_external_excluded_pool) if scalar @final_external_excluded_pool > 0;
+}
+
 exit 0;
