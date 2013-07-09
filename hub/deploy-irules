@@ -29,7 +29,7 @@ use REG::Util qw(
                   value_echo
                 );
 use Stubhub::P4::Client qw (
-                  check_out_perfoce_file
+                  check_out_perforce_file
                   clean_perforce_client
                 );
 use REG::RedeemTokens qw ( redeem_tokens );
@@ -173,12 +173,12 @@ sub get_irule_from_p4 {
     print "Error: Branch name $branch_name doesn't exist in depot.\n";
     exit 1;
   }
-  my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
-    = check_out_perfoce_file("/$p4_irule_dir/...");
-  system("/bin/chmod u+w $dynamic_perfoce_dir -R");
+  my ( $dynamic_perforce_client, $dynamic_perforce_dir )
+    = check_out_perforce_file("/$p4_irule_dir/...");
+  system("/bin/chmod u+w $dynamic_perforce_dir -R");
 
   foreach my $intExt ("int", "ext") {
-    my $iruleDir = "$dynamic_perfoce_dir$p4_irule_dir/$intExt";
+    my $iruleDir = "$dynamic_perforce_dir$p4_irule_dir/$intExt";
     logwarn "Irules dir not found: $iruleDir" && exit 0 unless -d $iruleDir;
 
     my $iruleFiles = `/bin/ls -1 $iruleDir/*`;
@@ -192,9 +192,9 @@ sub get_irule_from_p4 {
 
   my $uc_env_id = uc( $env_id );
   my $dest_file_dir = "/nas/release/$uc_env_id";
-  system("/usr/bin/sudo /bin/cp -rf $dynamic_perfoce_dir/$p4_irule_dir $dest_file_dir");
+  system("/usr/bin/sudo /bin/cp -rf $dynamic_perforce_dir/$p4_irule_dir $dest_file_dir");
 
-  clean_perforce_client( $dynamic_perforce_client, $dynamic_perfoce_dir );
+  clean_perforce_client( $dynamic_perforce_client, $dynamic_perforce_dir );
   $dest_file_dir = "$dest_file_dir/irules";
 
   return ( $dest_file_dir );
@@ -213,10 +213,10 @@ sub redeem_config_tokens {
   Readonly my $TOKEN_TABLE_BASED_FILE => "token-table-env-based";
   Readonly my $TOKEN_TABLE_BASED_DEPOT_PATH => "/internal/dev/properties/tokenization/$TOKEN_TABLE_BASED_FILE";
 
-  my ( $dynamic_perforce_client, $dynamic_perfoce_dir )
-    = check_out_perfoce_file("/$TOKEN_TABLE_BASED_DEPOT_PATH");
-  system("/bin/chmod u+w $dynamic_perfoce_dir -R");
-  my $token_table_fspath = "$dynamic_perfoce_dir$TOKEN_TABLE_BASED_DEPOT_PATH";
+  my ( $dynamic_perforce_client, $dynamic_perforce_dir )
+    = check_out_perforce_file("/$TOKEN_TABLE_BASED_DEPOT_PATH");
+  system("/bin/chmod u+w $dynamic_perforce_dir -R");
+  my $token_table_fspath = "$dynamic_perforce_dir$TOKEN_TABLE_BASED_DEPOT_PATH";
 
   open my $TOKEN_TABLE_FH, '<', $token_table_fspath
     or clean_die "redeem_config_tokens(): can't open token table for detokenization;",

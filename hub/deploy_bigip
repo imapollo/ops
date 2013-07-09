@@ -40,7 +40,7 @@ use Stubhub::ENV::Info qw (
                             get_env_branch
                           );
 use Stubhub::P4::Client qw (
-                            check_out_perfoce_file
+                            check_out_perforce_file
                             clean_perforce_client
                            );
 use Stubhub::BigIP::Virtual::ConfigGenerator qw (
@@ -164,11 +164,11 @@ sub generate_configuration {
         exit 1;
     }
     my ( $dynamic_perforce_client, $dynamic_perforce_dir )
-        = check_out_perfoce_file( "/$p4_f5_dir/..." );
+        = check_out_perforce_file( "/$p4_f5_dir/..." );
 
     Readonly my $PUBLIC_IP_LIST => '/internal/devops/network/bigip/public_virtual_server_ip.lst';
     my ( $public_ip_chkout_client, $public_ip_list_dir )
-        = check_out_perfoce_file( "/$PUBLIC_IP_LIST" );
+        = check_out_perforce_file( "/$PUBLIC_IP_LIST" );
 
     my $vs_file;
     if ( $intext eq "ext" ) {

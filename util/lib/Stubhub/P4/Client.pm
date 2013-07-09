@@ -23,7 +23,7 @@ BEGIN {
   @ISA          = qw( Exporter );
   @EXPORT       = qw();
   @EXPORT_OK    = qw(
-                        &check_out_perfoce_file
+                        &check_out_perforce_file
                         &clean_perforce_client
                     );
   %EXPORT_TAGS  = ();
@@ -50,7 +50,7 @@ sub create_temp_directory {
 #
 # Check out a file from perforce.
 #
-sub check_out_perfoce_file {
+sub check_out_perforce_file {
     my ( $file_path ) = @_;
 
     $ENV{ PATH } = ':/usr/local/bin'

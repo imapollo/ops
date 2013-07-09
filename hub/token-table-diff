@@ -227,7 +227,7 @@ sub create_temp_directory {
 #
 # Check out a file from perforce
 #
-sub check_out_perfoce_file {
+sub check_out_perforce_file {
     my ( $file_path ) = @_;
 
     $ENV{ PATH } = ':/usr/local/bin'
@@ -266,7 +266,7 @@ sub check_out_perfoce_file {
 #
 sub check_out_token_table {
     Readonly my $TOKEN_TABLE_FILE => "/internal/dev/properties/tokenization/token-table-env-stubhub-properties";
-    my $checked_out_file = check_out_perfoce_file( $TOKEN_TABLE_FILE );
+    my $checked_out_file = check_out_perforce_file( $TOKEN_TABLE_FILE );
     return $checked_out_file;
 }
 

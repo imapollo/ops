@@ -12,8 +12,12 @@ use lib '/nas/reg/lib/perl';
 
 use Readonly;
 use YAML qw( LoadFile );
-use Log::Transcript;
 use Data::Dumper;
+use Log::Transcript;
+use Stubhub::P4::Client qw (
+                            check_out_perforce_file
+                            clean_perforce_client
+                        );
 
 BEGIN {
   use Exporter();
@@ -63,7 +67,10 @@ sub get_exclude_list {
         logecho "Error: parameter object type must be 'pool', 'rule' or 'virtual'.\n";
         exit 1;
     }
-    my $exclude_settings = LoadFile("/nas/home/minjzhang/temp/exclude.lst");
+    Readonly my $EXCLUDE_LIST => '/internal/devops/network/bigip/exclude.lst';
+    my ( $dynamic_perforce_client, $dynamic_perforce_dir ) = check_out_perforce_file( "/$EXCLUDE_LIST" );
+    my $exclude_settings = LoadFile( "$dynamic_perforce_dir$EXCLUDE_LIST" );
+    clean_perforce_client( $dynamic_perforce_client, $dynamic_perforce_dir );
     my $object_list = $exclude_settings->{$envid}->{$intext}->{$object_type};
     my @objects;
     if ( defined $object_list ) {
