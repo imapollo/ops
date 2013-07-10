@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #
-# Update the monitor for jboss 6.
+# Update the monitor for jboss secured.
 #
-# Usage: bigip_update_jboss6_monitor [options]
+# Usage: bigip_update_health_monitor [options]
 #
 # Options:
 #  -e | --env               Specify the environment id to be updated. For example: srwd76.
@@ -10,7 +10,7 @@
 #  -h | --help              Show help information.
 #
 # Examples:
-#  bigip_update_jboss6_monitor -e srwd76
+#  bigip_update_health_monitor -e srwd76
 #
 # Author: minjzhang
 #
@@ -24,9 +24,12 @@ use Getopt::Long;
 use Stubhub::BigIP::System::Util qw (
                                     deploy_configuration
                                     download_configuration
+                                    save_configuration
                                     get_icontrol
                                 );
-
+use Stubhub::BigIP::Pool::Handler qw (
+                                    get_env_pool_list
+                                );
 
 # Get options
 my $show_usage = qw{};
@@ -62,7 +65,7 @@ sub usage {
     print <<END_OF_HELP
 Update the monitor for jboss 6.
 
-Usage: bigip_update_jboss6_monitor [options]
+Usage: bigip_update_health_monitor [options]
 
 Options:
  -e | --env               Specify the environment id to be updated. For example: srwd76.
@@ -70,7 +73,7 @@ Options:
  -h | --help              Show help information.
 
 Examples:
- bigip_update_jboss6_monitor -e srwd76
+ bigip_update_health_monitor -e srwd76
 
 END_OF_HELP
 }
@@ -92,50 +95,20 @@ sub uniq {
 }
 
 #
-# Get the pools need to be updated.
-#
-sub get_update_pools {
-    my ( $envid ) = @_;
-
-    my $pools = `/nas/home/minjzhang/bin/bigip_get_pools -e $envid`;
-    my @bigip_pools = split "\n", $pools;
-
-    my $jboss6_list_file = "/nas/home/minjzhang/temp/jboss6.lst";
-    open JBOSS6_LST_FH, "<$jboss6_list_file"
-        or die "Cannot open file $jboss6_list_file: $!";
-    my @jboss6_server_list = <JBOSS6_LST_FH>;
-    chomp @jboss6_server_list;
-    my %jboss6_servers = map { $_ => 1 } @jboss6_server_list;
-
-    my %jboss6_pools;
-    foreach my $pool ( @bigip_pools ) {
-        my $blade = $pool;
-        $blade =~ s/.*:srw[deq][0-9]{2}([a-z]{3}).*/$1/;
-        if ( exists( $jboss6_servers{$blade} ) ) {
-            $pool =~ s/(.*):.*/$1/;
-            $jboss6_pools{"$pool"} = 1;
-        }
-    }
-
-    close JBOSS6_LST_FH;
-
-    return %jboss6_pools;
-}
-
-#
 # Main
 #
 
-my %update_pools = get_update_pools( $envid );
-
 my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
 
+
 foreach my $intext ( "int", "ext" ) {
-    my $bigip_conf_file_path = "/nas/home/minjzhang/temp/$intext-bigip.conf.";
-    my $bigip_conf_file_dest = "/nas/home/minjzhang/temp/$intext-bigip.conf.dest";
+    my $bigip_conf_file_path = "/nas/home/minjzhang/temp/$envid-$intext-bigip.conf";
+    my $bigip_conf_file_dest = "/nas/home/minjzhang/temp/$envid-$intext-bigip.conf.dest";
 
     my $iControl = $internal_ic;
     $iControl = $external_ic if $intext eq "ext";
+
+    my @env_pools = get_env_pool_list( $iControl, $envid );
 
     download_configuration( $iControl, "/config/bigip.conf", "$bigip_conf_file_path");
 
@@ -151,15 +124,15 @@ foreach my $intext ( "int", "ext" ) {
             if ( $line =~ /^}$/ ) {
                 $inpool = 0;
             }
-            $line =~ s/\bJBoss-JMX-GET_SSL_443\b/JBoss6-JMX-GET_SSL_443/;
-            # $line =~ s/\bJBoss-JMX-GET_8080\b/Jboss6-JMX-GET_8080/;
-            $line =~ s/\bJBoss-JMX-GET\b/JBoss6-JMX-GET/;
+            $line =~ s/\bJBoss-JMX-GET_SSL_443\b/JBoss-Secured-SSL/;
+            $line =~ s/\bJBoss-JMX-GET_8080\b/JBoss6-Secured-HTTP-8080/;
+            $line =~ s/\bJBoss-JMX-GET\b/JBoss-Secured-HTTP/;
             print BIGIP_CONF_DEST_FH "$line\n";
         }
         if ( $line =~ /^pool\s+.*\s+{\s*/ ) {
             my $pool = $line;
             $pool =~ s/^pool\s+(.*)\s+{\s*/$1/;
-            if ( exists( $update_pools{$pool} ) ) {
+            if ( grep $_ eq $pool, @env_pools ) {
                 $inpool = 1;
                 print BIGIP_CONF_DEST_FH "$line\n";
             }
@@ -170,6 +143,7 @@ foreach my $intext ( "int", "ext" ) {
     close BIGIP_CONF_DEST_FH;
 
     deploy_configuration( $envid, $intext, $iControl, $bigip_conf_file_dest, $show_verbose);
+    save_configuration( $iControl );
 }
 
 exit 0;

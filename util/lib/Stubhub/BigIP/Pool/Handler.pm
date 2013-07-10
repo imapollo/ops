@@ -23,8 +23,8 @@ BEGIN {
   @EXPORT       = qw();
   @EXPORT_OK    = qw(
                         &delete_env_pools
-                        &get_pools
-                        &get_env_pools
+                        &get_pool_list
+                        &get_env_pool_list
                         &delete_not_excluded_env_pools
                     );
   %EXPORT_TAGS  = ();
