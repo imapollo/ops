@@ -75,8 +75,8 @@ sub get_icontrol {
                                     proto    => "$BIGIP_PROTOCOL"
                                 );
 
-    set_partition( $internal_ic, $internal_partition );
-    set_partition( $external_ic, $external_partition );
+    # set_partition( $internal_ic, $internal_partition );
+    # set_partition( $external_ic, $external_partition );
 
     return ( $internal_ic, $external_ic );
 }
