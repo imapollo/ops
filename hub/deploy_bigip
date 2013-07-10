@@ -222,9 +222,29 @@ sub filter_list {
 }
 
 #
+# Check the lock file for the environment.
+#
+sub check_deployment_lock {
+    my ( $envid ) = @_;
+    Readonly my $BIGIP_DEPLOYMENT_LOCK_DIR => '/nas/reg/log/bigip';
+    my $lock_file = "$BIGIP_DEPLOYMENT_LOCK_DIR/$envid.pid";
+    if ( -e $lock_file ) {
+        my $pid = `/bin/cat $lock_file`;
+        chomp $pid;
+        logecho "Error: Already have a process to deploy $envid: $pid. If the process is already finished, please remove $lock_file and then start another deployment.";
+        exit 1;
+    } else {
+        system("/bin/echo $$ > $lock_file");
+    }
+    return $lock_file;
+}
+
+#
 # Main
 #
 my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
+
+my $bigip_lock_file = check_deployment_lock( $envid );
 
 # Backup the configuration file.
 my $internal_bigip_server = get_bigip_server( $envid, "int" );
@@ -274,6 +294,8 @@ deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf, $show_verb
 
 save_configuration( $internal_ic );
 save_configuration( $external_ic );
+
+system( "/bin/rm $bigip_lock_file" );
 
 if ( scalar @final_internal_excluded_vs > 0
         or scalar @final_external_excluded_vs > 0
