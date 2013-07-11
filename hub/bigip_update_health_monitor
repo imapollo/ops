@@ -23,6 +23,7 @@ use lib '/nas/reg/lib/perl';
 
 use Getopt::Long;
 use Log::Transcript;
+use File::Temp;
 use Stubhub::BigIP::System::Util qw (
                                     deploy_configuration
                                     download_configuration
@@ -101,11 +102,11 @@ sub uniq {
 #
 
 my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
-
+my $tmpdir = File::Temp->newdir();
 
 foreach my $intext ( "int", "ext" ) {
-    my $bigip_conf_file_path = "/nas/home/minjzhang/temp/$envid-$intext-bigip.conf";
-    my $bigip_conf_file_dest = "/nas/home/minjzhang/temp/$envid-$intext-bigip.conf.dest";
+    my $bigip_conf_file_path = "$tmpdir/$envid-$intext-bigip.conf";
+    my $bigip_conf_file_dest = "$tmpdir/$envid-$intext-bigip.conf.dest";
 
     my $iControl = $internal_ic;
     $iControl = $external_ic if $intext eq "ext";
