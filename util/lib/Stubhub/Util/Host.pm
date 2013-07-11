@@ -18,6 +18,7 @@ BEGIN {
   @EXPORT       = qw();
   @EXPORT_OK    = qw(
                       &get_ip_by_hostname
+                      &get_hostname_by_ip
                     );
   %EXPORT_TAGS  = ();
 }
@@ -54,4 +55,17 @@ sub get_ip_by_hostname {
     }
 
     return $ip_address;
+}
+
+#
+# Get hostname by IP address.
+#
+sub get_hostname_by_ip {
+    my ( $ip_address ) = @_;
+    $ip_address =~ s/(.*):.*/$1/;
+    my $hostnames = `nslookup $ip_address | grep name | cut -d" " -f3`;
+    chomp $hostnames;
+    $hostnames =~ s/\n/,/g;
+    $hostnames =~ s/\.$//;
+    return $hostnames;
 }
