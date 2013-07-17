@@ -91,10 +91,18 @@ if ( ! defined $envid) {
 }
 
 #
-# Uniq the items in array.
+# Exclude pools from the list.
 #
-sub uniq {
-    return keys %{{ map { $_ => 1 } @_ }};
+sub exclude_pools {
+    my ( @pools ) = @_;
+    my @filtered_pools;
+    foreach my $pool ( @pools ) {
+        if ( $pool !~ /^SRW[DQE][0-9]+-HUB$/i
+                and $pool !~ /^SRW[DQE][0-9]+-G3_JOBS$/i ) {
+            push @filtered_pools, $pool;
+        }
+    }
+    return @filtered_pools;
 }
 
 #
@@ -112,6 +120,7 @@ foreach my $intext ( "int", "ext" ) {
     $iControl = $external_ic if $intext eq "ext";
 
     my @env_pools = get_env_pool_list( $iControl, $envid );
+    my @filtered_env_pools = exclude_pools( @env_pools );
 
     logecho "Downloading configuration ...";
     download_configuration( $iControl, "/config/bigip.conf", "$bigip_conf_file_path");
@@ -132,14 +141,14 @@ foreach my $intext ( "int", "ext" ) {
             $line =~ s/\bJBoss6-JMX-GET_SSL_443\b/JBoss-Secured-SSL/;
             $line =~ s/\bJBoss-JMX-GET\b/JBoss-Secured-HTTP/;
             $line =~ s/\bJBoss6-JMX-GET\b/JBoss-Secured-HTTP/;
-            $line =~ s/\bJBoss-JMX-GET_8080\b/JBoss-Secured-HTTP-8080/;
+            # $line =~ s/\bJBoss-JMX-GET_8080\b/JBoss-Secured-HTTP-8080/;
             $line =~ s/\bJK-Status-GET_SSL_443\b/JBoss-Secured-SSL/;
             print BIGIP_CONF_DEST_FH "$line\n";
         }
         if ( $line =~ /^pool\s+.*\s+{\s*/ ) {
             my $pool = $line;
             $pool =~ s/^pool\s+(.*)\s+{\s*/$1/;
-            if ( grep $_ eq $pool, @env_pools ) {
+            if ( grep $_ eq $pool, @filtered_env_pools) {
                 $inpool = 1;
                 print BIGIP_CONF_DEST_FH "$line\n";
             }
