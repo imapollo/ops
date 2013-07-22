@@ -57,16 +57,17 @@ $env_num =~ s/[srwd|srwe|SRWD|SRWE]//g;
 chomp($env_num);
 
 if ( $env_num >= 76 ) {
-    $sHost = "srwd00lba042-cl.stubcorp.dev";
-    $sHost = "srwd00lba014.stubcorp.dev" if $intExt =~ /int/;
+    $sHost = "10.80.159.3"; # srwd00lba042
+    $sHost = "10.80.158.5" if $intExt =~ /int/; # srwd00lba014/015
+    $sHost = "10.80.157.5" if $env_prefix =~ /srwq/i and $intExt =~ /int/; # srwd00lba017/018
 } else{
-    $sHost = "10.80.139.242";
-    $sHost = "10.80.139.232" if $intExt =~ /int/;
+    $sHost = "10.80.159.37"; # srwd00lba040/041
+    $sHost = "10.80.159.40" if $intExt =~ /int/; # srwd00lba012/013
 }
 
 # TODO Test server
-$sHost = "srwd00lba041.stubcorp.dev";
-$sHost = "srwd00lba013.stubcorp.dev" if $intExt =~ /int/;
+# $sHost = "srwd00lba041.stubcorp.dev";
+# $sHost = "srwd00lba013.stubcorp.dev" if $intExt =~ /int/;
 
 #============================================================================
 sub usage()
