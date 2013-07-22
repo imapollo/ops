@@ -58,6 +58,7 @@ use Stubhub::BigIP::System::Util qw (
                             deploy_configuration
                             save_configuration
                             download_configuration
+                            sync_configuration
                            );
 use Stubhub::BigIP::System::Info qw (
                             get_bigip_server
@@ -286,7 +287,7 @@ my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $b
 logecho "Deploying pools for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf, $show_verbose);
 deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf, $show_verbose);
-#system("/nas/utl/devops/bin/deploy-irules -e $envid -b $branch");
+# my $deploy_irule_success = system("/nas/utl/devops/bin/deploy-irules -e $envid -b $branch");
 system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
 logecho "Deploying virtual servers for $envid ...\n";
 deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf, $show_verbose);
@@ -294,6 +295,8 @@ deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf, $show_verb
 
 save_configuration( $internal_ic );
 save_configuration( $external_ic );
+sync_configuration( $internal_ic, $envid, "int" );
+sync_configuration( $external_ic, $envid, "ext" );
 
 system( "/bin/rm $bigip_lock_file" );
 

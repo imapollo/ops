@@ -39,6 +39,8 @@ BEGIN {
                         &get_icontrol
                         &set_partition
                         &save_configuration
+                        &check_failover_state
+                        &sync_configuration
                     );
   %EXPORT_TAGS  = ();
 }
@@ -136,6 +138,32 @@ sub deploy_configuration {
 sub save_configuration {
     my ( $iControl ) = @_;
     $iControl->save_configuration( 'today' );
+}
+
+#
+# Sync configurations to the Standby BigIP server.
+#
+sub sync_configuration {
+    my ( $iControl, $envid, $int_ext ) = @_;
+    my $ssh = _init_ssh( get_bigip_server( $envid, $int_ext ) );
+    if ( check_failover_state( $iControl ) eq 'FAILOVER_STATE_ACTIVE') {
+        my @output = mute_execute_ssh( $ssh, "config sync all" );
+        if ( grep /error/i, @output ) {
+            foreach my $line ( @output ) {
+                logecho $line;
+            }
+        }
+    } else {
+        logecho "WARN: Did not sync configuration as the current server is not Active.\n"
+    }
+}
+
+#
+# Check the failover status for BigIP server.
+#
+sub check_failover_state {
+    my ( $iControl ) = @_;
+    return $iControl->get_failover_state();
 }
 
 #
