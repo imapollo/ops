@@ -13,7 +13,9 @@ use lib '/nas/reg/lib/perl';
 use Readonly;
 use YAML qw( LoadFile );
 use Data::Dumper;
-use Log::Transcript;
+use Stubhub::Log::Util qw (
+                            get_logger
+                        );
 use Stubhub::P4::Client qw (
                             check_out_perforce_file
                             clean_perforce_client
@@ -36,6 +38,7 @@ BEGIN {
 }
 
 our @EXPORT_OK;
+our $logger = get_logger();
 
 #
 # Get BigIP partition name.
@@ -64,7 +67,7 @@ sub get_exclude_list {
     if ( $object_type ne "pool"
             and $object_type ne "rule"
             and $object_type ne "virtual" ) {
-        logecho "Error: parameter object type must be 'pool', 'rule' or 'virtual'.\n";
+        $logger->error( "Parameter object type must be 'pool', 'rule' or 'virtual'.\n" );
         exit 1;
     }
     Readonly my $EXCLUDE_LIST => '/internal/devops/network/bigip/exclude.lst';

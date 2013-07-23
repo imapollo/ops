@@ -106,7 +106,7 @@ sub set_partition {
 sub download_configuration {
     my ( $iControl, $remote_file, $local_file ) = @_;
     open LOCAL_FILE_FH, ">$local_file"
-        or $logger->logdie( "Error: Failed to open file: $local_file" );
+        or $logger->logdie( "Failed to open file: $local_file" );
     print LOCAL_FILE_FH $iControl->download_file($remote_file);
     close LOCAL_FILE_FH;
     $logger->debug( "Successfully download $remote_file to $local_file." );
@@ -125,7 +125,7 @@ sub deploy_configuration {
     $remote_file_name = "/config/deploy/$remote_file_name";
 
     if ( not _upload_file( $iControl, $remote_file_name, $file_name) ) {
-        $logger->logdie( "Error: Failed to upload file $file_name: $!" );
+        $logger->logdie( "Failed to upload file $file_name: $!" );
     }
 
     my @output = mute_execute_ssh( $ssh, "merge $remote_file_name" );
@@ -168,7 +168,7 @@ sub sync_configuration {
             }
         }
     } else {
-        $logger->warn( "WARN: Did not sync configuration as the current server is not Active." );
+        $logger->warn( "Did not sync configuration as the current server is not Active." );
     }
 }
 

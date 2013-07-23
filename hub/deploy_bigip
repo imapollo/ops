@@ -168,7 +168,7 @@ sub generate_configuration {
     } elsif ( $branch_name =~ m/^pb_/ ) {
         $p4_f5_dir = "/depot/project/$branch_name/$p4_f5_subdir";
     } else {
-        $logger->logdie( "Error: Branch name $branch_name doesn't look good." );
+        $logger->logdie( "Branch name $branch_name doesn't look good." );
     }
     my ( $dynamic_perforce_client, $dynamic_perforce_dir )
         = check_out_perforce_file( "/$p4_f5_dir/..." );
@@ -193,7 +193,7 @@ sub generate_configuration {
 # Parameter validation
 #
 if ( ! defined $envid or ! defined $branch) {
-    $logger->error( "Error: The pamameter '-e' and '-b' must be set." );
+    $logger->error( "The pamameter '-e' and '-b' must be set." );
     usage();
     exit 1;
 }
@@ -238,7 +238,7 @@ sub check_deployment_lock {
     if ( -e $lock_file ) {
         my $pid = `/bin/cat $lock_file`;
         chomp $pid;
-        $logger->logdie( "Error: Already have a process to deploy $envid: $pid. If the process is already finished, please remove $lock_file and then start another deployment." );
+        $logger->logdie( "Already have a process to deploy $envid: $pid. If the process is already finished, please remove $lock_file and then start another deployment." );
     } else {
         system("/bin/echo $$ > $lock_file");
     }

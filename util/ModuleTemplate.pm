@@ -1,7 +1,7 @@
 package Stubhub::ENV::Info;
 
 #
-# TODO baseic inforamtion about the module.
+# TODO basic inforamtion about the module.
 #
 
 use strict;
@@ -11,6 +11,9 @@ use lib '/nas/reg/lib/perl';
 use lib '/nas/home/minjzhang/ops/util/lib'; # TODO Determine if this should be removed
 
 use Readonly;
+use Stubhub::Log::Util qw (
+                            get_logger
+                        );
 
 BEGIN {
   use Exporter();

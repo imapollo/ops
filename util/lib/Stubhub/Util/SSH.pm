@@ -8,6 +8,9 @@ use lib '/nas/reg/lib/perl';
 
 use Readonly;
 use Net::SSH::Expect;
+use Stubhub::Log::Util qw (
+                            get_logger
+                        );
 
 BEGIN {
   use Exporter();
@@ -27,6 +30,7 @@ BEGIN {
 }
 
 our @EXPORT_OK;
+our $logger = get_logger();
 
 #
 # Login to ssh
@@ -93,5 +97,5 @@ sub mute_execute_ssh {
 sub execute_ssh {
     my ( $ssh, $command ) = @_;
     my @outputs = mute_execute_ssh( $ssh, $command );
-    print join "\n", @outputs;
+    $logger->info( join "\n", @outputs );
 }

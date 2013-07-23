@@ -12,6 +12,9 @@ use lib '/nas/reg/lib/perl';
 
 use Readonly;
 use Stubhub::Util::Command qw ( ssh_cmd );
+use Stubhub::Log::Util qw (
+                            get_logger
+                        );
 
 BEGIN {
   use Exporter();
@@ -31,6 +34,7 @@ BEGIN {
 }
 
 our @EXPORT_OK;
+our $logger  = get_logger();
 
 Readonly my $COBBLER_SERVER => "srwd00pup001.stubcorp.dev";
 
@@ -70,7 +74,7 @@ sub get_matched_systems {
 sub print_readable_system_profile {
   my ( $system ) = @_;
   my ( $status, @output ) = ssh_cmd($COBBLER_SERVER, "$COBBLER_SHOW_SYSTEM_PROFILE$system");
-  print @output;
+  $logger->info( @output );
 }
 
 #

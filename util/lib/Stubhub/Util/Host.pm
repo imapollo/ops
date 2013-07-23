@@ -7,6 +7,9 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
 
 use Readonly;
+use Stubhub::Log::Util qw (
+                            get_logger
+                        );
 
 BEGIN {
   use Exporter();
@@ -24,6 +27,7 @@ BEGIN {
 }
 
 our @EXPORT_OK;
+our $logger = get_logger();
 
 #
 # Get IP address by hostname.
@@ -39,7 +43,7 @@ sub get_ip_by_hostname {
     chomp $ip_address;
 
     if ( $ip_address !~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/ ) {
-        print "Error: Cannot get IP address for $hostname.\n";
+        $logger->error( "Cannot get IP address for $hostname.\n" );
         return "";
     }
 
@@ -51,7 +55,7 @@ sub get_ip_by_hostname {
 
     my $reverse_dns = `$DNS_COMMAND $ip_address`;
     if ( $reverse_dns !~ /$hostname/ and ! $is_alias ) {
-        print "Error: Reverse DNS for host $hostname is wrong.\n";
+        $logger->error( "Reverse DNS for host $hostname is wrong.\n" );
     }
 
     return $ip_address;

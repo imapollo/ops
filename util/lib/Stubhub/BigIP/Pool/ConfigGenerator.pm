@@ -111,7 +111,7 @@ sub generate_pool_config {
             my @pool_members = _get_ip_by_hostname_token( $token, $envid );
             $token =~ s/env_id\.(.*)\.ip/$1/;
             if ( $#pool_members == 0 ) {
-                # logecho "WARN: No pool members for " . uc( $token );
+                # logger->warn( "No pool members for " . uc( $token ) );
             }
             foreach my $pool_member ( @pool_members ) {
                 foreach my $foreach_line ( @foreach_lines ) {
