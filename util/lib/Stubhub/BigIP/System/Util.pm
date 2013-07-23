@@ -124,7 +124,7 @@ sub deploy_configuration {
         foreach my $line ( @output ) {
             logecho $line;
         }
-        exit 1;
+        return 1;
     } elsif ( $show_verbose ) {
         foreach my $line ( @output ) {
             logecho $line;
