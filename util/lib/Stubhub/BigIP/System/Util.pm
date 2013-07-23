@@ -152,6 +152,10 @@ sub sync_configuration {
             foreach my $line ( @output ) {
                 logecho $line;
             }
+        } else {
+            foreach my $line ( @output ) {
+                logecho $line;
+            }
         }
     } else {
         logecho "WARN: Did not sync configuration as the current server is not Active.\n"
