@@ -55,7 +55,7 @@ sub get_ip_by_hostname {
 
     my $reverse_dns = `$DNS_COMMAND $ip_address`;
     if ( $reverse_dns !~ /$hostname/ and ! $is_alias ) {
-        $logger->error( "Reverse DNS for host $hostname is wrong.\n" );
+        $logger->warn( "Reverse DNS for host $hostname is wrong.\n" );
     }
 
     return $ip_address;
