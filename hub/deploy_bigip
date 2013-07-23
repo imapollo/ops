@@ -34,7 +34,6 @@ use Getopt::Long;
 use Data::Dumper;
 use MIME::Base64;
 use File::Temp;
-use Log::Transcript;
 use BigIP::iControl;
 use Stubhub::ENV::Info qw (
                             get_env_branch
@@ -75,10 +74,15 @@ use Stubhub::BigIP::Pool::Handler qw (
                             delete_env_pools
                             delete_not_excluded_env_pools
                            );
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger
+                            get_logger_with_loglevel
+                           );
 
 # Get options
 my $show_usage = qw{};
-my $show_verbose = qw{};
+my $show_verbose = 0;
 my $envid = qw{};
 my $branch = qw{};
 my $including_vs = qw{};
@@ -108,6 +112,9 @@ if ( $show_usage ) {
     usage();
     exit 0;
 }
+
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
 
 #
 # Usage
@@ -161,8 +168,7 @@ sub generate_configuration {
     } elsif ( $branch_name =~ m/^pb_/ ) {
         $p4_f5_dir = "/depot/project/$branch_name/$p4_f5_subdir";
     } else {
-        logecho "Error: Branch name $branch_name doesn't look good.\n";
-        exit 1;
+        $logger->logdie( "Error: Branch name $branch_name doesn't look good." );
     }
     my ( $dynamic_perforce_client, $dynamic_perforce_dir )
         = check_out_perforce_file( "/$p4_f5_dir/..." );
@@ -187,7 +193,7 @@ sub generate_configuration {
 # Parameter validation
 #
 if ( ! defined $envid or ! defined $branch) {
-    logecho "Error: The pamameter '-e' and '-b' must be set.\n";
+    $logger->error( "Error: The pamameter '-e' and '-b' must be set." );
     usage();
     exit 1;
 }
@@ -232,8 +238,7 @@ sub check_deployment_lock {
     if ( -e $lock_file ) {
         my $pid = `/bin/cat $lock_file`;
         chomp $pid;
-        logecho "Error: Already have a process to deploy $envid: $pid. If the process is already finished, please remove $lock_file and then start another deployment.";
-        exit 1;
+        $logger->logdie( "Error: Already have a process to deploy $envid: $pid. If the process is already finished, please remove $lock_file and then start another deployment." );
     } else {
         system("/bin/echo $$ > $lock_file");
     }
@@ -244,6 +249,7 @@ sub check_deployment_lock {
 # Remove lock and exit the process.
 #
 sub clean_and_exit {
+    my $bigip_lock_file = @_;
     system( "/bin/rm $bigip_lock_file" );
     exit 1;
 }
@@ -251,8 +257,8 @@ sub clean_and_exit {
 #
 # Main
 #
-my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
 
+my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
 my $bigip_lock_file = check_deployment_lock( $envid );
 
 # Backup the configuration file.
@@ -276,37 +282,37 @@ my @final_internal_excluded_pool = filter_list( \@include_pool, \@internal_exclu
 my @final_external_excluded_pool = filter_list( \@include_pool, \@external_excluded_pool );
 
 # Remove the virtual servers, rules and pools for specific environment.
-logecho "Deleting virtual servers for $envid ...\n";
+$logger->info( "Deleting virtual servers for $envid ..." );
 delete_not_excluded_env_virtual_servers( $external_ic, $envid, @final_external_excluded_vs );
 delete_not_excluded_env_virtual_servers( $internal_ic, $envid, @final_internal_excluded_vs );
-logecho "Deleting rules for $envid ...\n";
+$logger->info( "Deleting rules for $envid ..." );
 delete_env_rules( $internal_ic, $envid );
 delete_env_rules( $external_ic, $envid );
-logecho "Deleting pools for $envid ...\n";
+$logger->info( "Deleting pools for $envid ..." );
 delete_not_excluded_env_pools( $external_ic, $envid, @final_external_excluded_pool );
 delete_not_excluded_env_pools( $internal_ic, $envid, @final_internal_excluded_pool );
 
 # Deploy virtual servers, rules and pools for specific environment.
 my $int_tmpdir = File::Temp->newdir();
 my $ext_tmpdir = File::Temp->newdir();
-logecho "Generating virtual server, pool configuration files ...\n";
+$logger->info( "Generating virtual server, pool configuration files ..." );
 my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext", \@final_external_excluded_vs, \@final_external_excluded_pool );
 my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int", \@final_internal_excluded_vs, \@final_internal_excluded_pool );
 
 my $deploy_success = 0;
 
-logecho "Deploying pools for $envid ...\n";
-$deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf, $show_verbose);
-clean_and_exit() if $deploy_success != 0;
-$deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf, $show_verbose);
-clean_and_exit() if $deploy_success != 0;
+$logger->info( "Deploying pools for $envid ..." );
+$deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf );
+clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
+$deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf );
+clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
 # system("/nas/utl/devops/bin/deploy-irules -e $envid -b $branch");
 system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
-logecho "Deploying virtual servers for $envid ...\n";
-$deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf, $show_verbose);
-clean_and_exit() if $deploy_success != 0;
-$deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf, $show_verbose);
-clean_and_exit() if $deploy_success != 0;
+$logger->info("Deploying virtual servers for $envid ...");
+$deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf );
+clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
+$deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf );
+clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
 
 save_configuration( $internal_ic );
 save_configuration( $external_ic );
@@ -319,13 +325,13 @@ if ( scalar @final_internal_excluded_vs > 0
         or scalar @final_external_excluded_vs > 0
         or scalar @final_internal_excluded_pool > 0
         or scalar @final_external_excluded_pool > 0) {
-    logecho "===================================";
-    logecho "Following BigIP objects are excluded during the deployment.";
-    logecho "Please use '-p' or '-s' option to deploy them:";
-    logecho "Internal virtual servers: " . join(',', @final_internal_excluded_vs) if scalar @final_internal_excluded_vs > 0;
-    logecho "External virtual servers: " . join(',', @final_external_excluded_vs) if scalar @final_external_excluded_vs > 0;
-    logecho "Internal pools: " . join(',', @final_internal_excluded_pool) if scalar @final_internal_excluded_pool > 0;
-    logecho "External pools: " . join(',', @final_external_excluded_pool) if scalar @final_external_excluded_pool > 0;
+    $logger->info( "===================================" );
+    $logger->info( "Following BigIP objects are excluded during the deployment." );
+    $logger->info( "Please use '-p' or '-s' option to deploy them:" );
+    $logger->info( "Internal virtual servers: " . join(',', @final_internal_excluded_vs) ) if scalar @final_internal_excluded_vs > 0;
+    $logger->info( "External virtual servers: " . join(',', @final_external_excluded_vs) ) if scalar @final_external_excluded_vs > 0;
+    $logger->info( "Internal pools: " . join(',', @final_internal_excluded_pool) ) if scalar @final_internal_excluded_pool > 0;
+    $logger->info( "External pools: " . join(',', @final_external_excluded_pool) ) if scalar @final_external_excluded_pool > 0;
 }
 
 exit 0;

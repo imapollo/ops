@@ -12,7 +12,6 @@ use lib '/nas/reg/lib/perl';
 
 use Readonly;
 use MIME::Base64;
-use Log::Transcript;
 use Stubhub::Util::SSH qw (
                             login_ssh
                             close_ssh
@@ -23,6 +22,9 @@ use Stubhub::BigIP::System::Info qw (
                                     get_bigip_server
                                     get_bigip_partition
                                 );
+use Stubhub::Log::Util qw (
+                            get_logger
+                        );
 use BigIP::iControl;
 
 BEGIN {
@@ -46,6 +48,7 @@ BEGIN {
 }
 
 our @EXPORT_OK;
+our $logger = get_logger();
 
 #
 # Get the iControl instance based on environment Id.
@@ -62,6 +65,10 @@ sub get_icontrol {
     my $external_bigip_server = get_bigip_server( $envid, "ext" );
     my $internal_partition = get_bigip_partition( $envid, "int" );
     my $external_partition = get_bigip_partition( $envid, "ext" );
+    
+    $logger->debug( "The internal BigIP server is: $internal_bigip_server" );
+    $logger->debug( "The external BigIP server is: $external_bigip_server" );
+
     my $external_ic = BigIP::iControl->new(
                                     server => "$external_bigip_server",
                                     username => "$BIGIP_USERNAME",
@@ -88,6 +95,7 @@ sub get_icontrol {
 #
 sub set_partition {
     my ( $iControl, $partition_name ) = @_;
+    $logger->debug( "Set partition $partition_name." );
     $iControl->set_active_partition( $partition_name );
     return;
 }
@@ -98,9 +106,10 @@ sub set_partition {
 sub download_configuration {
     my ( $iControl, $remote_file, $local_file ) = @_;
     open LOCAL_FILE_FH, ">$local_file"
-        or die "Error: Failed to open file: $local_file";
+        or $logger->logdie( "Error: Failed to open file: $local_file" );
     print LOCAL_FILE_FH $iControl->download_file($remote_file);
     close LOCAL_FILE_FH;
+    $logger->debug( "Successfully download $remote_file to $local_file." );
     return $local_file;
 }
 
@@ -108,7 +117,7 @@ sub download_configuration {
 # Deploy configuration onto BigIP server.
 #
 sub deploy_configuration {
-    my ( $envid, $int_ext, $iControl, $file_name, $show_verbose ) = @_;
+    my ( $envid, $int_ext, $iControl, $file_name ) = @_;
     my $ssh = _init_ssh( get_bigip_server( $envid, $int_ext ) );
 
     my $remote_file_name = $file_name;
@@ -116,18 +125,18 @@ sub deploy_configuration {
     $remote_file_name = "/config/deploy/$remote_file_name";
 
     if ( not _upload_file( $iControl, $remote_file_name, $file_name) ) {
-        die "Error: Failed to upload file $file_name: $!\n";
+        $logger->logdie( "Error: Failed to upload file $file_name: $!" );
     }
 
     my @output = mute_execute_ssh( $ssh, "merge $remote_file_name" );
     if ( grep /error/i, @output ) {
         foreach my $line ( @output ) {
-            logecho $line;
+            $logger->error( $line );
         }
         return 1;
-    } elsif ( $show_verbose ) {
+    } else {
         foreach my $line ( @output ) {
-            logecho $line;
+            $logger->debug( $line );
         }
     }
 }
@@ -137,6 +146,7 @@ sub deploy_configuration {
 #
 sub save_configuration {
     my ( $iControl ) = @_;
+    $logger->info( "Save the configuration successfully." );
     $iControl->save_configuration( 'today' );
 }
 
@@ -150,15 +160,15 @@ sub sync_configuration {
         my @output = mute_execute_ssh( $ssh, "config sync all" );
         if ( grep /error/i, @output ) {
             foreach my $line ( @output ) {
-                logecho $line;
+                $logger->error( $line );
             }
         } else {
             foreach my $line ( @output ) {
-                logecho $line;
+                $logger->info( $line );
             }
         }
     } else {
-        logecho "WARN: Did not sync configuration as the current server is not Active.\n"
+        $logger->warn( "WARN: Did not sync configuration as the current server is not Active." );
     }
 }
 
@@ -167,6 +177,7 @@ sub sync_configuration {
 #
 sub check_failover_state {
     my ( $iControl ) = @_;
+    $logger->debug( "The bigip failover state is: " . $iControl->get_failover_state() );
     return $iControl->get_failover_state();
 }
 
@@ -175,6 +186,7 @@ sub check_failover_state {
 #
 sub _upload_file {
     my ( $iControl, $remote_file_name, $local_file_name ) = @_;
+    $logger->debug( "Successfully uploaded $local_file_name to $remote_file_name." );
     my $success = $iControl->upload_file( $remote_file_name, $local_file_name);
     return $success;
 }
