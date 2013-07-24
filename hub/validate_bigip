@@ -38,6 +38,9 @@ use Stubhub::BigIP::Pool::Handler qw (
 use Stubhub::Log::Util qw (
                             init
                         );
+use Stubhub::Util::Host qw (
+                            get_hostname_by_ip
+                        );
 
 # Get options
 my $show_usage = qw{};
@@ -100,13 +103,17 @@ sub validate_env_pool_status {
     my $overall_pass = 1;
     foreach my $pool ( @filtered_pool_list ) {
         my $status = $iControl->get_ltm_pool_status_as_string( $pool );
+        my @pool_members = $iControl->get_ltm_pool_members( $pool );
+        my $pool_host = get_hostname_by_ip( $pool_members[0] );
+        $pool_host =~ s/$pattern([a-z]{3}).*/$1/;
+        $pool_host = uc $pool_host;
         if ( $status =~ /either don't have service checking enabled/ ) {
-            printf "%-30s %-20s\n", $pool, "WARN: $status";
+            printf "%-25s %-4s %-20s\n", $pool, $pool_host, "WARN: $status";
         } elsif ( $status !~ /The pool is available/ ) {
-            printf "%-30s %-20s\n", $pool, "FAIL: $status";
+            printf "%-25s %-4s %-20s\n", $pool, $pool_host, "FAIL: $status";
             $overall_pass = 0;
         } else {
-            printf "%-30s %-20s\n", $pool, "PASS" if $show_verbose;
+            printf "%-25s %-4s %-20s\n", $pool, $pool_host, "PASS" if $show_verbose;
         }
     }
     if ( scalar @filtered_pool_list == 0 ) {
@@ -127,6 +134,9 @@ sub filter_pool_list {
                 and $pool_name !~ /SRW[QDE][0-9]+-ABX$/
                 and $pool_name !~ /SRW[QDE][0-9]+-GEN3APPS$/
                 and $pool_name !~ /SRW[QDE][0-9]+-REST$/
+                and $pool_name !~ /SRW[QDE][0-9]+-SRH$/
+                and $pool_name !~ /SRW[QDE][0-9]+-USR$/
+                and $pool_name !~ /SRW[QDE][0-9]+-DSC$/
                 and $pool_name !~ /SRW[QDE][0-9]+-EHCACHE$/ ) {
             push @filtered_pool_list, $pool_name;
         }
