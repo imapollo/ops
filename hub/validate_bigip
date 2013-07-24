@@ -104,9 +104,12 @@ sub validate_env_pool_status {
     foreach my $pool ( @filtered_pool_list ) {
         my $status = $iControl->get_ltm_pool_status_as_string( $pool );
         my @pool_members = $iControl->get_ltm_pool_members( $pool );
-        my $pool_host = get_hostname_by_ip( $pool_members[0] );
-        $pool_host =~ s/$pattern([a-z]{3}).*/$1/;
-        $pool_host = uc $pool_host;
+        my $pool_host = "";
+        if ( scalar @pool_members > 0 ) {
+            $pool_host = get_hostname_by_ip( $pool_members[0] );
+            $pool_host =~ s/$pattern([a-z]{3}).*/$1/;
+            $pool_host = uc $pool_host;
+        }
         if ( $status =~ /either don't have service checking enabled/ ) {
             printf "%-25s %-4s %-20s\n", $pool, $pool_host, "WARN: $status";
         } elsif ( $status !~ /The pool is available/ ) {
