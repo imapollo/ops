@@ -38,6 +38,7 @@ use Stubhub::BigIP::System::Util qw (
                                 );
 use Stubhub::BigIP::Pool::Handler qw (
                                     get_env_pool_list
+                                    get_pool_members_status
                                 );
 use Stubhub::Log::Util qw (
                             init
@@ -112,22 +113,41 @@ sub validate_env_pool_status {
     my $fail_count = 0;
     foreach my $pool ( @filtered_pool_list ) {
         my $status = $iControl->get_ltm_pool_status_as_string( $pool );
-        my @pool_members = $iControl->get_ltm_pool_members( $pool );
-        my $pool_host = "";
-        if ( scalar @pool_members > 0 ) {
-            $pool_host = get_hostname_by_ip( $pool_members[0] );
-            $pool_host =~ s/$pattern([a-z]{3}).*/$1/;
-            $pool_host = uc $pool_host;
-        }
-        if ( $status =~ /either don't have service checking enabled/ ) {
-            printf "%-25s %-4s %-20s\n", $pool, $pool_host, "WARN: $status";
-            $pass_count += 1;
-        } elsif ( $status !~ /The pool is available/ ) {
-            printf "%-25s %-4s %-20s\n", $pool, $pool_host, "FAIL: $status";
-            $fail_count += 1;
-        } else {
-            printf "%-25s %-4s %-20s\n", $pool, $pool_host, "PASS" if $show_verbose;
-            $pass_count += 1;
+        my $pool_members_ref = get_pool_members_status( $iControl, $pool );
+        my $pool_members_status_ref = ${ $pool_members_ref }[0];
+        foreach my $pool_member_status_ref ( @{ $pool_members_status_ref } ) {
+            my $member_host = get_hostname_by_ip( $pool_member_status_ref->{'member'}->{'address'} );
+            my $member_port = $pool_member_status_ref->{'member'}->{'port'};
+            my $member_status = $pool_member_status_ref->{'object_status'}->{'availability_status'};
+            my $member_enabled = $pool_member_status_ref->{'object_status'}->{'enabled_status'};
+
+            if ( $member_host eq "" ) {
+            } else {
+                $member_host = "$member_host:$member_port";
+            }
+
+            if ( $member_status eq "AVAILABILITY_STATUS_GREEN" ) {
+                $member_status = "PASS";
+            } else {
+                $member_status = "FAIL";
+            }
+
+            if ( $member_enabled eq "ENABLED_STATUS_ENABLED" ) {
+                $member_enabled = "Enabled";
+            } else {
+                $member_enabled = "Disabled";
+            }
+
+            if ( $status =~ /either don't have service checking enabled/ ) {
+                printf "%-25s %-30s %-5s %-10s %-20s\n", $pool, "$member_host", $member_status, $member_enabled, "WARN: $status";
+                $pass_count += 1;
+            } elsif ( $status !~ /The pool is available/ ) {
+                printf "%-25s %-30s %-5s %-10s %-20s\n", $pool, "$member_host", $member_status, $member_enabled, "FAIL: $status";
+                $fail_count += 1;
+            } else {
+                printf "%-25s %-30s %-5s %-10s %-20s\n", $pool, "$member_host", $member_status, $member_enabled, "PASS" if $show_verbose;
+                $pass_count += 1;
+            }
         }
     }
     if ( scalar @filtered_pool_list == 0 ) {
@@ -151,6 +171,7 @@ sub filter_pool_list {
                 and $pool_name !~ /SRW[QDE][0-9]+-SRH$/
                 and $pool_name !~ /SRW[QDE][0-9]+-USR$/
                 and $pool_name !~ /SRW[QDE][0-9]+-DSC$/
+                and $pool_name !~ /SRW[QDE][0-9]+-DISRUPTIVE$/
                 and $pool_name !~ /SRW[QDE][0-9]+-EHCACHE$/ ) {
             push @filtered_pool_list, $pool_name;
         }

@@ -11,6 +11,7 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
 
 use Readonly;
+use Data::Dumper;
 use BigIP::iControl;
 
 BEGIN {
@@ -26,6 +27,7 @@ BEGIN {
                         &get_pool_list
                         &get_env_pool_list
                         &delete_not_excluded_env_pools
+                        &get_pool_members_status
                     );
   %EXPORT_TAGS  = ();
 }
@@ -79,4 +81,13 @@ sub delete_not_excluded_env_pools {
         }
     }
     $iControl->delete_pools( \@filtered_pools );
+}
+
+#
+# Get pool_members status.
+#
+sub get_pool_members_status {
+    my ( $iControl, $pool ) = @_;
+    my $pool_members_status = $iControl->get_pool_member_status( $pool );
+    return $pool_members_status;
 }
