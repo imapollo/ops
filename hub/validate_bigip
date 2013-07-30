@@ -12,6 +12,7 @@
 #
 # Options:
 #  -e | --env               Specify the environment ID. For example: srwd76.
+#  -m | --member            Show the detail pool member status.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
@@ -49,10 +50,12 @@ use Stubhub::Util::Host qw (
 
 # Get options
 my $show_usage = qw{};
+my $show_member_status = qw{};
 my $show_verbose = qw{};
 my $envid = qw{};
 my $options_okay = GetOptions (
    'e|env=s'     => \$envid,
+   'm|member'    => \$show_member_status,
    'v|verbose'   => \$show_verbose,
    'h|help'      => \$show_usage,
 );
@@ -93,6 +96,7 @@ Usage: validate_bigip [options]
 
 Options:
  -e | --env               Specify the environment ID. For example: srwd76.
+ -m | --member            Show the detail pool member status.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
@@ -111,42 +115,61 @@ sub validate_env_pool_status {
     my @filtered_pool_list = filter_pool_list( @pool_list );
     my $pass_count = 0;
     my $fail_count = 0;
+    my @pools_status;
     foreach my $pool ( @filtered_pool_list ) {
-        my $status = $iControl->get_ltm_pool_status_as_string( $pool );
         my $pool_members_ref = get_pool_members_status( $iControl, $pool );
         my $pool_members_status_ref = ${ $pool_members_ref }[0];
-        foreach my $pool_member_status_ref ( @{ $pool_members_status_ref } ) {
-            my $member_host = get_hostname_by_ip( $pool_member_status_ref->{'member'}->{'address'} );
-            my $member_port = $pool_member_status_ref->{'member'}->{'port'};
-            my $member_status = $pool_member_status_ref->{'object_status'}->{'availability_status'};
-            my $member_enabled = $pool_member_status_ref->{'object_status'}->{'enabled_status'};
 
-            if ( $member_host eq "" ) {
-            } else {
-                $member_host = "$member_host:$member_port";
-            }
+        my %pool_status;
 
-            if ( $member_status eq "AVAILABILITY_STATUS_GREEN" ) {
-                $member_status = "PASS";
-            } else {
-                $member_status = "FAIL";
-            }
+        $pool_status{ 'pool' } = $pool;
+        $pool_status{ 'status' } = $iControl->get_ltm_pool_availability_status( $pool );
+        $pool_status{ 'status_description' } = $iControl->get_ltm_pool_status_as_string( $pool );
+        $pool_status{ 'members' } = $pool_members_status_ref;
 
-            if ( $member_enabled eq "ENABLED_STATUS_ENABLED" ) {
-                $member_enabled = "Enabled";
-            } else {
-                $member_enabled = "Disabled";
-            }
+        my $pass = 0;
 
-            if ( $status =~ /either don't have service checking enabled/ ) {
-                printf "%-25s %-30s %-5s %-10s %-20s\n", $pool, "$member_host", $member_status, $member_enabled, "WARN: $status";
-                $pass_count += 1;
-            } elsif ( $status !~ /The pool is available/ ) {
-                printf "%-25s %-30s %-5s %-10s %-20s\n", $pool, "$member_host", $member_status, $member_enabled, "FAIL: $status";
-                $fail_count += 1;
-            } else {
-                printf "%-25s %-30s %-5s %-10s %-20s\n", $pool, "$member_host", $member_status, $member_enabled, "PASS" if $show_verbose;
-                $pass_count += 1;
+        if ( $pool_status{ 'status_description' } =~ /either don't have service checking enabled/ ) {
+            printf "%-45s %-20s\n", $pool_status{ 'pool' }, "WARN";
+            $pass = 0;
+            $pass_count += 1;
+        } elsif ( $pool_status{ 'status_description' } !~ /The pool is available/ ) {
+            printf "%-45s %-20s\n", $pool_status{ 'pool' }, "FAIL";
+            $pass = 1;
+            $fail_count += 1;
+        } else {
+            printf "%-45s %-20s\n", $pool_status{ 'pool' }, "PASS" if $show_verbose;
+            $pass = 0;
+            $pass_count += 1;
+        }
+
+        if ( $show_member_status ) {
+            foreach my $pool_member_status_ref ( @{ $pool_members_status_ref } ) {
+                my $member_host = get_hostname_by_ip( $pool_member_status_ref->{'member'}->{'address'} );
+                my $member_port = $pool_member_status_ref->{'member'}->{'port'};
+                my $member_status = $pool_member_status_ref->{'object_status'}->{'availability_status'};
+                my $member_enabled = $pool_member_status_ref->{'object_status'}->{'enabled_status'};
+
+                if ( $member_host eq "" ) {
+                } else {
+                    $member_host = "$member_host:$member_port";
+                }
+
+                if ( $member_status eq "AVAILABILITY_STATUS_GREEN" ) {
+                    $member_status = "PASS";
+                } else {
+                    $member_status = "FAIL";
+                }
+
+                if ( $member_enabled eq "ENABLED_STATUS_ENABLED" ) {
+                    $member_enabled = "Enabled";
+                } else {
+                    $member_enabled = "Disabled";
+                }
+
+                if ( $show_verbose or $pass == 1 ) {
+                    printf "       %-29s %-8s %-5s\n", $member_host, $member_enabled, $member_status;
+                }
             }
         }
     }
