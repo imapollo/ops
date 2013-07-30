@@ -12,6 +12,7 @@
 #
 # Options:
 #  -e | --env               Specify the environment ID. For example: srwd76.
+#  -j | --json              Return the JSON format status.
 #  -m | --member            Show the detail pool member status.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
@@ -32,6 +33,7 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 use Readonly;
 use Getopt::Long;
 use Data::Dumper;
+use JSON;
 use BigIP::iControl;
 use MIME::Base64;
 use Stubhub::BigIP::System::Util qw (
@@ -51,11 +53,13 @@ use Stubhub::Util::Host qw (
 # Get options
 my $show_usage = qw{};
 my $show_member_status = qw{};
+my $return_json = qw{};
 my $show_verbose = qw{};
 my $envid = qw{};
 my $options_okay = GetOptions (
    'e|env=s'     => \$envid,
    'm|member'    => \$show_member_status,
+   'j|json'      => \$return_json,
    'v|verbose'   => \$show_verbose,
    'h|help'      => \$show_usage,
 );
@@ -97,6 +101,7 @@ Usage: validate_bigip [options]
 Options:
  -e | --env               Specify the environment ID. For example: srwd76.
  -m | --member            Show the detail pool member status.
+ -j | --json              Return the JSON format status.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
@@ -113,39 +118,67 @@ sub validate_env_pool_status {
     my ( $iControl, $pattern ) = @_;
     my @pool_list = get_env_pool_list( $iControl, $pattern );
     my @filtered_pool_list = filter_pool_list( @pool_list );
-    my $pass_count = 0;
-    my $fail_count = 0;
     my @pools_status;
     foreach my $pool ( @filtered_pool_list ) {
         my $pool_members_ref = get_pool_members_status( $iControl, $pool );
         my $pool_members_status_ref = ${ $pool_members_ref }[0];
+        my @pool_no_bless_members_status;
+
+        # Convert to no bless data structure due to JSON module limitation.
+        foreach my $pool_member_status_ref ( @{ $pool_members_status_ref } ) {
+            my %no_bless_pool_status;
+            $no_bless_pool_status{ 'member' }{ 'address' } = get_hostname_by_ip( $pool_member_status_ref->{'member'}->{'address'} );
+            $no_bless_pool_status{ 'member' }{ 'port' } = $pool_member_status_ref->{'member'}->{'port'};
+            $no_bless_pool_status{ 'object_status' }{ 'availability_status' } = $pool_member_status_ref->{'object_status'}->{'availability_status'};
+            $no_bless_pool_status{ 'object_status' }{ 'enabled_status' } = $pool_member_status_ref->{'object_status'}->{'enabled_status'};
+            push @pool_no_bless_members_status, \%no_bless_pool_status;
+        }
 
         my %pool_status;
 
         $pool_status{ 'pool' } = $pool;
         $pool_status{ 'status' } = $iControl->get_ltm_pool_availability_status( $pool );
         $pool_status{ 'status_description' } = $iControl->get_ltm_pool_status_as_string( $pool );
-        $pool_status{ 'members' } = $pool_members_status_ref;
+        $pool_status{ 'members' } = \@pool_no_bless_members_status;
+
+        push @pools_status, \%pool_status;
+    }
+    return \@pools_status;
+}
+
+#
+# Print the pool status.
+#
+sub print_pool_status {
+    my ( $iControl, $pattern ) = @_;
+
+    my $pools_status_ref = validate_env_pool_status( $iControl, $pattern );
+    my $pass_count = 0;
+    my $fail_count = 0;
+
+    foreach my $pool_status_ref ( @{ $pools_status_ref }) {
+        my %pool_status = %{ $pool_status_ref };
+        my $pool_members_status_ref = $pool_status{ 'members' };
 
         my $pass = 0;
-
+        
         if ( $pool_status{ 'status_description' } =~ /either don't have service checking enabled/ ) {
-            printf "%-45s %-20s\n", $pool_status{ 'pool' }, "WARN";
+            printf "%-50s %-20s\n", $pool_status{ 'pool' }, "WARN";
             $pass = 0;
             $pass_count += 1;
         } elsif ( $pool_status{ 'status_description' } !~ /The pool is available/ ) {
-            printf "%-45s %-20s\n", $pool_status{ 'pool' }, "FAIL";
+            printf "%-50s %-20s\n", $pool_status{ 'pool' }, "FAIL";
             $pass = 1;
             $fail_count += 1;
         } else {
-            printf "%-45s %-20s\n", $pool_status{ 'pool' }, "PASS" if $show_verbose;
+            printf "%-50s %-20s\n", $pool_status{ 'pool' }, "PASS" if $show_verbose;
             $pass = 0;
             $pass_count += 1;
         }
 
         if ( $show_member_status ) {
             foreach my $pool_member_status_ref ( @{ $pool_members_status_ref } ) {
-                my $member_host = get_hostname_by_ip( $pool_member_status_ref->{'member'}->{'address'} );
+                my $member_host = $pool_member_status_ref->{'member'}->{'address'};
                 my $member_port = $pool_member_status_ref->{'member'}->{'port'};
                 my $member_status = $pool_member_status_ref->{'object_status'}->{'availability_status'};
                 my $member_enabled = $pool_member_status_ref->{'object_status'}->{'enabled_status'};
@@ -168,15 +201,17 @@ sub validate_env_pool_status {
                 }
 
                 if ( $show_verbose or $pass == 1 ) {
-                    printf "       %-29s %-8s %-5s\n", $member_host, $member_enabled, $member_status;
+                    printf "       %-34s %-8s %-5s\n", $member_host, $member_enabled, $member_status;
                 }
             }
         }
     }
-    if ( scalar @filtered_pool_list == 0 ) {
+
+    if ( scalar @{ $pools_status_ref } == 0 ) {
         printf "Error: No pools found for $pattern\n";
         return 0;
     }
+
     return ( $pass_count, $fail_count );
 }
 
@@ -223,24 +258,34 @@ if ( ! defined $envid) {
 #
 my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
 
-my ( $ext_pass_count, $ext_fail_count )= validate_env_pool_status( $external_ic, $envid );
-my ( $int_pass_count, $int_fail_count )= validate_env_pool_status( $internal_ic, $envid );
+if ( not $return_json ) {
+    my ( $ext_pass_count, $ext_fail_count ) = print_pool_status( $external_ic, $envid );
+    my ( $int_pass_count, $int_fail_count ) = print_pool_status( $internal_ic, $envid );
 
-my $overall_pass_rate = ( $ext_pass_count + $ext_fail_count + $int_pass_count + $int_fail_count ) / ( $ext_pass_count + $int_pass_count );
+    my $overall_pass_rate = ( $ext_pass_count + $ext_fail_count + $int_pass_count + $int_fail_count ) / ( $ext_pass_count + $int_pass_count );
 
-if ( $overall_pass_rate == 1 ) {
-    print "====================================\n" if $show_verbose;
-    print "Overall: PASS\n";
+    if ( $overall_pass_rate == 1 ) {
+        print "====================================\n" if $show_verbose;
+        print "Overall: PASS\n";
+        exit 0;
+    } elsif ( $overall_pass_rate > 1 and $overall_pass_rate < 2 ) {
+        print "====================================\n" if $show_verbose;
+        print "Overall: FAIL\n";
+        exit 1;
+    }
+    else {
+        print "====================================\n";
+        print "Overall: FAIL\n";
+        exit 2;
+    }
     exit 0;
-} elsif ( $overall_pass_rate > 1 and $overall_pass_rate < 2 ) {
-    print "====================================\n" if $show_verbose;
-    print "Overall: FAIL\n";
-    exit 1;
+} else {
+    my $internal_status_ref = validate_env_pool_status( $internal_ic, $envid );
+    my $external_status_ref = validate_env_pool_status( $external_ic, $envid );
+    my %env_status;
+    $env_status{ 'internal' } = $internal_status_ref;
+    $env_status{ 'external' } = $external_status_ref;
+    my $json_text = to_json( \%env_status , { allow_blessed=>1 } );
+    print $json_text;
+    exit 0;
 }
-else {
-    print "====================================\n";
-    print "Overall: FAIL\n";
-    exit 2;
-}
-
-exit 0;
