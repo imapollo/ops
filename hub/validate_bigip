@@ -269,7 +269,7 @@ if ( not $return_json ) {
         print "Overall: PASS\n";
         exit 0;
     } elsif ( $overall_pass_rate > 1 and $overall_pass_rate < 2 ) {
-        print "====================================\n" if $show_verbose;
+        print "====================================\n";
         print "Overall: FAIL\n";
         exit 1;
     }
