@@ -23,5 +23,5 @@ if [[ "${ROLE}" == `hostname` ]]; then
     echo "Jboss restarted."
     exit 0
 else
-    ssh ${ROLE} "restart_jboss ${ROLE}"
+    ssh ${ROLE} "/nas/home/minjzhang/bin/restart_jboss ${ROLE}"
 fi
