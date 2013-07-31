@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# Check the pool status for all the environments.
+# Run from cron job.
+#
+# Usage: check_all_env_pools [options]
+#
+# Options:
+#  -v | --verbose      Print verbose messages.
+#
+# Author: minjzhang
+#
+
+options=$@
+
+verbose=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+
+check_all_env_pools $options
+$*
+Usage: check_all_env_pools [options]
+
+Options:
+  -v | --verbose      Print verbose messages.
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o v -l verbose -- $options`
+if [ $? != 0 ]; then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -v | --verbose) verbose=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print verbose message
+#
+function _print_verbose_msg {
+    verbose_message=$1
+    if [[ "$verbose" == 1 ]]; then
+        echo $verbose_message
+    fi
+}
+
+#
+# Main
+#
+
+export PATH='/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin';
+
+dev_hosts_file='/nas/reg/etc/dev-qa-hosts'
+report_file='/nas/home/minjzhang/bigip.rpt'
+temp_file="$report_file.tmp"
+
+rm -f $temp_file
+
+grep srw /nas/reg/etc/dev-qa-hosts | sed 's/\(srw[deq][0-9]\+\).*/\1/' | uniq | while read envid
+do
+    /nas/reg/bin/validate_bigip -e $envid > /dev/null
+    pool_status=$?
+    curl www.$envid.com 2> /dev/null | grep -q 'Where Fans Buy and Sell Tickets'
+    home_page_result=$?
+    if [[ $pool_status -eq 0 && $home_page_result -eq 0 ]]; then
+        echo "$envid 0" >> $temp_file
+    elif [[ $pool_status -eq 1 && $home_page_result -eq 0 ]]; then
+        echo "$envid 1" >> $temp_file
+    else
+        echo "$envid 2" >> $temp_file
+    fi
+done
+
+mv $temp_file $report_file
+
+exit 0
