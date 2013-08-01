@@ -64,19 +64,15 @@ sub get_instance_list {
 
     my @instance_list;
 
+    print $hostname . "\n";
+    my $instances = `$SSH_COMMAND $RELMGT_SSH$hostname "$LS_COMMAND -ld $JBOSS_DIR $ACTIVEMQ_DIR $COLDFUSION_DIR $MEMCACHED_DIR" 2>/dev/null`;
+
     push @instance_list, "httpd" if $hostname !~ /mqm/ and $hostname !~ /mch/ and $hostname !~ /bpm/;
 
-    my $jboss_instance = `$SSH_COMMAND $RELMGT_SSH$hostname "$LS_COMMAND -ld $JBOSS_DIR" 2>/dev/null`;
-    push @instance_list, "jboss" if $jboss_instance ne "";
-
-    my $activemq_instance = `$SSH_COMMAND $RELMGT_SSH$hostname "$LS_COMMAND -ld $ACTIVEMQ_DIR" 2>/dev/null`;
-    push @instance_list, "activemq" if $activemq_instance ne "";
-
-    my $coldfusion_instance = `$SSH_COMMAND $RELMGT_SSH$hostname "$LS_COMMAND -ld $COLDFUSION_DIR" 2>/dev/null`;
-    push @instance_list, "coldfusion" if $coldfusion_instance ne "";
-
-    my $memcached_instance = `$SSH_COMMAND $RELMGT_SSH$hostname "$LS_COMMAND -ld $MEMCACHED_DIR" 2>/dev/null`;
-    push @instance_list, "memcached" if $memcached_instance ne "";
+    push @instance_list, "jboss" if $instances =~ /jboss/;
+    push @instance_list, "activemq" if $instances = /activemq/;
+    push @instance_list, "coldfusion" if $instances = /coldfusionmx/;
+    push @instance_list, "memcached" if $instances = /memcached/;
 
     return @instance_list;
 }
