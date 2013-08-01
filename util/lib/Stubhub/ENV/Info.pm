@@ -25,6 +25,7 @@ BEGIN {
   @EXPORT       = qw();
   @EXPORT_OK    = qw(
                         &get_env_branch
+                        &get_instance_list
                     );
   %EXPORT_TAGS  = ();
 }
@@ -43,4 +44,39 @@ sub get_env_branch {
     my $branch_name = join "", @output;
     chomp $branch_name;
     return $branch_name;
+}
+
+#
+# Get the instance list.
+#
+sub get_instance_list {
+    my ( $hostname ) = @_;
+    Readonly my $SSH_COMMAND => '/usr/bin/sudo /usr/bin/ssh -oPasswordAuthentication=no -ostricthostkeychecking=no';
+    Readonly my $RELMGT_SSH => '-i /nas/reg/relmgt/.ssh/id_dsa relmgt@';
+    Readonly my $LS_COMMAND => '/bin/ls';
+    Readonly my $GREP_COMMAND => '/bin/grep';
+
+    Readonly my $JBOSS_DIR => '/opt/jboss';
+    Readonly my $HTTPD_DIR => '/etc/httpd/conf/httpd.conf';
+    Readonly my $ACTIVEMQ_DIR => '/opt/activemq';
+    Readonly my $COLDFUSION_DIR => '/opt/coldfusionmx';
+    Readonly my $MEMCACHED_DIR => '/etc/init.d/memcached';
+
+    my @instance_list;
+
+    push @instance_list, "httpd" if $hostname !~ /mqm/ and $hostname !~ /mch/ and $hostname !~ /bpm/;
+
+    my $jboss_instance = `$SSH_COMMAND $RELMGT_SSH$hostname "$LS_COMMAND -ld $JBOSS_DIR" 2>/dev/null`;
+    push @instance_list, "jboss" if $jboss_instance ne "";
+
+    my $activemq_instance = `$SSH_COMMAND $RELMGT_SSH$hostname "$LS_COMMAND -ld $ACTIVEMQ_DIR" 2>/dev/null`;
+    push @instance_list, "activemq" if $activemq_instance ne "";
+
+    my $coldfusion_instance = `$SSH_COMMAND $RELMGT_SSH$hostname "$LS_COMMAND -ld $COLDFUSION_DIR" 2>/dev/null`;
+    push @instance_list, "coldfusion" if $coldfusion_instance ne "";
+
+    my $memcached_instance = `$SSH_COMMAND $RELMGT_SSH$hostname "$LS_COMMAND -ld $MEMCACHED_DIR" 2>/dev/null`;
+    push @instance_list, "memcached" if $memcached_instance ne "";
+
+    return @instance_list;
 }
