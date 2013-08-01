@@ -70,9 +70,9 @@ sub get_instance_list {
     push @instance_list, "httpd" if $hostname !~ /mqm/ and $hostname !~ /mch/ and $hostname !~ /bpm/;
 
     push @instance_list, "jboss" if $instances =~ /jboss/;
-    push @instance_list, "activemq" if $instances = /activemq/;
-    push @instance_list, "coldfusion" if $instances = /coldfusionmx/;
-    push @instance_list, "memcached" if $instances = /memcached/;
+    push @instance_list, "activemq" if $instances =~ /activemq/;
+    push @instance_list, "coldfusion" if $instances =~ /coldfusionmx/;
+    push @instance_list, "memcached" if $instances =~ /memcached/;
 
     return @instance_list;
 }
