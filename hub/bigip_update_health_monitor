@@ -125,6 +125,8 @@ foreach my $intext ( "int", "ext" ) {
     logecho "Downloading configuration ...";
     download_configuration( $iControl, "/config/bigip.conf", "$bigip_conf_file_path");
 
+    system("/bin/cp $bigip_conf_file_path /nas/home/minjzhang/temp");
+
     open BIGIP_CONF_FH, "<$bigip_conf_file_path"
         or die "Cannot open file $bigip_conf_file_path: $!";
     open BIGIP_CONF_DEST_FH, ">$bigip_conf_file_dest"
