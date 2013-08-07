@@ -39,6 +39,7 @@ BEGIN {
                         &deploy_configuration
                         &download_configuration
                         &get_icontrol
+                        &get_icontrol_instance
                         &set_partition
                         &save_configuration
                         &check_failover_state
@@ -51,15 +52,35 @@ our @EXPORT_OK;
 our $logger = get_logger();
 
 #
-# Get the iControl instance based on environment Id.
+# Get the iControl instance for the server.
+# Parameters:
+# - lba_server : BigIP load balance server name.
+# - username   : Username to login to the BigIP server.
+# - password   : Password.
+#
+sub get_icontrol_instance {
+    my ( $lba_server, $username, $password ) = @_;
+    Readonly my $BIGIP_PORT     => 443;
+    Readonly my $BIGIP_PROTOCOL => 'https';
+
+    my $iControl = BigIP::iControl->new (
+                                server   => "$lba_server",
+                                username => "$username",
+                                password => "$password",
+                                port     => $BIGIP_PORT,
+                                proto    => "$BIGIP_PROTOCOL"
+                            );
+    return $iControl;
+}
+
+#
+# Get the DEV/QA iControl instances based on environment Id.
 #
 sub get_icontrol {
     my ( $envid ) = @_;
 
     Readonly my $BIGIP_USERNAME => 'svcacctrelmgt';
     Readonly my $BIGIP_PASSWORD => 'UjhiYml0U3Qzdw==';
-    Readonly my $BIGIP_PORT     => 443;
-    Readonly my $BIGIP_PROTOCOL => 'https';
 
     my $internal_bigip_server = get_bigip_server( $envid, "int" );
     my $external_bigip_server = get_bigip_server( $envid, "ext" );
@@ -69,20 +90,8 @@ sub get_icontrol {
     $logger->debug( "The internal BigIP server is: $internal_bigip_server" );
     $logger->debug( "The external BigIP server is: $external_bigip_server" );
 
-    my $external_ic = BigIP::iControl->new(
-                                    server => "$external_bigip_server",
-                                    username => "$BIGIP_USERNAME",
-                                    password => decode_base64($BIGIP_PASSWORD),
-                                    port     => $BIGIP_PORT,
-                                    proto    => "$BIGIP_PROTOCOL"
-                                );
-    my $internal_ic = BigIP::iControl->new(
-                                    server => "$internal_bigip_server",
-                                    username => "$BIGIP_USERNAME",
-                                    password => decode_base64($BIGIP_PASSWORD),
-                                    port     => $BIGIP_PORT,
-                                    proto    => "$BIGIP_PROTOCOL"
-                                );
+    my $external_ic = get_icontrol_instance( $external_bigip_server, $BIGIP_USERNAME, decode_base64( $BIGIP_PASSWORD ) );
+    my $internal_ic = get_icontrol_instance( $internal_bigip_server, $BIGIP_USERNAME, decode_base64( $BIGIP_PASSWORD ) );
 
     # set_partition( $internal_ic, $internal_partition );
     # set_partition( $external_ic, $external_partition );

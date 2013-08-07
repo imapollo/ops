@@ -1,0 +1,150 @@
+#!/usr/bin/perl
+#
+# Switch the Wide IP pools order.
+#
+# Usage: switch_wideip [options]
+#
+# Options:
+#  -w | --wideip            Specify the wideip need to be modified.
+#  -p | --pool              Specify the pool member need to be re-order.
+#  -s | --server            Specify the lba server if needed.
+#  -u | --username          Specify the username to login to BigIP.
+#  -x | --password          Specify the password to login to BigIP.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  switch_wideip -w test.noc.com -p test2
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+
+use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Data::Dumper;
+use BigIP::iControl;
+use Stubhub::BigIP::System::Util qw (
+                                    get_icontrol_instance
+                                );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $wideip = qw{};
+my $pool = qw{};
+my $server = qw{};
+my $username = qw{};
+my $password = qw{};
+my $options_okay = GetOptions (
+    'w|wideip=s'  => \$wideip,
+    'p|pool=s'    => \$pool,
+    's|server=s'  => \$server,
+    'u|username=s'=> \$username,
+    'x|password=s'=> \$password,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+Switch the Wide IP pools order.
+
+Usage: switch_wideip [options]
+
+Options:
+ -w | --wideip            Specify the wideip need to be modified.
+ -p | --pool              Specify the pool member need to be re-order.
+ -s | --server            Specify the lba server if needed.
+ -u | --username          Specify the username to login to BigIP.
+ -x | --password          Specify the password to login to BigIP.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ switch_wideip -w test.noc.com -p test2
+
+END_OF_HELP
+}
+
+#
+# Verify if user account belongs to NOC group.
+#
+sub verify_user_group {
+    my ( $username ) = @_;
+    my $groups = `/usr/bin/groups $username`;
+    if ( $groups =~ /\bnoc\b/ ) {
+        return 0;
+    } else {
+        croak "The user $username is not a member of NOC.\n";
+    }
+}
+
+#
+# Get the BigIP LBA server.
+#
+sub get_lba_server {
+    my ( $lba_server ) = @_;
+    if ( not defined $lba_server ) {
+        return "srwd00lba012.stubcorp.dev";
+    } else {
+    return $lba_server;
+    }
+}
+
+#
+# Main
+#
+
+my $lba_server = get_lba_server( $server );
+
+#
+# Prompt for username and password.
+#
+if ( not defined $username ) {
+    print "Username: ";
+    $username = <>;
+    chomp $username;
+}
+if ( not defined $password ) {
+    print "Password: ";
+    system("stty -echo");
+    $password = <>;
+    chomp $password;
+    system("stty echo");
+    print "\n";
+}
+
+# verify_user_group( $username );
+my $icontrol = get_icontrol_instance( $lba_server, $username, $password );
+$icontrol->get_wideip_list();
+$wideip = "test.noc.com";
+print Dumper( $icontrol->get_wideip_pool_list( $wideip ) );
+# update_wideip_pool_order( $lba_server, $wideip, $pool );
+
+exit 0;
