@@ -142,9 +142,42 @@ if ( not defined $password ) {
 
 # verify_user_group( $username );
 my $icontrol = get_icontrol_instance( $lba_server, $username, $password );
-$icontrol->get_wideip_list();
-$wideip = "test.noc.com";
-print Dumper( $icontrol->get_wideip_pool_list( $wideip ) );
+
+if ( not defined $wideip ) {
+    my $wideip_index = 1;
+    my @wideip_list = $icontrol->get_wideip_list();
+    print "Wide IPs on the BigIP server:\n";
+    foreach my $wide_ip ( @wideip_list ) {
+        print "$wideip_index) $wide_ip\n";
+        $wideip_index += 1;
+    }
+    print "Enter the number of the Wide IP: ";
+    $wideip_index = <>;
+    if ( $wideip_index =~ /[0-9]+/ ) {
+        $wideip = $wideip_list[ $wideip_index - 1 ];
+    } else {
+        die "Please enter the number of the Wide IP.\n";
+    }
+}
+
+if ( not defined $pool ) {
+    my $pool_index = 1;
+    my @pool_list = $icontrol->get_wideip_pool_list( $wideip );
+    print "Pools for Wide IP $wideip:\n";
+    foreach my $a_pool ( @pool_list ) {
+        print "$pool_index) $a_pool\n";
+        $pool_index += 1;
+    }
+    print "Enter the number of the Pool: ";
+    $pool_index = <>;
+    if ( $pool_index =~ /[0-9]+/ ) {
+        $pool = $pool_list[ $pool_index - 1 ];
+    } else {
+        die "Please enter the number of Pool.\n";
+    }
+}
+print "modify gtm wideip $wideip pools modify {$pool {order 0}}\n";
+
 # update_wideip_pool_order( $lba_server, $wideip, $pool );
 
 exit 0;
