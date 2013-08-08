@@ -53,10 +53,12 @@ my $sArg3 = $ARGV[4];
 
 my $sHost;
 my $env_num = $sArg1;
-$env_num =~ s/[srwd|srwe|SRWD|SRWE]//g;
+my $env_prefix = $sArg1;
+$env_num =~ s/srw[deq]//ig;
+$env_prefix =~ s/(srw[deq]).*/$1/ig;
 chomp($env_num);
 
-if ( $env_num >= 76 ) {
+if ( $env_num >= 76 or $env_prefix =~ /srwq/i ) {
     $sHost = "10.80.159.3"; # srwd00lba042
     $sHost = "10.80.158.5" if $intExt =~ /int/; # srwd00lba014/015
     $sHost = "10.80.157.5" if $env_prefix =~ /srwq/i and $intExt =~ /int/; # srwd00lba017/018

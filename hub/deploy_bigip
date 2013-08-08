@@ -11,16 +11,20 @@
 # Options:
 #  -e | --env               Specify the environment ID. For example: srwd76.
 #  -b | --branch            Specify the branch name. For example: rb_ecomm_13_6.
-#  -p | --includepool       Specify which of the pools need to be included for deployment.
+#  -p | --onlypool          Deploy pools only. Will not delete pools at first.
+#  -r | --onlyirule         Deploy irules only. Will not delete irules at first.
+#  -s | --onlyvs            Deploy virtual servers only. Will not delete virtual servers at first.
+#     | --includepool       Specify which of the pools need to be included for deployment.
 #                           Multiple pools need to be separated by comma.
-#  -s | --includevs         Specify which of the virtual servers need to be included for deployment.
+#     | --includevs         Specify which of the virtual servers need to be included for deployment.
 #                           Multiple virtuals need to be separated by comma.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
 # Examples:
 #  deploy_bigip -e srwd76 -b rb_ecomm_13_6
-#  deploy_bigip -e srwd76 -b rb_ecomm_13_6 -s cti,cti-ssl
+#  deploy_bigip -e srwd76 -b rb_ecomm_13_6 -p
+#  deploy_bigip -e srwd76 -b rb_ecomm_13_6 --includevs cti,cti-ssl
 #
 
 use strict;
@@ -87,11 +91,17 @@ my $envid = qw{};
 my $branch = qw{};
 my $including_vs = qw{};
 my $including_pool = qw{};
+my $only_pool = qw{};
+my $only_irule = qw{};
+my $only_vs = qw{};
 my $options_okay = GetOptions (
    'e|env=s'         => \$envid,
    'b|branch=s'      => \$branch,
-   'p|includepool=s' => \$including_pool,
-   's|includevs=s'   => \$including_vs,
+   'p|onlypool'      => \$only_pool,
+   'r|onlyirule'     => \$only_irule,
+   's|onlyvs'        => \$only_vs,
+   'includepool=s'   => \$including_pool,
+   'includevs=s'     => \$including_vs,
    'v|verbose'       => \$show_verbose,
    'h|help'          => \$show_usage,
 );
@@ -132,16 +142,20 @@ Usage: deploy_bigip [options]
 Options:
  -e | --env               Specify the environment ID. For example: srwd76.
  -b | --branch            Specify the branch name. For example: rb_ecomm_13_6.
- -p | --includepool       Specify which of the pools need to be included for deployment.
+ -p | --onlypool          Deploy pools only. Will not delete pools at first.
+ -r | --onlyirule         Deploy irules only. Will not delete irules at first.
+ -s | --onlyvs            Deploy virtual servers only. Will not delete virtual servers at first.
+    | --includepool       Specify which of the pools need to be included for deployment.
                           Multiple pools need to be separated by comma.
- -s | --includevs         Specify which of the virtual servers need to be included for deployment.
+    | --includevs         Specify which of the virtual servers need to be included for deployment.
                           Multiple virtuals need to be separated by comma.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
 Examples:
  deploy_bigip -e srwd76 -b rb_ecomm_13_6
- deploy_bigip -e srwd76 -b rb_ecomm_13_6 -s cti,cti-ssl
+ deploy_bigip -e srwd76 -b rb_ecomm_13_6 -p
+ deploy_bigip -e srwd76 -b rb_ecomm_13_6 --includevs cti,cti-ssl
 
 END_OF_HELP
 }
@@ -281,16 +295,21 @@ my @final_external_excluded_vs = filter_list( \@include_vs, \@external_excluded_
 my @final_internal_excluded_pool = filter_list( \@include_pool, \@internal_excluded_pool );
 my @final_external_excluded_pool = filter_list( \@include_pool, \@external_excluded_pool );
 
-# Remove the virtual servers, rules and pools for specific environment.
-$logger->info( "Deleting virtual servers for $envid ..." );
-delete_not_excluded_env_virtual_servers( $external_ic, $envid, @final_external_excluded_vs );
-delete_not_excluded_env_virtual_servers( $internal_ic, $envid, @final_internal_excluded_vs );
-$logger->info( "Deleting rules for $envid ..." );
-delete_env_rules( $internal_ic, $envid );
-delete_env_rules( $external_ic, $envid );
-$logger->info( "Deleting pools for $envid ..." );
-delete_not_excluded_env_pools( $external_ic, $envid, @final_external_excluded_pool );
-delete_not_excluded_env_pools( $internal_ic, $envid, @final_internal_excluded_pool );
+my $deploy_all = 1;
+$deploy_all = 0 if ( $only_vs or $only_irule or $only_pool );
+
+if ( $deploy_all ) {
+    # Remove the virtual servers, rules and pools for specific environment.
+    $logger->info( "Deleting virtual servers for $envid ..." );
+    delete_not_excluded_env_virtual_servers( $external_ic, $envid, @final_external_excluded_vs );
+    delete_not_excluded_env_virtual_servers( $internal_ic, $envid, @final_internal_excluded_vs );
+    $logger->info( "Deleting rules for $envid ..." );
+    delete_env_rules( $internal_ic, $envid );
+    delete_env_rules( $external_ic, $envid );
+    $logger->info( "Deleting pools for $envid ..." );
+    delete_not_excluded_env_pools( $external_ic, $envid, @final_external_excluded_pool );
+    delete_not_excluded_env_pools( $internal_ic, $envid, @final_internal_excluded_pool );
+}
 
 # Deploy virtual servers, rules and pools for specific environment.
 my $int_tmpdir = File::Temp->newdir();
@@ -301,18 +320,25 @@ my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $b
 
 my $deploy_success = 0;
 
-$logger->info( "Deploying pools for $envid ..." );
-$deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf );
-clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
-$deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf );
-clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
-# system("/nas/utl/devops/bin/deploy-irules -e $envid -b $branch");
-system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
-$logger->info("Deploying virtual servers for $envid ...");
-$deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf );
-clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
-$deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf );
-clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
+if ( $only_pool or $deploy_all ) {
+    $logger->info( "Deploying pools for $envid ..." );
+    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf );
+    clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
+    $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf );
+    clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
+}
+if ( $only_irule or $deploy_all ) {
+    $logger->info("Deploying irules for $envid ...");
+    # system("/nas/utl/devops/bin/deploy-irules -e $envid -b $branch");
+    system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
+}
+if ( $only_vs or $deploy_all ) {
+    $logger->info("Deploying virtual servers for $envid ...");
+    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf );
+    clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
+    $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf );
+    clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
+}
 
 save_configuration( $internal_ic );
 save_configuration( $external_ic );
@@ -327,11 +353,15 @@ if ( scalar @final_internal_excluded_vs > 0
         or scalar @final_external_excluded_pool > 0) {
     $logger->info( "===================================" );
     $logger->info( "Following BigIP objects are excluded during the deployment." );
-    $logger->info( "Please use '-p' or '-s' option to deploy them:" );
-    $logger->info( "Internal virtual servers: " . join(',', @final_internal_excluded_vs) ) if scalar @final_internal_excluded_vs > 0;
-    $logger->info( "External virtual servers: " . join(',', @final_external_excluded_vs) ) if scalar @final_external_excluded_vs > 0;
-    $logger->info( "Internal pools: " . join(',', @final_internal_excluded_pool) ) if scalar @final_internal_excluded_pool > 0;
-    $logger->info( "External pools: " . join(',', @final_external_excluded_pool) ) if scalar @final_external_excluded_pool > 0;
+    $logger->info( "Please use '--includepool' or '--includevs' option to deploy them:" );
+    if ( $only_vs or $deploy_all ) {
+        $logger->info( "Internal virtual servers: " . join(',', @final_internal_excluded_vs) ) if scalar @final_internal_excluded_vs > 0;
+        $logger->info( "External virtual servers: " . join(',', @final_external_excluded_vs) ) if scalar @final_external_excluded_vs > 0;
+    }
+    if ( $only_pool or $deploy_all ) {
+        $logger->info( "Internal pools: " . join(',', @final_internal_excluded_pool) ) if scalar @final_internal_excluded_pool > 0;
+        $logger->info( "External pools: " . join(',', @final_external_excluded_pool) ) if scalar @final_external_excluded_pool > 0;
+    }
 }
 
 exit 0;
