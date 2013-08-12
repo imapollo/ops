@@ -413,7 +413,7 @@ sub read_all {
 	my $timeout = @_ ? shift : $self->{timeout};
 	my $out;
 	while ($self->_sec_expect($timeout, '-re', qr/[\s\S]+/)) {
-		$out .= $self->get_expect()->match();
+        $out .= $self->get_expect()->match();
 	}
 	return $out;
 }

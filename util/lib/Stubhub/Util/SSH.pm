@@ -77,14 +77,9 @@ sub mute_execute_ssh {
     my ( $ssh, $command ) = @_;
     my $output = $ssh->exec($command);
     if ( defined $output ) {
-        my @original_outputs = split(/\n/, $output);
-        my @outputs;
-        foreach my $line ( @original_outputs ) {
-            if ( $line !~ /tmos/ ) {
-                chomp $line;
-                push(@outputs, $line);
-            }
-        }
+        # Fix the line separator to only accept '\n'
+        $output =~ s/\r//g;
+        my @outputs = split('\n', $output);
         return @outputs;
     } else {
         return;

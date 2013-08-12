@@ -27,11 +27,19 @@ use Getopt::Long;
 use lib '/nas/reg/lib/perl';
 use lib '/nas/home/minjzhang/ops/util/lib';
 
+use Readonly;
 use Data::Dumper;
 use BigIP::iControl;
+use MIME::Base64;
 use Stubhub::BigIP::System::Util qw (
                                     get_icontrol_instance
                                 );
+use Stubhub::Util::SSH qw (
+                            login_ssh
+                            close_ssh
+                            execute_ssh
+                            mute_execute_ssh
+                        );
 
 # Get options
 my $show_usage = qw{};
@@ -90,6 +98,36 @@ Examples:
  switch_wideip -w test.noc.com -p test2
 
 END_OF_HELP
+}
+
+#
+# Swtich pool for WideIP.
+#
+sub switch_wideip_pool {
+    my ( $server, $icontrol, $wideip, $pool ) = @_;
+    Readonly my $star => 'root';
+    Readonly my $war => 'bHVtbkIwdGw=';
+    my $ssh = login_ssh( $server, $star, decode_base64( $war ) );
+    my $command = "tmsh modify gtm wideip $wideip pools modify {$pool {order 0}}";
+    my @output = mute_execute_ssh( $ssh, $command );
+
+    my $has_error = 0;
+    foreach my $line ( @output ) {
+        if ( $line =~ /\bnot\b/i or $line =~ /\berror\b/i ) {
+            print $line . "\n";
+            $has_error = 1;
+        }
+    }
+
+    if ( not $has_error ) {
+        my $pool_index = 1;
+        my @pool_list = $icontrol->get_wideip_pool_list( $wideip );
+        print "Pools for Wide IP $wideip:\n";
+        foreach my $a_pool ( @pool_list ) {
+            print "$pool_index) $a_pool\n";
+            $pool_index += 1;
+        }
+    }
 }
 
 #
@@ -176,8 +214,7 @@ if ( not defined $pool ) {
         die "Please enter the number of Pool.\n";
     }
 }
-print "modify gtm wideip $wideip pools modify {$pool {order 0}}\n";
 
-# update_wideip_pool_order( $lba_server, $wideip, $pool );
+switch_wideip_pool( $lba_server, $icontrol, $wideip, $pool );
 
 exit 0;
