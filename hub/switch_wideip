@@ -101,6 +101,41 @@ END_OF_HELP
 }
 
 #
+# Print pool list.
+#
+sub print_wideip_pool_list {
+    my ( $icontrol, $wideip ) = @_;
+
+    my $pool_index = 1;
+    my @pool_list = $icontrol->get_wideip_pool_list( $wideip );
+
+    print "Pools for Wide IP $wideip:\n";
+    my $primary_selected = 0;
+
+    foreach my $a_pool ( @pool_list ) {
+        my $pool_available = 0;
+        $pool_available = 1 if $icontrol->get_gtm_pool_status( $a_pool ) ne 'AVAILABILITY_STATUS_RED';
+        my $pool_enabled = 0;
+        $pool_enabled = 1 if $icontrol->get_gtm_pool_enabled_status( $a_pool ) eq 'ENABLED_STATUS_ENABLED';
+        print "$pool_index) $a_pool";
+
+        if ( $pool_available and $pool_enabled and not $primary_selected ) {
+            print " [ primary ]";
+            $primary_selected = 1;
+        }
+        if ( not $pool_available ) {
+            print " [ down ]";
+        }
+        if ( not $pool_enabled ) {
+            print " [ disabled ]";
+        }
+        print "\n";
+        $pool_index += 1;
+    }
+    return @pool_list;
+}
+
+#
 # Swtich pool for WideIP.
 #
 sub switch_wideip_pool {
@@ -119,14 +154,13 @@ sub switch_wideip_pool {
         }
     }
 
+    my $is_global_availability = 0;
+    if ( $icontrol->get_wideip_lb_method( $wideip ) eq 'LB_METHOD_GLOBAL_AVAILABILITY' ) {
+        $is_global_availability = 1;
+    }
+
     if ( not $has_error ) {
-        my $pool_index = 1;
-        my @pool_list = $icontrol->get_wideip_pool_list( $wideip );
-        print "Pools for Wide IP $wideip:\n";
-        foreach my $a_pool ( @pool_list ) {
-            print "$pool_index) $a_pool\n";
-            $pool_index += 1;
-        }
+        print_wideip_pool_list( $icontrol, $wideip );
     }
 }
 
@@ -199,15 +233,10 @@ if ( not defined $wideip ) {
 }
 
 if ( not defined $pool ) {
-    my $pool_index = 1;
-    my @pool_list = $icontrol->get_wideip_pool_list( $wideip );
-    print "Pools for Wide IP $wideip:\n";
-    foreach my $a_pool ( @pool_list ) {
-        print "$pool_index) $a_pool\n";
-        $pool_index += 1;
-    }
+    my @pool_list = print_wideip_pool_list( $icontrol, $wideip );
+
     print "Enter the number of the Pool: ";
-    $pool_index = <>;
+    my $pool_index = <>;
     if ( $pool_index =~ /[0-9]+/ ) {
         $pool = $pool_list[ $pool_index - 1 ];
     } else {
