@@ -5,6 +5,8 @@
 # Usage: Cloak-Uncloak [options]
 #
 # Options:
+#  -u | --username          Specify the username to login to LBA server.
+#  -x | --password          Specify the password to login to LBA server.
 #  -h | --help              Show help information.
 #
 
@@ -22,9 +24,13 @@ use Net::SSH::Expect;
 # Get options
 my $show_usage = qw{};
 my $show_verbose = qw{};
+my $lba_username = qw{};
+my $lba_password = qw{};
 my $options_okay = GetOptions (
-   'v|verbose'   => \$show_verbose,
-   'h|help'      => \$show_usage,
+   'u|username=s' => \$lba_username,
+   'x|password=s' => \$lba_password,
+   'v|verbose'    => \$show_verbose,
+   'h|help'       => \$show_usage,
 );
 
 #
@@ -146,8 +152,10 @@ sub print_list {
 # Main
 #
 
-Readonly my $HOSTNAME => 'srwp01lba040';
-Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubprod.com";
+#Readonly my $HOSTNAME => 'srwp01lba040';
+Readonly my $HOSTNAME => 'srwd00lba040';
+#Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubprod.com";
+Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubcorp.dev";
 Readonly my $TMSH_EXEC => 'tmsh';
 
 print "-------------------------------------------------------------------
@@ -155,31 +163,33 @@ print "-------------------------------------------------------------------
 -------------------------------------------------------------------
 ";
 
-print "Username: ";
-my $lba_username = <>;
-chomp $lba_username;
-print "Password: ";
-system("stty -echo");
-my $lba_password = <>;
-chomp $lba_password;
-system("stty echo");
-print "\n";
+if ( not defined $lba_username ) {
+    print "Username: ";
+    my $lba_username = <>;
+    chomp $lba_username;
+}
+if ( not defined $lba_password ) {
+    print "Password: ";
+    system("stty -echo");
+    my $lba_password = <>;
+    chomp $lba_password;
+    system("stty echo");
+    print "\n";
+}
 
 my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
-
-while (1) { # begin of while loop
 
 # Choose list
 print "Enter the list you want to configure:
 1. blacklist
 2. whitelist
 3. hackercrackerlist
-q. quit
+b. back
 > ";
 my $listname = <>;
 chomp $listname;
 
-if ( $listname eq "q" ) {
+if ( $listname eq "b" ) {
     close_ssh($ssh);
     exit 0;
 }
@@ -201,11 +211,11 @@ print "Enter the action you want to do for $listname:
 1. list
 2. add
 3. delete
-q. quit
+b. back
 > ";
 my $action = <>;
 chomp $action;
-if ( $action eq "q" ) {
+if ( $action eq "b" ) {
     close_ssh($ssh);
     exit 0;
 }
@@ -267,8 +277,6 @@ if ( $action eq "list" ) {
         }
     }
 }
-
-} # end of while loop
 
 close_ssh($ssh);
 exit 0;
