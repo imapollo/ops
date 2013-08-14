@@ -12,6 +12,7 @@ use strict;
 use warnings;
 
 use lib '/nas/reg/lib/perl';
+use lib '/nas/utl/lib/perl';
 #use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
@@ -127,7 +128,7 @@ sub print_list {
     my @ip_addresses;
     foreach my $line ( @outputs ) {
         if ( $line =~ /{ }/ ) {
-            $line =~ s/^\s*(\S+)\s*{ }\s*$/$1/;
+            $line =~ s/^\s*(.*)\s*{ }\s*$/$1/;
             push( @ip_addresses, $line );
         }
     }
@@ -144,6 +145,7 @@ sub print_list {
 #
 # Main
 #
+
 Readonly my $HOSTNAME => 'srwp01lba040';
 Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubprod.com";
 Readonly my $TMSH_EXEC => 'tmsh';
@@ -156,7 +158,6 @@ print "-------------------------------------------------------------------
 print "Username: ";
 my $lba_username = <>;
 chomp $lba_username;
-#print "Enter your password (type your password in line below):\n";
 print "Password: ";
 system("stty -echo");
 my $lba_password = <>;
@@ -172,6 +173,7 @@ while (1) { # begin of while loop
 print "Enter the list you want to configure:
 1. blacklist
 2. whitelist
+3. hackercrackerlist
 q. quit
 > ";
 my $listname = <>;
@@ -181,14 +183,16 @@ if ( $listname eq "q" ) {
     close_ssh($ssh);
     exit 0;
 }
-if ( $listname !~ /[12]/ ) {
+if ( $listname !~ /[123]/ ) {
     usage();
     next;
 } else {
     if ( $listname eq "1" ) {
         $listname = "blacklist";
-    } else {
+    } elsif ( $listname eq "2" ) {
         $listname = "whitelist";
+    } else {
+        $listname = "hackercrackerlist";
     }
 }
 
@@ -220,10 +224,11 @@ if ( $action !~ /[123]/ ) {
 
 # Do action
 Readonly my $IP_EXAMPLES =>
-"-------------------------------------------------------------------
+'-------------------------------------------------------------------
 | 1.1.1.1                                                         |
 | 1.1.1.1 2.2.2.2                                                 |
--------------------------------------------------------------------";
+| "Mozilla/5.0 (Windows NT 6.1; WOW64)"                           |
+-------------------------------------------------------------------';
 
 if ( $action eq "list" ) {
     print_list( $ssh, $listname );
