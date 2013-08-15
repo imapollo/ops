@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# Teamworks Control Script
+#
+# To use this script run it as root - it will switch to the specified user
+#
+
+# Define Teamworks home directory
+TEAMWORKS_BIN="/software/TWEMS/teamworks-ems"
+
+# Make sure JAVA_HOME is in path
+export JAVA_HOME="/opt/jdk1.5.0_22"
+export PATH="/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin"
+export HOSTNAME=`hostname`
+
+if [ ! -d "$TEAMWORKS_BIN" ]; then
+  echo "TEAMWORKS_BIN does not exist as a valid directory : $TEAMWORKS_BIN"
+  exit 1
+fi
+
+# Gets PID of Teamworks processes
+TMWK_PIDS=`ps -efl | grep -e "startup/wrapper.conf" -e "/software/TWEMS" | grep -v grep | awk ' { print $4 }'`
+
+case "$1" in
+start)
+    TMWK_PIDS=`ps -efl | grep -e "startup/wrapper.conf" -e "/software/TWEMS" | grep -v grep | awk ' { print $4 }'`
+    if [ "$TMWK_PIDS" ]; then
+        echo Teamworks processes are already running:
+        echo "$TMWK_PIDS"
+        echo exiting
+        exit 0
+    fi
+    cd $TEAMWORKS_BIN
+    ./twems.sh server-start -Dsrv-name=`hostname -s`
+    ;;
+stop)
+    TMWK_PIDS=`ps -efl | grep -e "startup/wrapper.conf" -e "/software/TWEMS" | grep -v grep | awk ' { print $4 }'`
+    if [ ! "$TMWK_PIDS" ]; then
+        echo Teamworks already stopped
+        exit 0
+    fi
+    cd $TEAMWORKS_BIN
+    ./twems.sh server-stop -Dsrv-name=`hostname -s`
+    TMWK_PIDS=`ps -efl | grep -e "startup/wrapper.conf" -e "/software/TWEMS" | grep -v grep | awk ' { print $4 }'`
+    if [ "$TMWK_PIDS" ]; then
+        echo $TMWK_PIDS | while read pid
+        do
+            kill -9 $pid
+        done
+        echo "Killed the following Teamworks processes:"
+        echo $TMWK_PIDS
+    fi
+    echo Teamworks stopped
+    ;;
+status)
+    if [ "$TMWK_PIDS" ]; then
+        echo Teamworks is running:
+        echo "$TMWK_PIDS"
+    else
+        echo Teamworks is not running
+    fi
+    ;;
+restart)
+    $0 stop
+    $0 start
+    ;;
+*)
+    echo "usage: $0 (start|stop|status|restart|help)"
+esac
+
