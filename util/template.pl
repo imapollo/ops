@@ -21,6 +21,14 @@ use warnings;
 use Carp;
 use Getopt::Long;
 
+# use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
 # Get options
 my $show_usage = qw{};
 my $show_verbose = qw{};
@@ -30,6 +38,12 @@ my $options_okay = GetOptions (
     'v|verbose'   => \$show_verbose,
     'h|help'      => \$show_usage,
 );
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
 
 #
 # Signal Handler
@@ -62,7 +76,7 @@ END_OF_HELP
 # Parameter validation
 #
 if ( ! defined $another) {
-    print "Error: The pamameter '-a' must be set.\n";
+    $logger->error( "The pamameter '-a' must be set.\n" );
     usage();
     exit 1;
 }

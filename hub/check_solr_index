@@ -1,0 +1,227 @@
+#!/usr/bin/perl
+#
+# Check the number of Solr index items. Including:
+# - MCI
+# - LCX
+#
+# Usage: check_solr_index [options]
+#
+# Options:
+#  -e | --envid             Specify the environment ID to check. eg, srwd83.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  check_solr_index ..
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+
+use lib '/nas/reg/lib/perl';
+# use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Readonly;
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $envid = qw{};
+my $options_okay = GetOptions (
+    'e|envid=s'   => \$envid,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+Check the number of Solr index items. Including:
+- MCI
+- LCX
+
+Usage: check_solr_index [options]
+
+Options:
+ -e | --envid             Specify the environment ID to check. Eg, swd83.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ check_solr_index -e srwd83
+
+END_OF_HELP
+}
+
+#
+# Parameter validation.
+#
+if ( ! defined $envid ) {
+    $logger->error( "The pamameter '-e' must be set.\n" );
+    usage();
+    exit 1;
+}
+
+#
+# Get the solr instance URL for the specific environment.
+#
+sub get_solr_instance {
+    my ( $envid ) = @_;
+    Readonly my $DEV_QA_HOSTS => '/nas/reg/etc/dev-qa-hosts';
+    Readonly my $GREP_CMD => '/bin/grep';
+
+    my $mci_hosts = `$GREP_CMD $envid $DEV_QA_HOSTS | $GREP_CMD mci`;
+    my @mci_host_list = split "\n", $mci_hosts;
+    my @mci_solr = map { local $_ = $_; s/^(.*)$/http:\/\/$1\/solr/; $_ } @mci_host_list;
+
+    my $lcx_hosts = `$GREP_CMD $envid $DEV_QA_HOSTS | $GREP_CMD lcx`;
+    my @lcx_host_list = split "\n", $lcx_hosts;
+    my @lcx_solr = map { local $_ = $_; s/^(.*)$/http:\/\/$1\/solr/; $_ } @lcx_host_list;
+
+    return( \@mci_solr, \@lcx_solr );
+}
+
+#
+# Get query numFound result.
+#
+sub query_num_found {
+    my ( $solr_query_url, $result_name ) = @_;
+
+    Readonly my $CURL_CMD => '/usr/bin/curl';
+    Readonly my $GREP_CMD => '/bin/grep';
+
+    my $query_result = `$CURL_CMD "$solr_query_url" 2> /dev/null | $GREP_CMD '"numFound"'`;
+    chomp $query_result;
+    $query_result =~ s/.*"numFound":([0-9]+),.*/$1/;
+    my $hostname = $solr_query_url;
+    $hostname =~ s/http:\/\/(.*)\/solr.*/$1/;
+    printf "%-50s %-10s\n", "$hostname $result_name:", $query_result;
+    return $query_result;
+}
+
+#
+# Query the listing in MCI.
+#
+sub query_mci_listing {
+    my ( $mci_solr_list_ref ) = @_;
+    Readonly my $MCI_LISTING_QUERY => 'inventory/select?q=*%3A*&wt=json&indent=true';
+    foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
+        query_num_found( "$mci_solr/$MCI_LISTING_QUERY", "listing" );
+    }
+}
+
+#
+# Query the order in MCI.
+#
+sub query_mci_order {
+    my ( $mci_solr_list_ref ) = @_;
+    Readonly my $MCI_ORDERS_QUERY => 'orders/select?q=*%3A*&wt=json&indent=true';
+    foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
+        query_num_found( "$mci_solr/$MCI_ORDERS_QUERY", "orders" );
+    }
+}
+
+#
+# Query the payment in MCI.
+#
+sub query_mci_payment {
+    my ( $mci_solr_list_ref ) = @_;
+    Readonly my $MCI_PAYMENTS_QUERY => 'payments/select?q=*%3A*&wt=json&indent=true';
+    foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
+        query_num_found( "$mci_solr/$MCI_PAYMENTS_QUERY", "payments" );
+    }
+
+}
+
+#
+# Query the genre in LCX.
+#
+sub query_lcx_genre {
+    my ( $lcx_solr_list_ref ) = @_;
+    Readonly my $LCX_GENRE_QUERY => 'general/select?q=%2BstubhubDocumentType%3Agenre&wt=json&indent=true';
+    foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
+        query_num_found( "$lcx_solr/$LCX_GENRE_QUERY", "genre" );
+    }
+}
+
+#
+# Query the cobrand in LCX.
+#
+sub query_lcx_cobrand {
+    my ( $lcx_solr_list_ref ) = @_;
+    Readonly my $LCX_COBRAND_QUERY => 'general/select?q=%2BstubhubDocumentType%3Acobrand&wt=json&indent=true';
+    foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
+        query_num_found( "$lcx_solr/$LCX_COBRAND_QUERY", "cobrand" );
+    }
+}
+
+#
+# Query the event in LCX.
+#
+sub query_lcx_event {
+    my ( $lcx_solr_list_ref ) = @_;
+    Readonly my $LCX_EVENT_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aevent&wt=json&indent=true';
+    foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
+        query_num_found( "$lcx_solr/$LCX_EVENT_QUERY", "event" );
+    }
+}
+
+#
+# Query the ticket in LCX.
+#
+sub query_lcx_ticket {
+    my ( $lcx_solr_list_ref ) = @_;
+    Readonly my $LCX_TICKET_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aticket&wt=json&indent=true';
+    foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
+        query_num_found( "$lcx_solr/$LCX_TICKET_QUERY", "ticket" );
+    }
+}
+
+
+#
+# Main.
+#
+my ( $mci_solr_list_ref, $lcx_solr_list_ref ) = get_solr_instance( $envid );
+query_mci_listing( $mci_solr_list_ref );
+query_mci_order( $mci_solr_list_ref );
+query_mci_payment( $mci_solr_list_ref );
+query_lcx_genre( $lcx_solr_list_ref );
+query_lcx_cobrand( $lcx_solr_list_ref );
+query_lcx_event( $lcx_solr_list_ref );
+query_lcx_ticket( $lcx_solr_list_ref );
+
+exit 0;

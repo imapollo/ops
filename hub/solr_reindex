@@ -1,0 +1,129 @@
+#!/usr/bin/perl
+#
+# Check the number of Solr index items. Including:
+# - MCI
+# - LCX
+#
+# Usage: check_solr_index [options]
+#
+# Options:
+#  -e | --envid             Specify the environment ID to check. eg, srwd83.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  check_solr_index ..
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+
+use lib '/nas/reg/lib/perl';
+# use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Readonly;
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $envid = qw{};
+my $options_okay = GetOptions (
+    'e|envid=s'   => \$envid,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+Check the number of Solr index items. Including:
+- MCI
+- LCX
+
+Usage: check_solr_index [options]
+
+Options:
+ -e | --envid             Specify the environment ID to check. Eg, swd83.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ check_solr_index -e srwd83
+
+END_OF_HELP
+}
+
+#
+# Parameter validation.
+#
+if ( ! defined $envid ) {
+    $logger->error( "The pamameter '-e' must be set.\n" );
+    usage();
+    exit 1;
+}
+
+#
+# Invoke the re-index method.
+#
+sub invoke_reindex {
+    my ( $envid ) = @_;
+    Readonly my $DEV_QA_HOSTS => '/nas/reg/etc/dev-qa-hosts';
+    Readonly my $GREP_CMD => '/bin/grep';
+
+    my $mci_hosts = `$GREP_CMD $envid $DEV_QA_HOSTS | $GREP_CMD mci`;
+    my @mci_host_list = split "\n", $mci_hosts;
+    my @mci_jmx = map { local $_ = $_; s/^(.*)$/http:\/\/$1\/jmx-console\/HtmlAdaptor/; $_ } @mci_host_list;
+
+    my $lcm_hosts = `$GREP_CMD $envid $DEV_QA_HOSTS | $GREP_CMD lcm`;
+    my @lcm_host_list = split "\n", $lcm_hosts;
+    my @lcm_jmx = map { local $_ = $_; s/^(.*)$/http:\/\/$1\/jmx-console\/HtmlAdaptor/; $_ } @lcm_host_list;
+
+    my $lcx_hosts = `$GREP_CMD $envid $DEV_QA_HOSTS | $GREP_CMD lcx`;
+    my @lcx_host_list = split "\n", $lcx_hosts;
+    my @lcx_jmx = map { local $_ = $_; s/^(.*)$/http:\/\/$1\/jmx-console\/HtmlAdaptor/; $_ } @lcx_host_list;
+
+    Readonly my $REIDX_MCI_LISTING =>
+    Readonly my $REIDX_MCI_ORDER =>
+    Readonly my $REIDX_MCI_PAYMENT =>
+}
+
+#
+# Main
+#
+invoke_reindex( $envid );
+
+exit 0;
