@@ -123,7 +123,7 @@ sub print_wideip_pool_list {
             print " [ primary ]";
             $primary_selected = 1;
         }
-        if ( not $pool_available ) {
+        if ( not $pool_available and $pool_enabled ) {
             print " [ down ]";
         }
         if ( not $pool_enabled ) {
