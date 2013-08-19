@@ -116,10 +116,22 @@ sub get_solr_instance {
 }
 
 #
+# Print the query result for specific environment.
+#
+sub print_query_result {
+    my ( $solr_url, $query_result, $expected_result, $result_name ) = @_;
+    my $hostname = $solr_url;
+    $hostname =~ s/http:\/\/(.*)\/solr.*/$1/;
+    my $fail = "";
+    $fail = "[fail]" if $query_result < $expected_result;
+    printf "%-50s %-8s %-10s\n", "$hostname $result_name:", $query_result, $fail;
+}
+
+#
 # Get query numFound result.
 #
 sub query_num_found {
-    my ( $solr_query_url, $result_name ) = @_;
+    my ( $solr_query_url ) = @_;
 
     Readonly my $CURL_CMD => '/usr/bin/curl';
     Readonly my $GREP_CMD => '/bin/grep';
@@ -127,9 +139,6 @@ sub query_num_found {
     my $query_result = `$CURL_CMD "$solr_query_url" 2> /dev/null | $GREP_CMD '"numFound"'`;
     chomp $query_result;
     $query_result =~ s/.*"numFound":([0-9]+),.*/$1/;
-    my $hostname = $solr_query_url;
-    $hostname =~ s/http:\/\/(.*)\/solr.*/$1/;
-    printf "%-50s %-10s\n", "$hostname $result_name:", $query_result;
     return $query_result;
 }
 
@@ -140,7 +149,8 @@ sub query_mci_listing {
     my ( $mci_solr_list_ref ) = @_;
     Readonly my $MCI_LISTING_QUERY => 'inventory/select?q=*%3A*&wt=json&indent=true';
     foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
-        query_num_found( "$mci_solr/$MCI_LISTING_QUERY", "listing" );
+        my $query_result = query_num_found( "$mci_solr/$MCI_LISTING_QUERY" );
+        print_query_result( $mci_solr, $query_result, 1, "listing" );
     }
 }
 
@@ -151,7 +161,8 @@ sub query_mci_order {
     my ( $mci_solr_list_ref ) = @_;
     Readonly my $MCI_ORDERS_QUERY => 'orders/select?q=*%3A*&wt=json&indent=true';
     foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
-        query_num_found( "$mci_solr/$MCI_ORDERS_QUERY", "orders" );
+        my $query_result = query_num_found( "$mci_solr/$MCI_ORDERS_QUERY" );
+        print_query_result( $mci_solr, $query_result, 1, "order" );
     }
 }
 
@@ -162,9 +173,9 @@ sub query_mci_payment {
     my ( $mci_solr_list_ref ) = @_;
     Readonly my $MCI_PAYMENTS_QUERY => 'payments/select?q=*%3A*&wt=json&indent=true';
     foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
-        query_num_found( "$mci_solr/$MCI_PAYMENTS_QUERY", "payments" );
+        my $query_result = query_num_found( "$mci_solr/$MCI_PAYMENTS_QUERY" );
+        print_query_result( $mci_solr, $query_result, 1, "payment" );
     }
-
 }
 
 #
@@ -174,7 +185,8 @@ sub query_lcx_genre {
     my ( $lcx_solr_list_ref ) = @_;
     Readonly my $LCX_GENRE_QUERY => 'general/select?q=%2BstubhubDocumentType%3Agenre&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
-        query_num_found( "$lcx_solr/$LCX_GENRE_QUERY", "genre" );
+        my $query_result = query_num_found( "$lcx_solr/$LCX_GENRE_QUERY" );
+        print_query_result( $lcx_solr, $query_result, 35000, "genre" );
     }
 }
 
@@ -185,7 +197,8 @@ sub query_lcx_cobrand {
     my ( $lcx_solr_list_ref ) = @_;
     Readonly my $LCX_COBRAND_QUERY => 'general/select?q=%2BstubhubDocumentType%3Acobrand&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
-        query_num_found( "$lcx_solr/$LCX_COBRAND_QUERY", "cobrand" );
+        my $query_result = query_num_found( "$lcx_solr/$LCX_COBRAND_QUERY" );
+        print_query_result( $lcx_solr, $query_result, 2200, "cobrand" );
     }
 }
 
@@ -196,7 +209,8 @@ sub query_lcx_event {
     my ( $lcx_solr_list_ref ) = @_;
     Readonly my $LCX_EVENT_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aevent&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
-        query_num_found( "$lcx_solr/$LCX_EVENT_QUERY", "event" );
+        my $query_result = query_num_found( "$lcx_solr/$LCX_EVENT_QUERY" );
+        print_query_result( $lcx_solr, $query_result, 60000, "event" );
     }
 }
 
@@ -207,15 +221,17 @@ sub query_lcx_ticket {
     my ( $lcx_solr_list_ref ) = @_;
     Readonly my $LCX_TICKET_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aticket&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
-        query_num_found( "$lcx_solr/$LCX_TICKET_QUERY", "ticket" );
+        my $query_result = query_num_found( "$lcx_solr/$LCX_TICKET_QUERY" );
+        print_query_result( $lcx_solr, $query_result, 10000, "ticket" );
     }
 }
-
 
 #
 # Main.
 #
+
 my ( $mci_solr_list_ref, $lcx_solr_list_ref ) = get_solr_instance( $envid );
+
 query_mci_listing( $mci_solr_list_ref );
 query_mci_order( $mci_solr_list_ref );
 query_mci_payment( $mci_solr_list_ref );
