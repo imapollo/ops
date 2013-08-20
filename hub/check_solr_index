@@ -23,8 +23,7 @@ use Carp;
 use Getopt::Long;
 
 use lib '/nas/reg/lib/perl';
-# use lib '/nas/utl/devops/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
+use lib '/nas/utl/devops/lib/perl';
 
 use Readonly;
 use Stubhub::Log::Util qw (
@@ -125,6 +124,11 @@ sub print_query_result {
     my $fail = "";
     $fail = "[fail]" if $query_result < $expected_result;
     printf "%-50s %-8s %-10s\n", "$hostname $result_name:", $query_result, $fail;
+    if ( $fail eq "[fail]" ) {
+        return 0;
+    } else {
+        return 1;
+    }
 }
 
 #
@@ -146,84 +150,98 @@ sub query_num_found {
 # Query the listing in MCI.
 #
 sub query_mci_listing {
-    my ( $mci_solr_list_ref ) = @_;
+    my ( $mci_solr_list_ref, $expected_value ) = @_;
+    my $success = 1;
     Readonly my $MCI_LISTING_QUERY => 'inventory/select?q=*%3A*&wt=json&indent=true';
     foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
         my $query_result = query_num_found( "$mci_solr/$MCI_LISTING_QUERY" );
-        print_query_result( $mci_solr, $query_result, 1, "listing" );
+        $success = 0 if not print_query_result( $mci_solr, $query_result, $expected_value, "listing" );
     }
+    return $success;
 }
 
 #
 # Query the order in MCI.
 #
 sub query_mci_order {
-    my ( $mci_solr_list_ref ) = @_;
+    my ( $mci_solr_list_ref, $expected_value ) = @_;
+    my $success = 1;
     Readonly my $MCI_ORDERS_QUERY => 'orders/select?q=*%3A*&wt=json&indent=true';
     foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
         my $query_result = query_num_found( "$mci_solr/$MCI_ORDERS_QUERY" );
-        print_query_result( $mci_solr, $query_result, 1, "order" );
+        $success = 0 if not print_query_result( $mci_solr, $query_result, $expected_value, "order" );
     }
+    return $success;
 }
 
 #
 # Query the payment in MCI.
 #
 sub query_mci_payment {
-    my ( $mci_solr_list_ref ) = @_;
+    my ( $mci_solr_list_ref, $expected_value ) = @_;
+    my $success = 1;
     Readonly my $MCI_PAYMENTS_QUERY => 'payments/select?q=*%3A*&wt=json&indent=true';
     foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
         my $query_result = query_num_found( "$mci_solr/$MCI_PAYMENTS_QUERY" );
-        print_query_result( $mci_solr, $query_result, 1, "payment" );
+        $success = 0 if not print_query_result( $mci_solr, $query_result, $expected_value, "payment" );
     }
+    return $success;
 }
 
 #
 # Query the genre in LCX.
 #
 sub query_lcx_genre {
-    my ( $lcx_solr_list_ref ) = @_;
+    my ( $lcx_solr_list_ref, $expected_value ) = @_;
+    my $success = 1;
     Readonly my $LCX_GENRE_QUERY => 'general/select?q=%2BstubhubDocumentType%3Agenre&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
         my $query_result = query_num_found( "$lcx_solr/$LCX_GENRE_QUERY" );
-        print_query_result( $lcx_solr, $query_result, 35000, "genre" );
+        $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "genre" );
     }
+    return $success;
 }
 
 #
 # Query the cobrand in LCX.
 #
 sub query_lcx_cobrand {
-    my ( $lcx_solr_list_ref ) = @_;
+    my ( $lcx_solr_list_ref, $expected_value ) = @_;
+    my $success = 1;
     Readonly my $LCX_COBRAND_QUERY => 'general/select?q=%2BstubhubDocumentType%3Acobrand&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
         my $query_result = query_num_found( "$lcx_solr/$LCX_COBRAND_QUERY" );
-        print_query_result( $lcx_solr, $query_result, 2200, "cobrand" );
+        $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "cobrand" );
     }
+    return $success;
 }
 
 #
 # Query the event in LCX.
 #
 sub query_lcx_event {
-    my ( $lcx_solr_list_ref ) = @_;
+    my ( $lcx_solr_list_ref, $expected_value ) = @_;
+    my $success = 1;
     Readonly my $LCX_EVENT_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aevent&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
         my $query_result = query_num_found( "$lcx_solr/$LCX_EVENT_QUERY" );
-        print_query_result( $lcx_solr, $query_result, 60000, "event" );
+        $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "event" );
     }
+    return $success;
 }
 
 #
 # Query the ticket in LCX.
 #
 sub query_lcx_ticket {
-    my ( $lcx_solr_list_ref ) = @_;
+    my ( $lcx_solr_list_ref, $expected_value ) = @_;
+    my $success = 1;
     Readonly my $LCX_TICKET_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aticket&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
         my $query_result = query_num_found( "$lcx_solr/$LCX_TICKET_QUERY" );
-        print_query_result( $lcx_solr, $query_result, 10000, "ticket" );
+        $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "ticket" );
     }
+    return $success;
 }
 
 #
@@ -232,12 +250,15 @@ sub query_lcx_ticket {
 
 my ( $mci_solr_list_ref, $lcx_solr_list_ref ) = get_solr_instance( $envid );
 
-query_mci_listing( $mci_solr_list_ref );
-query_mci_order( $mci_solr_list_ref );
-query_mci_payment( $mci_solr_list_ref );
-query_lcx_genre( $lcx_solr_list_ref );
-query_lcx_cobrand( $lcx_solr_list_ref );
-query_lcx_event( $lcx_solr_list_ref );
-query_lcx_ticket( $lcx_solr_list_ref );
+my $success = 1;
 
-exit 0;
+$success = 0 if not query_mci_listing( $mci_solr_list_ref, 1 );
+$success = 0 if not query_mci_order( $mci_solr_list_ref, 1 );
+$success = 0 if not query_mci_payment( $mci_solr_list_ref, 0 );
+$success = 0 if not query_lcx_genre( $lcx_solr_list_ref, 35000 );
+$success = 0 if not query_lcx_cobrand( $lcx_solr_list_ref, 2200 );
+$success = 0 if not query_lcx_event( $lcx_solr_list_ref, 6000 );
+$success = 0 if not query_lcx_ticket( $lcx_solr_list_ref, 10000 );
+
+exit 0 if $success;
+exit 1;
