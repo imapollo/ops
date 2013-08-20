@@ -73,19 +73,9 @@ print
 -------------------------------------------------------------------
 ";
 
-print "Username: ";
-my $username = <>;
-chomp $username;
-print "Password: ";
-system("stty -echo");
-my $password = <>;
-chomp $password;
-system("stty echo");
-print "\n";
-
 while (1) {
     print "Enter the tool number you want to use:
-1. Block/unblock list
+1. blacklist / whitelist / hackercrackerlist
 2. Switch Read-Only DB
 q. quit
 > ";
@@ -99,9 +89,9 @@ q. quit
         next;
     } else {
         if ( $menu eq "1" ) {
-            system("/nas/home/minjzhang/bin/Cloak-uncloak -u $username -x $password");
+            system("/nas/home/minjzhang/bin/Cloak-uncloak");
         } elsif ( $menu eq "2" ) {
-            system("/nas/home/minjzhang/bin/switch_wideip -u $username -x $password -w test.noc.com");
+            system("/nas/home/minjzhang/bin/switch_wideip");
         }
     }
 }

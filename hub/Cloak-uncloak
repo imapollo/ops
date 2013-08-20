@@ -152,10 +152,8 @@ sub print_list {
 # Main
 #
 
-#Readonly my $HOSTNAME => 'srwp01lba040';
-Readonly my $HOSTNAME => 'srwd00lba040';
-#Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubprod.com";
-Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubcorp.dev";
+Readonly my $HOSTNAME => 'lbaxxx';
+Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME";
 Readonly my $TMSH_EXEC => 'tmsh';
 
 print "-------------------------------------------------------------------
@@ -165,19 +163,21 @@ print "-------------------------------------------------------------------
 
 if ( not defined $lba_username ) {
     print "Username: ";
-    my $lba_username = <>;
+    $lba_username = <>;
     chomp $lba_username;
 }
 if ( not defined $lba_password ) {
     print "Password: ";
     system("stty -echo");
-    my $lba_password = <>;
+    $lba_password = <>;
     chomp $lba_password;
     system("stty echo");
     print "\n";
 }
 
 my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
+
+while (1) {
 
 # Choose list
 print "Enter the list you want to configure:
@@ -277,6 +277,8 @@ if ( $action eq "list" ) {
         }
     }
 }
+
+} # end of while loop
 
 close_ssh($ssh);
 exit 0;

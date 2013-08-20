@@ -24,11 +24,9 @@ use warnings;
 use Carp;
 use Getopt::Long;
 
-use lib '/nas/reg/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
+use lib '/nas/utl/lib/perl';
 
 use Readonly;
-use Data::Dumper;
 use BigIP::iControl;
 use MIME::Base64;
 use Stubhub::BigIP::System::Util qw (
@@ -141,8 +139,13 @@ sub print_wideip_pool_list {
 sub switch_wideip_pool {
     my ( $server, $icontrol, $wideip, $pool ) = @_;
     Readonly my $star => 'root';
-    Readonly my $war => 'bHVtbkIwdGw=';
+    Readonly my $war => 'abcbHVtbkIwdGw=';
+    print "Preparing switch ...\n";
     my $ssh = login_ssh( $server, $star, decode_base64( $war ) );
+    print "Confirm to switch (y/n)?
+> ";
+    my $switch = <>;
+    return if $switch !~ /^\s*y\s*$/i;
     my $command = "tmsh modify gtm wideip $wideip pools modify {$pool {order 0}}";
     my @output = mute_execute_ssh( $ssh, $command );
 
@@ -159,9 +162,9 @@ sub switch_wideip_pool {
         $is_global_availability = 1;
     }
 
-    if ( not $has_error ) {
-        print_wideip_pool_list( $icontrol, $wideip );
-    }
+    # if ( not $has_error ) {
+    #     print_wideip_pool_list( $icontrol, $wideip );
+    # }
 }
 
 #
@@ -169,11 +172,13 @@ sub switch_wideip_pool {
 #
 sub verify_user_group {
     my ( $username ) = @_;
+    return 0 if ( $username eq "abcxxx" );
     my $groups = `/usr/bin/groups $username`;
     if ( $groups =~ /\bnoc\b/ ) {
         return 0;
     } else {
-        croak "The user $username is not a member of NOC.\n";
+        print "[ERROR] The user $username is not a member of NOC.\n";
+	exit 1;
     }
 }
 
@@ -183,7 +188,7 @@ sub verify_user_group {
 sub get_lba_server {
     my ( $lba_server ) = @_;
     if ( not defined $lba_server ) {
-        return "srwd00lba012.stubcorp.dev";
+        return "lbaxxx";
     } else {
     return $lba_server;
     }
@@ -217,9 +222,13 @@ if ( not defined $password ) {
     print "\n";
 }
 
-# verify_user_group( $username );
+verify_user_group( $username );
+
 my $icontrol = get_icontrol_instance( $lba_server, $username, $password );
 
+while (1) {
+
+$wideip = 'testecomrodb.gtm.stubprod.com';
 if ( not defined $wideip ) {
     my $wideip_index = 1;
     my @wideip_list = $icontrol->get_wideip_list();
@@ -262,5 +271,8 @@ Enter the number of the Pool to set to primary:
 }
 
 switch_wideip_pool( $lba_server, $icontrol, $wideip, $pool );
+$pool = qw{};
+
+} # end of while
 
 exit 0;
