@@ -195,7 +195,8 @@ sub query_mci_payment {
 sub query_lcx_genre {
     my ( $lcx_solr_list_ref, $expected_value ) = @_;
     my $success = 1;
-    Readonly my $LCX_GENRE_QUERY => 'general/select?q=%2BstubhubDocumentType%3Agenre&wt=json&indent=true';
+    my $domain_name = _get_domain_name( @{ $lcx_solr_list_ref }[0] );
+    Readonly my $LCX_GENRE_QUERY => 'general/select?q=%2BstubhubDocumentType%3Agenre+%2B(allowedViewingDomain%3A' . $domain_name . '.com+or+allowedViewingDomain%3A' . $domain_name . '.co.uk)&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
         my $query_result = query_num_found( "$lcx_solr/$LCX_GENRE_QUERY" );
         $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "genre" );
@@ -209,7 +210,8 @@ sub query_lcx_genre {
 sub query_lcx_cobrand {
     my ( $lcx_solr_list_ref, $expected_value ) = @_;
     my $success = 1;
-    Readonly my $LCX_COBRAND_QUERY => 'general/select?q=%2BstubhubDocumentType%3Acobrand&wt=json&indent=true';
+    my $domain_name = _get_domain_name( @{ $lcx_solr_list_ref }[0] );
+    Readonly my $LCX_COBRAND_QUERY => 'general/select?q=%2BstubhubDocumentType%3Acobrand+%2Bdomain%3A.' . $domain_name . '.com&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
         my $query_result = query_num_found( "$lcx_solr/$LCX_COBRAND_QUERY" );
         $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "cobrand" );
@@ -223,7 +225,8 @@ sub query_lcx_cobrand {
 sub query_lcx_event {
     my ( $lcx_solr_list_ref, $expected_value ) = @_;
     my $success = 1;
-    Readonly my $LCX_EVENT_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aevent&wt=json&indent=true';
+    my $domain_name = _get_domain_name( @{ $lcx_solr_list_ref }[0] );
+    Readonly my $LCX_EVENT_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aevent+%2B(allowedViewingDomain%3A' . $domain_name . '.com+or+allowedViewingDomain%3A' . $domain_name . '.co.uk)&wt=json&indent=true';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
         my $query_result = query_num_found( "$lcx_solr/$LCX_EVENT_QUERY" );
         $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "event" );
@@ -243,6 +246,13 @@ sub query_lcx_ticket {
         $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "ticket" );
     }
     return $success;
+}
+
+sub _get_domain_name {
+    my ( $domain_name ) = @_;
+    chomp $domain_name;
+    $domain_name =~ s/.*\.(srw[deq][0-9]+)\..*/$1/;
+    return $domain_name;
 }
 
 #
