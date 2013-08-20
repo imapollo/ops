@@ -122,6 +122,7 @@ sub print_query_result {
     my $hostname = $solr_url;
     $hostname =~ s/http:\/\/(.*)\/solr.*/$1/;
     my $fail = "";
+    $query_result = -1 if $query_result !~ /[0-9]+/;
     $fail = "[fail]" if $query_result < $expected_result;
     printf "%-50s %-8s %-10s\n", "$hostname $result_name:", $query_result, $fail;
     if ( $fail eq "[fail]" ) {
