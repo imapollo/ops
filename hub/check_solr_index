@@ -8,11 +8,20 @@
 #
 # Options:
 #  -e | --envid             Specify the environment ID to check. eg, srwd83.
+#     | --mci-listing       Specify the expect number for listing on MCI.
+#     | --mci-order         Specify the expect number for order on MCI.
+#     | --mci-payment       Specify the expect number for payment on MCI.
+#     | --lcx-genre         Specify the expect number for genre on LCX.
+#     | --lcx-cobrand       Specify the expect number for cobrand on LCX.
+#     | --lcx-event         Specify the expect number for event on LCX.
+#     | --lcx-ticket        Specify the expect number for ticket on LCX.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
 # Examples:
-#  check_solr_index ..
+#  check_solr_index -e srwd83
+#  check_solr_index -e srwd83 --mci-listing 10
+#  check_solr_index -e srwd83 --mci-payment 0 --lcx-ticket 0
 #
 # Author: minjzhang
 #
@@ -35,10 +44,26 @@ use Stubhub::Log::Util qw (
 my $show_usage = qw{};
 my $show_verbose = qw{};
 my $envid = qw{};
+
+my $mci_listing_expected = 1;
+my $mci_order_expected = 1;
+my $mci_payment_expected = 1;
+my $lcx_genre_expected = 35000;
+my $lcx_cobrand_expected = 2200;
+my $lcx_event_expected = 60000;
+my $lcx_ticket_expected = 10000;
+
 my $options_okay = GetOptions (
-    'e|envid=s'   => \$envid,
-    'v|verbose'   => \$show_verbose,
-    'h|help'      => \$show_usage,
+    'e|envid=s'     => \$envid,
+    'mci-listing=s' => \$mci_listing_expected,
+    'mci-order=s'   => \$mci_order_expected,
+    'mci-payment=s' => \$mci_payment_expected,
+    'lcx-genre=s'   => \$lcx_genre_expected,
+    'lcx-cobrand=s' => \$lcx_cobrand_expected,
+    'lcx-event=s'   => \$lcx_event_expected,
+    'lcx-ticket=s'  => \$lcx_ticket_expected,
+    'v|verbose'     => \$show_verbose,
+    'h|help'        => \$show_usage,
 );
 
 #
@@ -77,11 +102,20 @@ Usage: check_solr_index [options]
 
 Options:
  -e | --envid             Specify the environment ID to check. Eg, swd83.
+    | --mci-listing       Specify the expect number for listing on MCI.
+    | --mci-order         Specify the expect number for order on MCI.
+    | --mci-payment       Specify the expect number for payment on MCI.
+    | --lcx-genre         Specify the expect number for genre on LCX.
+    | --lcx-cobrand       Specify the expect number for cobrand on LCX.
+    | --lcx-event         Specify the expect number for event on LCX.
+    | --lcx-ticket        Specify the expect number for ticket on LCX.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
 Examples:
  check_solr_index -e srwd83
+ check_solr_index -e srwd83 --mci-listing 10
+ check_solr_index -e srwd83 --mci-payment 0 --lcx-ticket 0
 
 END_OF_HELP
 }
@@ -263,13 +297,13 @@ my ( $mci_solr_list_ref, $lcx_solr_list_ref ) = get_solr_instance( $envid );
 
 my $success = 1;
 
-$success = 0 if not query_mci_listing( $mci_solr_list_ref, 1 );
-$success = 0 if not query_mci_order( $mci_solr_list_ref, 1 );
-$success = 0 if not query_mci_payment( $mci_solr_list_ref, 0 );
-$success = 0 if not query_lcx_genre( $lcx_solr_list_ref, 35000 );
-$success = 0 if not query_lcx_cobrand( $lcx_solr_list_ref, 2200 );
-$success = 0 if not query_lcx_event( $lcx_solr_list_ref, 6000 );
-$success = 0 if not query_lcx_ticket( $lcx_solr_list_ref, 10000 );
+$success = 0 if not query_mci_listing( $mci_solr_list_ref, $mci_listing_expected );
+$success = 0 if not query_mci_order( $mci_solr_list_ref, $mci_order_expected );
+$success = 0 if not query_mci_payment( $mci_solr_list_ref, $mci_payment_expected );
+$success = 0 if not query_lcx_genre( $lcx_solr_list_ref, $lcx_genre_expected );
+$success = 0 if not query_lcx_cobrand( $lcx_solr_list_ref, $lcx_cobrand_expected);
+$success = 0 if not query_lcx_event( $lcx_solr_list_ref, $lcx_event_expected );
+$success = 0 if not query_lcx_ticket( $lcx_solr_list_ref, $lcx_ticket_expected );
 
 exit 0 if $success;
 exit 1;
