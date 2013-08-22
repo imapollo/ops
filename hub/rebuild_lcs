@@ -93,71 +93,133 @@ if [[ "`whoami`" != "relmgt" ]]; then
     exit 1
 fi
 
-LCX_HOST=${envid}lcx001.${envid}.com
-LCM_HOST=${envid}lcm001.${envid}.com
-LCG_HOST=${envid}lcg001.${envid}.com
+. /nas/home/minjzhang/bin/base
+
+LCX_HOSTS=`$BIN/getroles ${envid} | grep lcx`
+LCM_HOSTS=`$BIN/getroles ${envid} | grep lcm`
+LCG_HOSTS=`$BIN/getroles ${envid} | grep lcg`
 
 # Stop lcs-slave on LCX
-_print_debug_msg "Stopping lcs-slave on LCX"
-ssh $LCX_HOST "sudo /sbin/service lcs-slave stop" < /dev/null
+_print_debug_msg "Stopping lcs-slave on LCX ..."
+echo $LCX_HOSTS | while read lcx_host
+do
+    ssh $lcx_host "sudo /sbin/service lcs-slave stop" < /dev/null
+done
 _print_debug_msg "Stopped lcs-slave on LCX"
 
 # Stop jboss on LCM, LCG and LCX
-kill_jboss_server $LCM_HOST
-kill_jboss_server $LCG_HOST
-kill_jboss_server $LCX_HOST
+_print_debug_msg "Stopping JBoss ..."
+echo $LCM_HOSTS | while read lcm_host
+do
+    kill_jboss_server $lcm_host
+done
+echo $LCG_HOSTS | while read lcg_host
+do
+    kill_jboss_server $lcg_host
+done
+echo $LCX_HOSTS | while read lcx_host
+do
+    kill_jboss_server $LCX_HOST
+done
 
 # Stop activeMQ on LCG and LCM
 _print_debug_msg "Stopping activeMQ on LCG and LCM"
-ssh $LCG_HOST "sudo /sbin/service activeMQ stop" < /dev/null
-ssh $LCM_HOST "sudo /sbin/service activeMQ stop" < /dev/null
+echo $LCG_HOSTS | while read lcg_host
+do
+    ssh $lcg_host "sudo /sbin/service activeMQ stop" < /dev/null
+done
+echo $LCM_HOSTS | while read lcm_host
+do
+    ssh $lcm_host "sudo /sbin/service activeMQ stop" < /dev/null
+done
 _print_debug_msg "Stopped activeMQ on LCG and LCM"
 
 # Stop memcached on LCM
 _print_debug_msg "Stopping memcached on LCM"
-ssh $LCM_HOST "sudo /sbin/service memcached stop" < /dev/null
+echo $LCM_HOSTS | while read lcm_host
+do
+    ssh $lcm_host "sudo /sbin/service memcached stop" < /dev/null
+done
 _print_debug_msg "Stopped memcached on LCM"
 
 # Clean SOLR index
 if [[ "$clean_data" == 1 ]]; then
     _print_debug_msg "Cleaning SOLR index"
-    ssh $LCX_HOST "sudo rm -rf /opt/jboss/bin/solr/data/*/*" < /dev/null
+    echo $LCX_HOSTS | while read lcx_host
+    do
+        ssh $lcx_host "sudo rm -rf /opt/jboss/bin/solr/data/*/*" < /dev/null
+    done
     _print_debug_msg "Cleaned SOLR index"
 fi
 
 # Clean data for activeMQ
 if [[ "$clean_data" == 1 ]]; then
     _print_debug_msg "Cleaning data for active MQ"
-    ssh $LCM_HOST "sudo rm -rf /opt/activemq/data" < /dev/null
-    ssh $LCG_HOST "sudo rm -rf /opt/activemq/data" < /dev/null
+    echo $LCM_HOSTS | while read lcm_host
+    do
+        ssh $lcm_hosts "sudo rm -rf /opt/activemq/data" < /dev/null
+    done
+    echo $LCG_HOSTS | while read lcg_host
+    do
+        ssh $lcg_host "sudo rm -rf /opt/activemq/data" < /dev/null
+    done
     _print_debug_msg "Cleaned data for active MQ"
 fi
 
 # Start JBoss on LCX
 _print_debug_msg "Starting JBoss on LCX"
-ssh $LCX_HOST "sudo /sbin/service jboss start" < /dev/null
+echo $LCX_HOSTS | while read lcx_host
+do
+    ssh $lcx_host "sudo /sbin/service jboss start" < /dev/null
+done
 _print_debug_msg "Started JBoss on LCX"
+
+sleep 5
 
 # Start lcs-slave on LCX
 _print_debug_msg "Starting lcs-slave on LCX"
-ssh $LCX_HOST "sudo /sbin/service lcs-slave start" < /dev/null
+echo $LCX_HOSTS | while read lcx_host
+do
+    ssh $lcx_host "sudo /sbin/service lcs-slave start" < /dev/null
+done
 _print_debug_msg "Started lcs-slave on LCX"
+
+sleep 5
 
 # Start activeMQ on LCG and LCM
 _print_debug_msg "Starting activeMQ on LCG and LCM"
-ssh $LCG_HOST "sudo /sbin/service activeMQ start" < /dev/null
-ssh $LCM_HOST "sudo /sbin/service activeMQ start" < /dev/null
+echo $LCG_HOSTS | grep 001 | while read lcg_host
+do
+    ssh $lcg_host "sudo /sbin/service activeMQ start" < /dev/null
+done
+echo $LCM_HOSTS | grep 001 | while read lcm_host
+do
+    ssh $lcm_host "sudo /sbin/service activeMQ start" < /dev/null
+done
 _print_debug_msg "Started activeMQ on LCG and LCM"
+
+sleep 5
 
 # Start memcached on LCM
 _print_debug_msg "Starting memcached on LCM"
-ssh $LCM_HOST "sudo /sbin/service memcached start" < /dev/null
+echo $LCM_HOSTS | while read lcm_host
+do
+    ssh $lcm_host "sudo /sbin/service memcached start" < /dev/null
+done
 _print_debug_msg "Started memcached on LCM"
+
+sleep 5
 
 # Start JBoss on LCG and LCM
 _print_debug_msg "Starting JBoss on LCG and LCM"
-ssh $LCG_HOST "sudo /sbin/service jboss start" < /dev/null
-ssh $LCM_HOST "sudo /sbin/service jboss start" < /dev/null
+echo $LCG_HOSTS | while read lcg_host
+do
+    ssh $lcg_host "sudo /sbin/service jboss start" < /dev/null
+done
+echo $LCM_HOSTS | while read lcm_host
+do
+    ssh $lcm_host "sudo /sbin/service jboss start" < /dev/null
+done
 _print_debug_msg "Started JBoss on LCG and LCM"
 
 if [[ "$clean_data" == 1 ]]; then
