@@ -182,15 +182,33 @@ sub query_num_found {
 }
 
 #
+# Query Solr doc.
+#
+sub query_solr_index {
+    my $success = 1;
+    my ( $solr_url, $query_url, $ping_url, $expected_value, $query_name ) = @_;
+    if ( check_solr_pingable( $solr_url, $ping_url ) ) {
+        my $query_result = query_num_found( "$solr_url/$query_url" );
+        $success = 0 if not print_query_result( $solr_url, $query_result, $expected_value, $query_name );
+    } else {
+        my $hostname = $solr_url;
+        $hostname =~ s/http:\/\/(.*)\/solr.*/$1/;
+        printf "%-50s %-8s %-10s\n", "$hostname $query_name", "Not pingable", "[fail]";
+        $success = 0;
+    }
+    return $success;
+}
+
+#
 # Query the listing in MCI.
 #
 sub query_mci_listing {
     my ( $mci_solr_list_ref, $expected_value ) = @_;
     my $success = 1;
     Readonly my $MCI_LISTING_QUERY => 'inventory/select?q=*%3A*&wt=json&indent=true';
+    Readonly my $MCI_LISTING_PING => 'inventory/admin/ping?wt=json';
     foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
-        my $query_result = query_num_found( "$mci_solr/$MCI_LISTING_QUERY" );
-        $success = 0 if not print_query_result( $mci_solr, $query_result, $expected_value, "listing" );
+        $success = 0 if not query_solr_index( $mci_solr, $MCI_LISTING_QUERY, $MCI_LISTING_PING, $expected_value, "listing");
     }
     return $success;
 }
@@ -202,9 +220,9 @@ sub query_mci_order {
     my ( $mci_solr_list_ref, $expected_value ) = @_;
     my $success = 1;
     Readonly my $MCI_ORDERS_QUERY => 'orders/select?q=*%3A*&wt=json&indent=true';
+    Readonly my $MCI_ORDERS_PING => 'orders/admin/ping?wt=json';
     foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
-        my $query_result = query_num_found( "$mci_solr/$MCI_ORDERS_QUERY" );
-        $success = 0 if not print_query_result( $mci_solr, $query_result, $expected_value, "order" );
+        $success = 0 if not query_solr_index( $mci_solr, $MCI_ORDERS_QUERY, $MCI_ORDERS_PING, $expected_value, "order");
     }
     return $success;
 }
@@ -216,9 +234,9 @@ sub query_mci_payment {
     my ( $mci_solr_list_ref, $expected_value ) = @_;
     my $success = 1;
     Readonly my $MCI_PAYMENTS_QUERY => 'payments/select?q=*%3A*&wt=json&indent=true';
+    Readonly my $MCI_PAYMENTS_PING => 'payments/admin/ping?wt=json';
     foreach my $mci_solr ( @{ $mci_solr_list_ref } ) {
-        my $query_result = query_num_found( "$mci_solr/$MCI_PAYMENTS_QUERY" );
-        $success = 0 if not print_query_result( $mci_solr, $query_result, $expected_value, "payment" );
+        $success = 0 if not query_solr_index( $mci_solr, $MCI_PAYMENTS_QUERY, $MCI_PAYMENTS_PING, $expected_value, "payment");
     }
     return $success;
 }
@@ -231,9 +249,9 @@ sub query_lcx_genre {
     my $success = 1;
     my $domain_name = _get_domain_name( @{ $lcx_solr_list_ref }[0] );
     Readonly my $LCX_GENRE_QUERY => 'general/select?q=%2BstubhubDocumentType%3Agenre+%2B(allowedViewingDomain%3A' . $domain_name . '.com+or+allowedViewingDomain%3A' . $domain_name . '.co.uk)&wt=json&indent=true';
+    Readonly my $LCX_GENERAL_PING => 'general/admin/ping?wt=json';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
-        my $query_result = query_num_found( "$lcx_solr/$LCX_GENRE_QUERY" );
-        $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "genre" );
+        $success = 0 if not query_solr_index( $lcx_solr, $LCX_GENRE_QUERY, $LCX_GENERAL_PING, $expected_value, "genre");
     }
     return $success;
 }
@@ -246,9 +264,9 @@ sub query_lcx_cobrand {
     my $success = 1;
     my $domain_name = _get_domain_name( @{ $lcx_solr_list_ref }[0] );
     Readonly my $LCX_COBRAND_QUERY => 'general/select?q=%2BstubhubDocumentType%3Acobrand+%2Bdomain%3A.' . $domain_name . '.com&wt=json&indent=true';
+    Readonly my $LCX_GENERAL_PING => 'general/admin/ping?wt=json';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
-        my $query_result = query_num_found( "$lcx_solr/$LCX_COBRAND_QUERY" );
-        $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "cobrand" );
+        $success = 0 if not query_solr_index( $lcx_solr, $LCX_COBRAND_QUERY, $LCX_GENERAL_PING, $expected_value, "cobrand");
     }
     return $success;
 }
@@ -261,9 +279,9 @@ sub query_lcx_event {
     my $success = 1;
     my $domain_name = _get_domain_name( @{ $lcx_solr_list_ref }[0] );
     Readonly my $LCX_EVENT_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aevent+%2B(allowedViewingDomain%3A' . $domain_name . '.com+or+allowedViewingDomain%3A' . $domain_name . '.co.uk)&wt=json&indent=true';
+    Readonly my $LCX_GENERAL_PING => 'general/admin/ping?wt=json';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
-        my $query_result = query_num_found( "$lcx_solr/$LCX_EVENT_QUERY" );
-        $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "event" );
+        $success = 0 if not query_solr_index( $lcx_solr, $LCX_EVENT_QUERY, $LCX_GENERAL_PING, $expected_value, "event");
     }
     return $success;
 }
@@ -275,11 +293,28 @@ sub query_lcx_ticket {
     my ( $lcx_solr_list_ref, $expected_value ) = @_;
     my $success = 1;
     Readonly my $LCX_TICKET_QUERY => 'general/select?q=%2BstubhubDocumentType%3Aticket&wt=json&indent=true';
+    Readonly my $LCX_GENERAL_PING => 'general/admin/ping?wt=json';
     foreach my $lcx_solr ( @{ $lcx_solr_list_ref } ) {
-        my $query_result = query_num_found( "$lcx_solr/$LCX_TICKET_QUERY" );
-        $success = 0 if not print_query_result( $lcx_solr, $query_result, $expected_value, "ticket" );
+        $success = 0 if not query_solr_index( $lcx_solr, $LCX_TICKET_QUERY, $LCX_GENERAL_PING, $expected_value, "ticket");
     }
     return $success;
+}
+
+#
+# Check if mci listing is pingable.
+#
+sub check_solr_pingable {
+    my ( $mci_solr_url, $admin_ping_url ) = @_;
+    Readonly my $CURL_CMD => '/usr/bin/curl';
+    Readonly my $GREP_CMD => '/bin/grep';
+
+    my $query_result = `$CURL_CMD "$mci_solr_url/$admin_ping_url" 2> /dev/null`;
+    if ( $query_result =~ /"status":"OK"/ ) {
+        $query_result = 1;
+    } else {
+        $query_result = 0;
+    }
+    return $query_result;
 }
 
 sub _get_domain_name {
