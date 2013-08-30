@@ -1,0 +1,262 @@
+#!/usr/bin/perl
+#
+# <Brief description of the script>
+# <More information about the script>
+#
+# Usage: <script> [options]
+#
+# Options:
+#  -e | --envid             Specify the environment ID. For example: srwd83.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  <script> ..
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+
+# use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Data::Dumper;
+use Readonly;
+use HTML::TableExtract;
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $envid = qw{};
+my $options_okay = GetOptions (
+    'e|envid=s'   => \$envid,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+<copy from header>
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $envid ) {
+    $logger->error( "The pamameter '-e' must be set.\n" );
+    usage();
+    exit 1;
+}
+
+#
+# Get the ActiveMQ queues status.
+# Return the reference of @queues.
+#
+sub get_activemq_queue {
+    my ( $activemq_queue_url ) = @_;
+    Readonly my $CURL_COMMAND => '/usr/bin/curl';
+    my $html_string = `$CURL_COMMAND "$activemq_queue_url" 2> /dev/null`;
+    my $te = HTML::TableExtract->new( depth => 1 );
+    $te->parse( $html_string );
+
+    my @queues;
+    foreach my $ts ( $te->tables ) {
+        my $is_header = 1;
+        foreach my $row_ref ($ts->rows) {
+            if ( $is_header ) {
+                $is_header = 0;
+                next;
+            }
+            my %queue;
+            $queue{ 'name' } = _trim_queue_name( _trim_string( @{ $row_ref }[0] ) );
+            $queue{ 'pending' } = _trim_string( @{ $row_ref }[1] );
+            $queue{ 'consumer' } = _trim_string( @{ $row_ref }[2] );
+            $queue{ 'enqueued' } = _trim_string( @{ $row_ref }[3] );
+            $queue{ 'dequeued' } = _trim_string( @{ $row_ref }[4] );
+
+            push @queues, \%queue;
+        }
+    }
+    return \@queues;
+}
+
+#
+# Get the ActiveMQ durable topic subscribers status.
+# Return the reference of @subscribers.
+#
+sub get_activemq_subscribers {
+    my ( $activemq_subscriber_url ) = @_;
+    Readonly my $CURL_COMMAND => '/usr/bin/curl';
+    my $html_string = `$CURL_COMMAND "$activemq_subscriber_url" 2> /dev/null`;
+    my $te = HTML::TableExtract->new( depth => 1 );
+    $te->parse( $html_string );
+
+    my @subscribers;
+    foreach my $ts ( $te->tables ) {
+        my $is_header = 1;
+        foreach my $row_ref ($ts->rows) {
+            if ( $is_header ) {
+                $is_header = 0;
+                if ( @{ $row_ref }[0] !~ /Client ID/ ) {
+                    last;
+                } else {
+                    next;
+                }
+            }
+            my %subscriber;
+            $subscriber{ 'client' } = _trim_queue_name( _trim_string( @{ $row_ref }[0] ) );
+            $subscriber{ 'subscription' } = _trim_queue_name( _trim_string( @{ $row_ref }[1] ) );
+            $subscriber{ 'pending' } = _trim_string( @{ $row_ref }[5] );
+            $subscriber{ 'dispatched' } = _trim_string( @{ $row_ref }[7] );
+            $subscriber{ 'enqueued' } = _trim_string( @{ $row_ref }[8] );
+            $subscriber{ 'dequeued' } = _trim_string( @{ $row_ref }[9] );
+
+            push @subscribers, \%subscriber;
+        }
+    }
+    return \@subscribers;
+
+}
+
+#
+# Validate the following items for the queue:
+# - Have consumers
+# - No pending messages
+#
+sub validate_queue {
+    my ( $queues_ref ) = @_;
+    foreach my $queue_ref ( @{ $queues_ref } ) {
+        _validate_queue_consumer( $queue_ref );
+        _validate_queue_pending( $queue_ref );
+    }
+}
+
+#
+# Validate number of pending messages in the queue.
+#
+sub _validate_queue_pending {
+    my ( $queue_ref ) = @_;
+    if ( $queue_ref->{ 'pending' } > 0 ) {
+        $logger->warn( "Pending message for queue $queue_ref->{ 'name' }: $queue_ref->{ 'pending' }" );
+    }
+}
+
+#
+# Validate number of consumer in the queue.
+#
+sub _validate_queue_consumer {
+    my ( $queue_ref ) = @_;
+    if ( $queue_ref->{ 'consumer' } == 0 ) {
+        $logger->warn( "Number of consumer for queue $queue_ref->{ 'name' }: $queue_ref->{ 'consumer' }" );
+    }
+}
+
+#
+# Validate the following items for the subscribers:
+# - The number of the subscribers.
+# - No pending messages.
+#
+sub validate_subscriber {
+    my ( $subscribers_ref ) = @_;
+    _validate_subscribers_number( $subscribers_ref );
+    foreach my $subscriber_ref ( @{ $subscribers_ref } ) {
+        _validate_subscriber_pending( $subscriber_ref );
+    }
+}
+
+#
+# Validate the number of the subscribers.
+#
+sub _validate_subscribers_number {
+    my ( $subscribers_ref ) = @_;
+    if ( scalar @{ $subscribers_ref } > 0 ) {
+        return 1;
+    } else {
+        $logger->error( "No subscribers for LCM" );
+        return 0;
+    }
+}
+
+#
+# Validate number of pending messages in the subscriber.
+#
+sub _validate_subscriber_pending {
+    my ( $subscriber_ref ) = @_;
+    if ( $subscriber_ref->{ 'pending' } > 0 ) {
+        $logger->warn( "Pending message for subscriber $subscriber_ref->{ 'client' }: $subscriber_ref->{ 'pending' }" );
+    }
+}
+
+#
+# Trim the name of queue.
+#
+sub _trim_queue_name {
+    my ( $string ) = @_;
+    $string =~ s/.*\.\.\.\s+(.*)/$1/;
+    return $string;
+}
+
+#
+# Trim the string for heading and trailing spaces and line separators.
+#
+sub _trim_string {
+    my ( $string ) = @_;
+    $string =~ s/\n//g;
+    $string =~ s/\r//g;
+    $string =~ s/^\s+(.*)\s+$/$1/;
+    return $string;
+}
+
+#
+# Main
+#
+my $mqm_activemq_url = "http://${envid}mqm001.${envid}.com:8161/admin/queues.jsp";
+my $mqm_queues_ref = get_activemq_queue( $mqm_activemq_url );
+validate_queue( $mqm_queues_ref );
+
+my $lcm_activemq_url = "http://${envid}lcm001.${envid}.com:8161/admin/queues.jsp";
+my $lcm_queues_ref = get_activemq_queue( $lcm_activemq_url );
+validate_queue( $lcm_queues_ref );
+
+my $lcm_activemq_subscribers_url = "http://${envid}lcm001.${envid}.com:8161/admin/subscribers.jsp";
+my $lcm_subscribers_ref = get_activemq_subscribers( $lcm_activemq_subscribers_url );
+validate_subscriber( $lcm_subscribers_ref );
+
+exit 0;
