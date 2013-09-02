@@ -1,17 +1,20 @@
 #!/usr/bin/perl
 #
-# <Brief description of the script>
-# <More information about the script>
+# Check the ActiveMQ including:
+# - MQM
+# - LCM
 #
-# Usage: <script> [options]
+# Usage: check_activemq [options]
 #
 # Options:
 #  -e | --envid             Specify the environment ID. For example: srwd83.
+#  -s | --showignore        Show the ignore queues.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
 # Examples:
-#  <script> ..
+# check_activemq -e srwd83
+# check_activemq -e srwd83 -s
 #
 # Author: minjzhang
 #
@@ -37,10 +40,12 @@ use Stubhub::Log::Util qw (
 my $show_usage = qw{};
 my $show_verbose = qw{};
 my $envid = qw{};
+my $show_ignore = qw{};
 my $options_okay = GetOptions (
-    'e|envid=s'   => \$envid,
-    'v|verbose'   => \$show_verbose,
-    'h|help'      => \$show_usage,
+    'e|envid=s'    => \$envid,
+    's|showignore' => \$show_ignore,
+    'v|verbose'    => \$show_verbose,
+    'h|help'       => \$show_usage,
 );
 
 #
@@ -71,7 +76,21 @@ if ( $show_usage ) {
 #
 sub usage {
     print <<END_OF_HELP
-<copy from header>
+Check the ActiveMQ including:
+- MQM
+- LCM
+
+Usage: check_activemq [options]
+
+Options:
+ -e | --envid             Specify the environment ID. For example: srwd83.
+ -s | --showignore        Show the ignore queues.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+check_activemq -e srwd83
+check_activemq -e srwd83 -s
 
 END_OF_HELP
 }
@@ -161,10 +180,32 @@ sub get_activemq_subscribers {
 # - No pending messages
 #
 sub validate_queue {
-    my ( $queues_ref ) = @_;
+    my ( $queues_ref, $mq_server, $expected_number ) = @_;
+    my $success = 1;
+    $success = 0 if not _validate_queues_number( $queues_ref, $mq_server, $expected_number );
     foreach my $queue_ref ( @{ $queues_ref } ) {
-        _validate_queue_consumer( $queue_ref );
-        _validate_queue_pending( $queue_ref );
+        $success = 0 if not _validate_queue_consumer( $queue_ref, $mq_server );
+        $success = 0 if not _validate_queue_pending( $queue_ref, $mq_server );
+    }
+    return $success;
+}
+
+#
+# Return true if the queue name is in queue ignore list.
+#
+sub _is_in_queue_ignore_list {
+    my ( $queue_name ) = @_;
+    my %ignore_list = (
+        'DLQ.Consumer.eventLifeCycle.classifiedAds' => 1,
+        'DLQ.com.stubhub.predelivery.TMListingPreDeliveryQueue' => 1,
+        'DLQ.com.stubhub.predelivery.TDCListingPreDeliveryQueue' => 1,
+        'DLQ.Consumer.orderLifeCycle.pendingConfirmNotification' => 1,
+        'Consumer.eventLifeCycle' => 1,
+    );
+    if ( exists( $ignore_list{ "$queue_name"} ) ) {
+        return 1;
+    } else {
+        return 0;
     }
 }
 
@@ -172,20 +213,34 @@ sub validate_queue {
 # Validate number of pending messages in the queue.
 #
 sub _validate_queue_pending {
-    my ( $queue_ref ) = @_;
+    my ( $queue_ref, $mq_server ) = @_;
+    my $success = 1;
     if ( $queue_ref->{ 'pending' } > 0 ) {
-        $logger->warn( "Pending message for queue $queue_ref->{ 'name' }: $queue_ref->{ 'pending' }" );
+        if ( _is_in_queue_ignore_list( $queue_ref->{ 'name' } ) ) {
+            $logger->warn( "[$mq_server] Pending message for queue $queue_ref->{ 'name' }: $queue_ref->{ 'pending' }" ) if $show_ignore;
+        } else {
+            $logger->error( "[$mq_server] Pending message for queue $queue_ref->{ 'name' }: $queue_ref->{ 'pending' }" );
+            $success = 0;
+        }
     }
+    return $success;
 }
 
 #
 # Validate number of consumer in the queue.
 #
 sub _validate_queue_consumer {
-    my ( $queue_ref ) = @_;
+    my ( $queue_ref, $mq_server ) = @_;
+    my $success = 1;
     if ( $queue_ref->{ 'consumer' } == 0 ) {
-        $logger->warn( "Number of consumer for queue $queue_ref->{ 'name' }: $queue_ref->{ 'consumer' }" );
+        if ( _is_in_queue_ignore_list( $queue_ref->{ 'name' } ) ) {
+            $logger->warn( "[$mq_server] Number of consumer for queue $queue_ref->{ 'name' }: $queue_ref->{ 'consumer' }" ) if $show_ignore;
+        } else {
+            $logger->error( "[$mq_server] Number of consumer for queue $queue_ref->{ 'name' }: $queue_ref->{ 'consumer' }" );
+            $success = 0;
+        }
     }
+    return $success;
 }
 
 #
@@ -194,10 +249,26 @@ sub _validate_queue_consumer {
 # - No pending messages.
 #
 sub validate_subscriber {
-    my ( $subscribers_ref ) = @_;
-    _validate_subscribers_number( $subscribers_ref );
+    my ( $subscribers_ref, $mq_server, $expected_number ) = @_;
+    my $success = 1;
+    $success = 0 if not _validate_subscribers_number( $subscribers_ref, $mq_server, $expected_number );
     foreach my $subscriber_ref ( @{ $subscribers_ref } ) {
-        _validate_subscriber_pending( $subscriber_ref );
+        $success = 0 if not _validate_subscriber_pending( $subscriber_ref, $mq_server );
+    }
+    return $success;
+}
+
+#
+# Validate the number of the consumers.
+#
+sub _validate_queues_number {
+    my ( $queues_ref, $mq_server, $expected_number ) = @_;
+    my $queue_number = scalar @{ $queues_ref };
+    if ( $queue_number >= $expected_number ) {
+        return 1;
+    } else {
+        $logger->error( "[$mq_server] The number of queues is less than expected [$expected_number]: $queue_number" );
+        return 0;
     }
 }
 
@@ -205,11 +276,12 @@ sub validate_subscriber {
 # Validate the number of the subscribers.
 #
 sub _validate_subscribers_number {
-    my ( $subscribers_ref ) = @_;
-    if ( scalar @{ $subscribers_ref } > 0 ) {
+    my ( $subscribers_ref, $mq_server, $expected_number ) = @_;
+    my $subscribers_number = scalar @{ $subscribers_ref };
+    if ( $subscribers_number >= $expected_number ) {
         return 1;
     } else {
-        $logger->error( "No subscribers for LCM" );
+        $logger->error( "[$mq_server] The number of subscribers is less than expected [$expected_number]: $subscribers_number" );
         return 0;
     }
 }
@@ -218,10 +290,13 @@ sub _validate_subscribers_number {
 # Validate number of pending messages in the subscriber.
 #
 sub _validate_subscriber_pending {
-    my ( $subscriber_ref ) = @_;
+    my ( $subscriber_ref, $mq_server ) = @_;
+    my $success = 1;
     if ( $subscriber_ref->{ 'pending' } > 0 ) {
-        $logger->warn( "Pending message for subscriber $subscriber_ref->{ 'client' }: $subscriber_ref->{ 'pending' }" );
+        $logger->error( "[$mq_server] Pending message for subscriber $subscriber_ref->{ 'client' }: $subscriber_ref->{ 'pending' }" );
+        $success = 0;
     }
+    return $success;
 }
 
 #
@@ -245,18 +320,36 @@ sub _trim_string {
 }
 
 #
+# Get the number of LCX hosts.
+#
+sub get_lcx_number {
+    my ( $envid ) = @_;
+    Readonly my $GREP_COMMAND => '/bin/grep';
+    Readonly my $DEV_QA_HOSTS => '/nas/reg/etc/dev-qa-hosts';
+    my $lcx_hosts = `$GREP_COMMAND $envid $DEV_QA_HOSTS | $GREP_COMMAND lcx`;
+    my @hosts = split "\n", $lcx_hosts;
+    return scalar @hosts;
+}
+
+#
 # Main
 #
+
+my $success = 1;
+
 my $mqm_activemq_url = "http://${envid}mqm001.${envid}.com:8161/admin/queues.jsp";
 my $mqm_queues_ref = get_activemq_queue( $mqm_activemq_url );
-validate_queue( $mqm_queues_ref );
+$success = 0 if not validate_queue( $mqm_queues_ref, "MQM", 50 );
 
 my $lcm_activemq_url = "http://${envid}lcm001.${envid}.com:8161/admin/queues.jsp";
 my $lcm_queues_ref = get_activemq_queue( $lcm_activemq_url );
-validate_queue( $lcm_queues_ref );
+$success = 0 if not validate_queue( $lcm_queues_ref, "LCM", 7 );
 
 my $lcm_activemq_subscribers_url = "http://${envid}lcm001.${envid}.com:8161/admin/subscribers.jsp";
 my $lcm_subscribers_ref = get_activemq_subscribers( $lcm_activemq_subscribers_url );
-validate_subscriber( $lcm_subscribers_ref );
+my $lcx_number = get_lcx_number( $envid );
+my $subscribers_expected_number = 8 * $lcx_number;
+$success = 0 if not validate_subscriber( $lcm_subscribers_ref, "LCM", $subscribers_expected_number );
 
-exit 0;
+exit 0 if $success;
+exit 1;
