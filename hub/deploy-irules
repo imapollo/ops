@@ -63,6 +63,7 @@ usage: $pgm options
 options:
 
   -b,--branch Branch     branch 
+  -r,--irule iRule,...   irules
   -e,--environment Env   environment 
   -h,--help              List usage
   -v,--verbose           Select verbose output mode.
@@ -76,6 +77,7 @@ my $optargs;
 
 if ( not GetOptions (
            'b|branch=s'          => \$optargs->{ branch },
+           'r|irule=s'           => \$optargs->{ irule },
            'h|help'              => \$optargs->{ help },
            'e|environment=s'     => \$optargs->{ environment },
            'v|verbose'           => \$optargs->{ verbose },
@@ -94,12 +96,16 @@ $optargs->{ help } and warn $usage and exit 0;
 Readonly my $VERBOSE         => defined $optargs->{ verbose };
 Readonly my $BRANCH          => $optargs->{ branch };
 Readonly my $ENVIRONMENT     => $optargs->{ environment };
+Readonly my $IRULE           => $optargs->{ irule };
 
 value_echo( 'cmd',      "$pgm @ORIGINAL_ARGV");
 defined $BRANCH         and value_echo( 'branch',      $BRANCH );
 defined $ENVIRONMENT    and value_echo( 'environment', $ENVIRONMENT );
+defined $IRULE          and value_echo( 'irule',       $IRULE);
 
 my $env = uc $ENVIRONMENT;
+
+my @include_irule = split ",", $IRULE;
 
 my $globalResult=0;
 
@@ -120,6 +126,16 @@ foreach my $intExt ("int", "ext") {
   foreach my $iRuleFile (split /\n/, $iruleFiles) {
     my $foundIruleSuccess=0;
     next unless $iRuleFile;
+    if ( scalar @include_irule > 0 ) {
+        my $included = 0;
+        foreach my $irule ( @include_irule ) {
+            if ( $iRuleFile =~ /\/$irule$/ ) {
+                $included = 1;
+                last;
+            }
+        }
+        next unless $included;
+    }
     logecho "===================================";
     #my $cmd = "/nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
     my $cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";

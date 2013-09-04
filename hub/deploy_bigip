@@ -14,10 +14,14 @@
 #  -p | --onlypool          Deploy pools only. Will not delete pools at first.
 #  -r | --onlyirule         Deploy irules only. Will not delete irules at first.
 #  -s | --onlyvs            Deploy virtual servers only. Will not delete virtual servers at first.
+#     | --poolname          Only deploy the specified pool.
+#     | --rulename          Only deploy the specified pool.
+#     | --vsname            Only deploy the specified virtual server.
 #     | --includepool       Specify which of the pools need to be included for deployment.
 #                           Multiple pools need to be separated by comma.
 #     | --includevs         Specify which of the virtual servers need to be included for deployment.
 #                           Multiple virtuals need to be separated by comma.
+#  -i | --ignoresave        Skip save and sync configurations after loading.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
@@ -94,6 +98,10 @@ my $including_pool = qw{};
 my $only_pool = qw{};
 my $only_irule = qw{};
 my $only_vs = qw{};
+my $only_pool_name = qw{};
+my $only_rule_name = qw{};
+my $only_vs_name = qw{};
+my $ignore_save = qw{};
 my $options_okay = GetOptions (
    'e|env=s'         => \$envid,
    'b|branch=s'      => \$branch,
@@ -102,6 +110,10 @@ my $options_okay = GetOptions (
    's|onlyvs'        => \$only_vs,
    'includepool=s'   => \$including_pool,
    'includevs=s'     => \$including_vs,
+   'poolname=s'      => \$only_pool_name,
+   'rulename=s'      => \$only_rule_name,
+   'vsname=s'        => \$only_vs_name,
+   'i|ignoresave'    => \$ignore_save,
    'v|verbose'       => \$show_verbose,
    'h|help'          => \$show_usage,
 );
@@ -145,10 +157,14 @@ Options:
  -p | --onlypool          Deploy pools only. Will not delete pools at first.
  -r | --onlyirule         Deploy irules only. Will not delete irules at first.
  -s | --onlyvs            Deploy virtual servers only. Will not delete virtual servers at first.
+    | --poolname          Only deploy the specified pool. Multiple pools need to be separated by comma.
+    | --rulename          Only deploy the specified irule. Multiple irules need to be separated by comma.
+    | --vsname            Only deploy the specified virtual server. Multiple vs need to be separated by comma.
     | --includepool       Specify which of the pools need to be included for deployment.
                           Multiple pools need to be separated by comma.
     | --includevs         Specify which of the virtual servers need to be included for deployment.
                           Multiple virtuals need to be separated by comma.
+ -i | --ignoresave        Skip save and sync configurations after loading.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
@@ -172,7 +188,7 @@ sub uniq {
 # including virtual server, pool.
 #
 sub generate_configuration {
-    my ( $env_id, $branch_name, $tmpdir, $intext, $excluded_vs_ref, $excluded_pool_ref ) = @_;
+    my ( $env_id, $branch_name, $tmpdir, $intext, $excluded_vs_ref, $excluded_pool_ref, $only_include_vs_ref, $only_include_pool_ref ) = @_;
     my $p4_f5_dir = qw{};
     my $p4_f5_subdir = "templates/fsroot/etc/stubhub/f5";
     if ( $branch_name eq "main" ) {
@@ -194,10 +210,10 @@ sub generate_configuration {
     my $vs_file;
     if ( $intext eq "ext" ) {
         $vs_file = generate_pub_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext",
-            "$public_ip_list_dir$PUBLIC_IP_LIST", $envid, "$tmpdir", @{ $excluded_vs_ref } );
+            "$public_ip_list_dir$PUBLIC_IP_LIST", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref );
     }
-    $vs_file = generate_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir", @{ $excluded_vs_ref } );
-    my $pool_file = generate_not_excluded_pool_configs( "$dynamic_perforce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir", @{ $excluded_pool_ref } );
+    $vs_file = generate_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref );
+    my $pool_file = generate_not_excluded_pool_configs( "$dynamic_perforce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir", $excluded_pool_ref, $only_include_pool_ref  );
     clean_perforce_client( $dynamic_perforce_client, $dynamic_perforce_dir );
     clean_perforce_client( $public_ip_chkout_client, $public_ip_list_dir);
     return ( $vs_file, $pool_file );
@@ -290,13 +306,15 @@ my @external_excluded_pool = get_exclude_list( $envid, "external", "pool" );
 
 my @include_vs = split ",", $including_vs if defined $including_vs;
 my @include_pool = split ",", $including_pool if defined $including_pool;
+my @only_include_vs = split ",", $only_vs_name if defined $only_vs_name;
+my @only_include_pool = split ",", $only_pool_name if defined $only_pool_name;
 my @final_internal_excluded_vs = filter_list( \@include_vs, \@internal_excluded_vs );
 my @final_external_excluded_vs = filter_list( \@include_vs, \@external_excluded_vs );
 my @final_internal_excluded_pool = filter_list( \@include_pool, \@internal_excluded_pool );
 my @final_external_excluded_pool = filter_list( \@include_pool, \@external_excluded_pool );
 
 my $deploy_all = 1;
-$deploy_all = 0 if ( $only_vs or $only_irule or $only_pool );
+$deploy_all = 0 if ( $only_vs or $only_irule or $only_pool or $only_pool_name or $only_vs_name or $only_rule_name );
 
 if ( $deploy_all ) {
     # Remove the virtual servers, rules and pools for specific environment.
@@ -315,35 +333,41 @@ if ( $deploy_all ) {
 my $int_tmpdir = File::Temp->newdir();
 my $ext_tmpdir = File::Temp->newdir();
 $logger->info( "Generating virtual server, pool configuration files ..." );
-my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext", \@final_external_excluded_vs, \@final_external_excluded_pool );
-my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int", \@final_internal_excluded_vs, \@final_internal_excluded_pool );
+my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext", \@final_external_excluded_vs, \@final_external_excluded_pool, \@only_include_vs, \@only_include_pool );
+my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int", \@final_internal_excluded_vs, \@final_internal_excluded_pool, \@only_include_vs, \@only_include_pool );
 
 my $deploy_success = 0;
 
-if ( $only_pool or $deploy_all ) {
+if ( $only_pool_name or $only_pool or $deploy_all ) {
     $logger->info( "Deploying pools for $envid ..." );
-    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf );
+    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf ) if ( -e $internal_pool_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
-    $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf );
+    $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf ) if ( -e $external_pool_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
 }
-if ( $only_irule or $deploy_all ) {
+if ( $only_rule_name or $only_irule or $deploy_all ) {
     $logger->info("Deploying irules for $envid ...");
     # system("/nas/utl/devops/bin/deploy-irules -e $envid -b $branch");
-    system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
+    if ( defined $only_rule_name ) {
+        system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch -r $only_rule_name");
+    } else {
+        system("/nas/home/minjzhang/bin/deploy-irules -e $envid -b $branch");
+    }
 }
-if ( $only_vs or $deploy_all ) {
+if ( $only_vs_name or $only_vs or $deploy_all ) {
     $logger->info("Deploying virtual servers for $envid ...");
-    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf );
+    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf ) if ( -e $internal_vs_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
-    $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf );
+    $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf ) if ( -e $external_vs_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
 }
 
-save_configuration( $internal_ic );
-save_configuration( $external_ic );
-sync_configuration( $internal_ic, $envid, "int" );
-sync_configuration( $external_ic, $envid, "ext" );
+if ( not $ignore_save ) {
+    save_configuration( $internal_ic );
+    save_configuration( $external_ic );
+    sync_configuration( $internal_ic, $envid, "int" );
+    sync_configuration( $external_ic, $envid, "ext" );
+}
 
 system( "/bin/rm $bigip_lock_file" );
 

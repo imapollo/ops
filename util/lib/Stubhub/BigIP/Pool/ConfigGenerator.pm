@@ -39,7 +39,9 @@ our @EXPORT_OK;
 # under a folder, including not excluded pools.
 #
 sub generate_not_excluded_pool_configs {
-    my ( $templates_dir, $envid, $output_dir, @excluded_pools ) = @_;
+    my ( $templates_dir, $envid, $output_dir, $excluded_pools_ref, $only_include_pool_ref ) = @_;
+    my @excluded_pools = @{ $excluded_pools_ref };
+    my @only_include_pool = @{ $only_include_pool_ref };
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
     my @template_files = grep { ! -d } readdir DH;
     closedir DH;
@@ -47,14 +49,26 @@ sub generate_not_excluded_pool_configs {
     foreach my $pool_template ( @template_files ) {
         my $pool_template_filename = $pool_template;
         $pool_template_filename =~ s/.*\/(.*)/$1/;
-        my $excluded = 0;
-        foreach my $excluded_pool ( @excluded_pools ) {
-            if ( $excluded_pool =~ /^$pool_template_filename$/i ) {
-                $excluded = 1;
-                last;
+        if ( scalar @only_include_pool > 0 ) {
+            my $included = 0;
+            foreach my $only_include ( @only_include_pool ) {
+                if ( $only_include =~ /^$pool_template_filename$/i ) {
+                    $included = 1;
+                    last;
+                }
             }
+            next if not $included;
+        } else {
+            my $excluded = 0;
+            foreach my $excluded_pool ( @excluded_pools ) {
+                if ( $excluded_pool =~ /^$pool_template_filename$/i ) {
+                    $excluded = 1;
+                    last;
+                }
+            }
+            next if $excluded;
         }
-        next if $excluded;
+
         generate_pool_config( $output_file, "$templates_dir/$pool_template", $envid );
     }
     return $output_file;

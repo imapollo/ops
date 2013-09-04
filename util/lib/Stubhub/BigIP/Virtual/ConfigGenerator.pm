@@ -41,7 +41,9 @@ our @EXPORT_OK;
 # Return empty string if no public ip for the environment.
 #
 sub generate_pub_not_excluded_vs_configs {
-    my ( $templates_dir, $public_ip_list, $envid, $output_dir, @excluded_virtual_servers ) = @_;
+    my ( $templates_dir, $public_ip_list, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref ) = @_;
+    my @excluded_virtual_servers = @{ $excluded_virtual_servers_ref };
+    my @only_include_vs = @{ $only_include_vs_ref };
     my $public_vs = _get_env_public_ip( $public_ip_list, $envid );
     my $public_vs_number = scalar keys %$public_vs;
     my $output_file = "$output_dir/virtual_server_$envid.conf";
@@ -54,14 +56,28 @@ sub generate_pub_not_excluded_vs_configs {
     foreach my $virtual_server_template ( @template_files ) {
         my $vs_template_filename = $virtual_server_template;
         $vs_template_filename =~ s/.*\/(.*)/$1/;
-        my $excluded = 0;
-        foreach my $excluded_virtual_server ( @excluded_virtual_servers ) {
-            if ( $excluded_virtual_server eq $vs_template_filename ) {
-                $excluded = 1;
-                last;
+
+        # Generate or not
+        if ( scalar @only_include_vs  > 0 ) {
+            my $included = 0;
+            foreach my $only_include ( @only_include_vs ) {
+                if ( $only_include eq $vs_template_filename ) {
+                    $included = 1;
+                    last;
+                }
             }
+            next if not $included;
+        } else {
+            my $excluded = 0;
+            foreach my $excluded_virtual_server ( @excluded_virtual_servers ) {
+                if ( $excluded_virtual_server eq $vs_template_filename ) {
+                    $excluded = 1;
+                    last;
+                }
+            }
+            next if $excluded;
         }
-        next if $excluded;
+
         if ( exists $public_vs->{ "pub-$envid-$vs_template_filename" } ) {
             generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid,
                 $public_vs->{ "pub-$envid-$vs_template_filename" } );
@@ -75,7 +91,9 @@ sub generate_pub_not_excluded_vs_configs {
 # under a folder.
 #
 sub generate_not_excluded_vs_configs {
-    my ( $templates_dir, $envid, $output_dir, @excluded_virtual_servers ) = @_;
+    my ( $templates_dir, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref ) = @_;
+    my @excluded_virtual_servers = @{ $excluded_virtual_servers_ref };
+    my @only_include_vs = @{ $only_include_vs_ref };
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
     my @template_files = grep { ! -d } readdir DH;
     closedir DH;
@@ -83,14 +101,28 @@ sub generate_not_excluded_vs_configs {
     foreach my $virtual_server_template ( @template_files ) {
         my $vs_template_filename = $virtual_server_template;
         $vs_template_filename =~ s/.*\/(.*)/$1/;
-        my $excluded = 0;
-        foreach my $excluded_virtual_server ( @excluded_virtual_servers ) {
-            if ( $excluded_virtual_server eq $vs_template_filename ) {
-                $excluded = 1;
-                last;
+
+        # Generate or not
+        if ( scalar @only_include_vs  > 0 ) {
+            my $included = 0;
+            foreach my $only_include ( @only_include_vs ) {
+                if ( $only_include eq $vs_template_filename ) {
+                    $included = 1;
+                    last;
+                }
             }
+            next if not $included;
+        } else {
+            my $excluded = 0;
+            foreach my $excluded_virtual_server ( @excluded_virtual_servers ) {
+                if ( $excluded_virtual_server eq $vs_template_filename ) {
+                    $excluded = 1;
+                    last;
+                }
+            }
+            next if $excluded;
         }
-        next if $excluded;
+
         generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid, "" );
     }
     return $output_file;
