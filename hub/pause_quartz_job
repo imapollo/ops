@@ -1,0 +1,119 @@
+#!/usr/bin/perl
+#
+# Pause the Quartz Jobs.
+#
+# Usage: pause_quartz_job [options]
+#
+# Options:
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  pause_quartz_job
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+
+use lib '/nas/reg/lib/perl';
+use lib '/nas/utl/devops/lib/perl';
+
+use Readonly;
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
+# Get options
+my $show_usage = qw{}; my $show_verbose = qw{}; my $options_okay = GetOptions (
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+Pause the Quartz Jobs.
+
+Usage: pause_quartz_job [options]
+
+Options:
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ pause_quartz_job
+
+END_OF_HELP
+}
+
+#
+# Get the list of trigger need to be paused.
+#
+sub get_triggers {
+    my %triggers = (
+        'Payments' => [ 'TaxpayerWarningNotificationJobCronTrigger',
+                        'TaxpayerListingBlockNotificationJobCronTrigger' ],
+    );
+    return \%triggers;
+}
+
+#
+# User validation.
+#
+my $user = qx( '/usr/bin/whoami' );
+chomp $user;
+if ( $user ne 'relmgt' ) {
+    $logger->error( "The script 'pause_quartz_job' must be run by 'relmgt'.\n");
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+my $host_name = qx( '/bin/hostname' );
+chomp $host_name;
+my $jmx_console = "http://${host_name}/jmx-console/HtmlAdaptor";
+
+my $triggers_ref = get_triggers();
+
+Readonly my $CURL_CMD => '/usr/bin/curl';
+
+foreach my $trigger_group ( keys %{ $triggers_ref } ) {
+    my $triggers_list_ref = $triggers_ref->{ "$trigger_group" };
+    foreach my $trigger ( @{ $triggers_list_ref } ) {
+        `$CURL_CMD -s -X POST --data "action=invokeOpByName&name=quartz%3Atype%3DQuartzScheduler%2Cname%3DSharedStubHubJobScheduler%2Cinstance%3DShared_StubHub_Quartz_Jobs&methodName=pauseTrigger&argType=java.lang.String&arg0=${trigger}&argType=java.lang.String&arg1=${trigger_group}" $jmx_console > /dev/null`;
+    }
+}
+
+exit 0;

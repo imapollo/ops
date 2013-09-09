@@ -1,0 +1,216 @@
+#!/usr/bin/perl
+#
+# Install cronjob into certain roles.
+#
+# Usage: install_cron_job [options]
+#
+# Options:
+#  -e | --envid             Specify the environment id. eg, srwd83. 
+#  -j | --job               Specify the cron job to be installed.
+#  -l | --list              List the cron jobs can be installed.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  install_cron_job -e srwd83 -j pause_quartz_job
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+
+use lib '/nas/reg/lib/perl';
+use lib '/nas/utl/devops/lib/perl';
+
+use Readonly;
+use File::Temp;
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $envid = qw{};
+my $job = qw{};
+my $do_list = qw{};
+my $options_okay = GetOptions (
+    'e|envid=s'   => \$envid,
+    'j|job=s'     => \$job,
+    'l|list'      => \$do_list,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+Install cronjob into certain roles.
+
+Usage: install_cron_job [options]
+
+Options:
+ -e | --envid             Specify the environment id. eg, srwd83. 
+ -j | --job               Specify the cron job to be installed.
+ -l | --list              List the cron jobs can be installed.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ install_cron_job -e srwd83 -j pause_quartz_job
+
+END_OF_HELP
+}
+
+#
+# Get the cron jobs defined.
+#
+sub get_cron_jobs {
+    my %cron_jobs = (
+        'pause_quartz_job' => {
+            'role'      => 'job',
+            'schedule'  => '0 * * * *',
+            'script'    => '/nas/utl/devops/bin/pause_quartz_job',
+            'comment'   => 'Pause quartz job - pause_quartz_job.'
+        }
+    );
+    return \%cron_jobs;
+}
+
+#
+# List the cron jobs can be installed.
+#
+sub list_cron_jobs {
+    my $cron_jobs_ref = get_cron_jobs();
+    foreach my $cron_job_name ( keys %{ $cron_jobs_ref } ) {
+        print $cron_job_name . "\n";
+    }
+}
+
+#
+# Get the role list.
+# Return the reference of the list \@role_list;
+#
+sub get_role_list {
+    my ( $envid, $role ) = @_;
+    Readonly my $HOSTS_FILE => '/nas/reg/etc/dev-qa-hosts';
+
+    my @role_list;
+
+    open (HOST_FH,'<', $HOSTS_FILE);
+    while ( my $line = <HOST_FH> ) {
+        next if ( $line =~ m/unknown/i );
+        chomp $line;
+        if ( $line =~ /^${envid}${role}[0-9]+\./ ) {
+            push @role_list, $line;
+        }
+    }
+    close HOST_FH;
+
+    return \@role_list;
+}
+
+#
+# Install the cron job.
+#
+sub install_cron_job {
+    my ( $role_list_ref, $cron_job_ref ) = @_;
+
+    Readonly my $CRON_CMD => '/usr/bin/crontab';
+    Readonly my $ECHO_CMD => '/bin/echo';
+    Readonly my $SSH_CMD => '/usr/bin/ssh';
+
+    my $local_host = qx( '/bin/hostname' );
+    chomp $local_host;
+
+    my $cron_tmp_file= File::Temp->new();
+
+    my $cron_backup_cmd = "$CRON_CMD -l > $cron_tmp_file";
+    my $cron_append_cmd = "$ECHO_CMD \'# $cron_job_ref->{ 'comment' }\' >> $cron_tmp_file; $ECHO_CMD '$cron_job_ref->{ 'schedule' } $cron_job_ref->{ 'script' }' >> $cron_tmp_file";
+    my $cron_install_cmd = "$CRON_CMD $cron_tmp_file";
+    my $cron_exec_cmd = qq($cron_backup_cmd; $cron_append_cmd; $cron_install_cmd);
+
+    foreach my $host ( @{ $role_list_ref } ) {
+        my $status;
+        if ($host eq $local_host) {
+            qx( $cron_exec_cmd );
+            $status = $? >> 8;
+        } else {
+            qx( $SSH_CMD $host "$cron_exec_cmd" );
+            $status = $? >> 8;
+        }
+    }
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $do_list ) {
+    if ( ! defined $envid or ! defined $job ) {
+        $logger->error( "The pamameter '-e' and '-j' must be set.\n" );
+        usage();
+        exit 1;
+    }
+} else {
+    list_cron_jobs();
+    exit 0;
+}
+
+#
+# User validation.
+#
+my $user = qx( '/usr/bin/whoami' );
+chomp $user;
+if ( $user ne 'relmgt' ) {
+    $logger->error( "The script 'install_cron_job' must be run by 'relmgt'.\n");
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+my $cron_jobs_ref = get_cron_jobs();
+my $cron_job_ref;
+if ( defined $cron_jobs_ref->{ $job } ) {
+    $cron_job_ref = $cron_jobs_ref->{ $job };
+} else {
+    $logger->error( "The job [$job] doesn't exist.\n" );
+    $logger->info( "Following jobs can be installed:" );
+    list_cron_jobs();
+    usage();
+    exit 1;
+}
+my $role_list_ref = get_role_list( $envid, $cron_job_ref->{ 'role' } );
+install_cron_job( $role_list_ref, $cron_job_ref );
+
+exit 0;
