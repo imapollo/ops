@@ -6,3 +6,4 @@ ${envid}slx001.${envid}.com:intsvc.api.${envid}.com:443
 ${envid}myx001.${envid}.com:intsvc.api.${envid}.com:443
 ${envid}sli001.${envid}.com:intsvc.api.${envid}.com:443
 ${envid}apx001.${envid}.com:intsvc.api.${envid}.com:443
+srwd10agg001.srwd10.com:${envid}apx001.${envid}.com:8080
