@@ -105,7 +105,7 @@ defined $IRULE          and value_echo( 'irule',       $IRULE);
 
 my $env = uc $ENVIRONMENT;
 
-my @include_irule = split ",", $IRULE;
+my @include_irule = split ",", $IRULE if $IRULE;
 
 my $globalResult=0;
 
@@ -203,7 +203,7 @@ sub get_irule_from_p4 {
     logwarn "No Irules in $iruleDir" && exit 0 unless $iruleFiles;
     
     foreach my $iRuleFile (split /\n/, $iruleFiles) {
-      redeem_config_tokens( $iRuleFile, $env_id);
+      redeem_config_tokens( $iRuleFile, $env_id, $branch_name);
     }
   }
 
@@ -220,7 +220,7 @@ sub get_irule_from_p4 {
 #------------------------------------------------------------------------
 # Redeem configuration tokens
 sub redeem_config_tokens {
-  my ( $config_file_path, $envid ) = @_;
+  my ( $config_file_path, $envid, $branch_name ) = @_;
 
   open my $CONFIG_FILE_FH, '<', $config_file_path
     or clean_die "redeem_config_tokens(): can't open config file for detokenization;",
@@ -266,6 +266,9 @@ sub redeem_config_tokens {
       or clean_die "redeem_config_tokens(): can't open '$config_file_path'",
                    " for writing: $!";
   for my $line ( @$detokenized_data ) {
+    if ( $line =~ /^# Build Tree ID: .*/ ) {
+      $line =~ s/^(# Build Tree ID:) .*/$1 $branch_name/;
+    }
     print $FH $line;
   }
 
