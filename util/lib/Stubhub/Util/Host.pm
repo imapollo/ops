@@ -21,6 +21,7 @@ BEGIN {
   @EXPORT       = qw();
   @EXPORT_OK    = qw(
                       &get_ip_by_hostname
+                      &get_public_ip_by_hostname
                       &get_hostname_by_ip
                     );
   %EXPORT_TAGS  = ();
@@ -56,6 +57,45 @@ sub get_ip_by_hostname {
     my $reverse_dns = `$DNS_COMMAND $ip_address`;
     if ( $reverse_dns !~ /$hostname/ and ! $is_alias ) {
         $logger->warn( "Reverse DNS for host $hostname is wrong.\n" );
+    }
+
+    return $ip_address;
+}
+
+#
+# Get Public IP address by hostname.
+#
+sub get_public_ip_by_hostname {
+    my ( $hostname ) = @_;
+
+    Readonly my $DNS_COMMAND => '/usr/bin/host';
+    Readonly my $GREP_COMMAND => '/bin/grep';
+
+    my $name_server = `$DNS_COMMAND $hostname 8.8.8.8 | $GREP_COMMAND "8.8.8.8"`;
+    return "" if $name_server !~ /8.8.8.8/;
+
+    my $ip_address = `$DNS_COMMAND $hostname 8.8.8.8 | $GREP_COMMAND "has address"`;
+    $ip_address =~ s/.* has address (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/$1/;
+    chomp $ip_address;
+
+    if ( $ip_address !~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/ ) {
+        $logger->error( "Cannot get IP address for $hostname.\n" );
+        return "";
+    }
+
+    my $is_alias = 0;
+    my $dns_result = `$DNS_COMMAND $hostname`;
+    if ( $dns_result =~ /alias/ ) {
+        $is_alias = 1;
+    }
+
+    my $reverse_dns = `$DNS_COMMAND $ip_address`;
+    if ( $reverse_dns =~ /not found/ ) {
+        $logger->error( "Reverse DNS for public host $hostname is wrong.\n" );
+        return "";
+    }
+    if ( $reverse_dns !~ /smf\.ragingwire\.net/ and ! $is_alias ) {
+        $logger->warn( "Reverse DNS for public host $hostname is wrong.\n" );
     }
 
     return $ip_address;

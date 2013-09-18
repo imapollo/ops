@@ -52,7 +52,6 @@ use Stubhub::P4::Client qw (
                            );
 use Stubhub::BigIP::Virtual::ConfigGenerator qw (
                             generate_vs_configs
-                            generate_pub_vs_configs
                             generate_not_excluded_vs_configs
                             generate_pub_not_excluded_vs_configs
                            );
@@ -340,9 +339,9 @@ my $deploy_success = 0;
 
 if ( $only_pool_name or $only_pool or $deploy_all ) {
     $logger->info( "Deploying pools for $envid ..." );
-    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf ) if ( -e $internal_pool_conf );
-    clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
     $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf ) if ( -e $external_pool_conf );
+    clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
+    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf ) if ( -e $internal_pool_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
 }
 if ( $only_rule_name or $only_irule or $deploy_all ) {
@@ -356,9 +355,9 @@ if ( $only_rule_name or $only_irule or $deploy_all ) {
 }
 if ( $only_vs_name or $only_vs or $deploy_all ) {
     $logger->info("Deploying virtual servers for $envid ...");
-    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf ) if ( -e $internal_vs_conf );
-    clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
     $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf ) if ( -e $external_vs_conf );
+    clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
+    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf ) if ( -e $internal_vs_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
 }
 
