@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# Import the certs into jre cacerts.
+#
+# Usage: import_cacerts [options]
+#
+# Options:
+#  -e | --envid=..     Specify the environment id.
+#  -r | --role=..      Specify the role to import cacerts to.
+#  -u | --url=..       Specify the URL to import cacerts from.
+#  -c | --certsfile=.. Specify the path of the cacerts file in JRE.
+#                      Default: /opt/jdk1.5.0_22/jre/lib/security/cacerts
+#  -v | --verbose      Print verbose messages.
+#
+# Author: minjzhang
+#
+
+options=$@
+
+envid=""
+role=""
+url=""
+cacerts_file="/opt/jdk1.5.0_22/jre/lib/security/cacerts"
+verbose=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+
+import_cacerts $options
+$*
+Import the certs into jre cacerts.
+
+Usage: import_cacerts [options]
+
+Options:
+ -e | --envid=..     Specify the environment id.
+ -r | --role=..      Specify the role to import cacerts to.
+ -u | --url=..       Specify the URL to import certs from.
+ -c | --certsfile=.. Specify the path of the cacerts file in JRE.
+                     Default: /opt/jdk1.5.0_22/jre/lib/security/cacerts
+ -v | --verbose      Print verbose messages.
+
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o e:r:u:c:v -l envid:,role:,url:,certsfile:,verbose -- $options`
+if [ $? != 0 ]; then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -e | --envid) envid="${2// }"; shift 2;;
+        -r | --role) role="${2// }"; shift 2;;
+        -u | --url) url="${2// }"; shift 2;;
+        -c | --certsfile) cacerts_file="${2// }"; shift 2;;
+        -v | --verbose) verbose=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print verbose message
+#
+function _print_verbose_msg {
+    verbose_message=$1
+    if [[ "$verbose" == 1 ]]; then
+        echo $verbose_message
+    fi
+}
+
+#
+# Variable validation.
+#
+if [[ "$envid" == "" || "$role" == "" || "$url" == "" ]]; then
+    echo "Error: Pamaters '-e', '-r', '-u' must be set."
+    _usage
+    exit 1
+fi
+
+#
+# Main
+#
+tmp_certs="$(mktemp)"
+tmp_der_certs="$(mktemp)"
+tmp_yes="$(mktemp)"
+grep $envid /nas/reg/etc/dev-qa-hosts | grep $role | while read host
+do
+    ssh -oPasswordAuthentication=no -ostricthostkeychecking=no $host "echo 'yes' > $tmp_yes;
+    /nas/home/minjzhang/bin/timeout 5 openssl s_client -connect $url:443 > $tmp_certs;
+    openssl x509 -in $tmp_certs -outform DER -out $tmp_der_certs;
+    sudo /opt/jdk1.5.0_22/bin/keytool -import -keystore /opt/jdk1.5.0_22/jre/lib/security/cacerts -storepass changeit -file $tmp_der_certs -alias paymentkey < $tmp_yes" < /dev/null
+done
+
+exit 0
