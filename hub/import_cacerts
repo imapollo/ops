@@ -8,8 +8,8 @@
 #  -e | --envid=..     Specify the environment id.
 #  -r | --role=..      Specify the role to import cacerts to.
 #  -u | --url=..       Specify the URL to import cacerts from.
-#  -c | --certsfile=.. Specify the path of the cacerts file in JRE.
-#                      Default: /opt/jdk1.5.0_22/jre/lib/security/cacerts
+#  -j | --jdkhome=..   Specify the path of the JDK. Default: /opt/jdk1.5.0_22.
+#                      cacerts file is located in $JDK_HOME/jre/lib/security/cacerts
 #  -v | --verbose      Print verbose messages.
 #
 # Author: minjzhang
@@ -20,7 +20,7 @@ options=$@
 envid=""
 role=""
 url=""
-cacerts_file="/opt/jdk1.5.0_22/jre/lib/security/cacerts"
+jdk_home="/opt/jdk1.5.0_22"
 verbose=0
 
 #
@@ -39,8 +39,8 @@ Options:
  -e | --envid=..     Specify the environment id.
  -r | --role=..      Specify the role to import cacerts to.
  -u | --url=..       Specify the URL to import certs from.
- -c | --certsfile=.. Specify the path of the cacerts file in JRE.
-                     Default: /opt/jdk1.5.0_22/jre/lib/security/cacerts
+ -j | --jdkhome=..   Specify the path of the JDK. Default: /opt/jdk1.5.0_22.
+                     cacerts file is located in \$JDK_HOME/jre/lib/security/cacerts
  -v | --verbose      Print verbose messages.
 
 EOF
@@ -49,7 +49,7 @@ EOF
 #
 # Get options
 #
-OPTS=`getopt -o e:r:u:c:v -l envid:,role:,url:,certsfile:,verbose -- $options`
+OPTS=`getopt -o e:r:u:j:v -l envid:,role:,url:,jdk_home:,verbose -- $options`
 if [ $? != 0 ]; then
     echo "Error: Unrecognized parameters."
     _usage
@@ -63,7 +63,7 @@ while true ; do
         -e | --envid) envid="${2// }"; shift 2;;
         -r | --role) role="${2// }"; shift 2;;
         -u | --url) url="${2// }"; shift 2;;
-        -c | --certsfile) cacerts_file="${2// }"; shift 2;;
+        -j | --jdkhome) jdk_home="${2// }"; shift 2;;
         -v | --verbose) verbose=1; shift;;
         --) shift; break;;
     esac
@@ -99,7 +99,7 @@ do
     ssh -oPasswordAuthentication=no -ostricthostkeychecking=no $host "echo 'yes' > $tmp_yes;
     /nas/home/minjzhang/bin/timeout 5 openssl s_client -connect $url:443 > $tmp_certs;
     openssl x509 -in $tmp_certs -outform DER -out $tmp_der_certs;
-    sudo /opt/jdk1.5.0_22/bin/keytool -import -keystore /opt/jdk1.5.0_22/jre/lib/security/cacerts -storepass changeit -file $tmp_der_certs -alias paymentkey < $tmp_yes" < /dev/null
+    sudo $jdk_home/bin/keytool -import -keystore $jdk_home/jre/lib/security/cacerts -storepass changeit -file $tmp_der_certs -alias paymentkey < $tmp_yes" < /dev/null
 done
 
 exit 0
