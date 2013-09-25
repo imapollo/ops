@@ -8,6 +8,7 @@
 #  -e | --envid=..     Specify the environment id.
 #  -r | --role=..      Specify the role to import cacerts to.
 #  -u | --url=..       Specify the URL to import cacerts from.
+#                      For example: payments.api.srwd24.com
 #  -j | --jdkhome=..   Specify the path of the JDK. Default: /opt/jdk1.5.0_22.
 #                      cacerts file is located in $JDK_HOME/jre/lib/security/cacerts
 #  -v | --verbose      Print verbose messages.
@@ -39,6 +40,7 @@ Options:
  -e | --envid=..     Specify the environment id.
  -r | --role=..      Specify the role to import cacerts to.
  -u | --url=..       Specify the URL to import certs from.
+                     For example: payments.api.srwd24.com
  -j | --jdkhome=..   Specify the path of the JDK. Default: /opt/jdk1.5.0_22.
                      cacerts file is located in \$JDK_HOME/jre/lib/security/cacerts
  -v | --verbose      Print verbose messages.
@@ -97,7 +99,7 @@ tmp_yes="$(mktemp)"
 grep $envid /nas/reg/etc/dev-qa-hosts | grep $role | while read host
 do
     ssh -oPasswordAuthentication=no -ostricthostkeychecking=no $host "echo 'yes' > $tmp_yes;
-    /nas/home/minjzhang/bin/timeout 5 openssl s_client -connect $url:443 > $tmp_certs;
+    /nas/utl/devops/bin/timeout 5 openssl s_client -connect $url:443 > $tmp_certs;
     openssl x509 -in $tmp_certs -outform DER -out $tmp_der_certs;
     sudo $jdk_home/bin/keytool -import -keystore $jdk_home/jre/lib/security/cacerts -storepass changeit -file $tmp_der_certs -alias paymentkey < $tmp_yes" < /dev/null
 done
