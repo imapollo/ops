@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Validate the BIG-IP settings for specified environment.
+# Validate the BIG-IP status for specified environment.
 # Following items will be checked:
 #  - Pool
 #
