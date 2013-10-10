@@ -35,8 +35,8 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 use Readonly;
 use Getopt::Long;
 use Data::Dumper;
+use File::Temp;
 
-# use BigIP::iControl;
 use Stubhub::BigIP::System::Util qw (
                                     get_icontrol
                                 );
@@ -46,6 +46,20 @@ use Stubhub::BigIP::Pool::Handler qw (
 use Stubhub::BigIP::Virtual::Handler qw (
                                     get_env_virtual_servers
                                 );
+use Stubhub::BigIP::Virtual::ConfigGenerator qw (
+                                    generate_vs_separate_configs
+                                );
+use Stubhub::BigIP::Virtual::Parser qw (
+                                    parse_virtual_servers
+                                );
+use Stubhub::P4::Info qw (
+                                    get_p4_branch_path
+                                );
+use Stubhub::P4::Client qw (
+                                    check_out_perforce_file
+                                    clean_perforce_client
+                                );
+use Stubhub::P4::Constants;
 # use Stubhub::Util::Host qw (
 #                             get_hostname_by_ip
 #                         );
@@ -103,6 +117,13 @@ if ( ! defined $envid ) {
 # Get the expected virtual server list from P4.
 #
 sub get_expected_vs_list {
+    my ( $vs_configuration_dir ) = @_;
+    my $virtual_servers_ref = parse_virtual_servers( $vs_configuration_dir );
+    my @expected_vs_list;
+    foreach my $virtual_server_ref ( @{ $virtual_servers_ref } ) {
+        push @expected_vs_list, $virtual_server_ref->{ 'name' };
+    }
+    print join "\n", @expected_vs_list;
 }
 
 #
@@ -140,14 +161,39 @@ sub validate_pool_conf {
 }
 
 #
+# Get the BIGIP templates from P4 depot.
+#
+sub get_bigip_templates {
+    my ( $branch ) = @_;
+    my $p4_branch_path = get_p4_branch_path( $branch );
+
+
+    my ( $dynamic_p4_client, $dynamic_p4_dir ) = check_out_perforce_file( "/$p4_branch_path/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/..." );
+    # BIGIP_VS_SURDIR
+    # BIGIP_POOL_SUBDIR
+    # BIGIP_IRULE_SUBDIR
+    # ${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR
+    return ( $dynamic_p4_client, $dynamic_p4_dir, $p4_branch_path );
+}
+
+#
 # Main
 #
-my @icontrols = get_icontrol( $envid );
+my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
+my %icontrols = (
+    'int' => $internal_ic,
+    'ext' => $external_ic
+);
 
-foreach my $icontrol ( @icontrols ) {
-    my @env_vs_list = get_env_virtual_servers( $icontrol, $envid );
-    my @env_expected_vs_list = get_expected_vs_list();
-    my @env_pool_list = get_env_pool_list( $icontrol, $envid );
+my ( $dynamic_p4_client, $dynamic_p4_dir, $p4_branch_path ) = get_bigip_templates( $branch );
+
+foreach my $ic_key ( keys %icontrols ) {
+    my $output_dir = File::Temp->newdir();
+    generate_vs_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_VS_SURDIR/$ic_key", $envid, $output_dir );
+
+    my @env_vs_list = get_env_virtual_servers( $icontrols{ $ic_key }, $envid );
+    my @env_expected_vs_list = get_expected_vs_list( $output_dir );
+    my @env_pool_list = get_env_pool_list( $icontrols{ $ic_key }, $envid );
     my @env_expected_pool_list = get_expected_pool_list();
 
     validate_vs_list();
@@ -155,3 +201,7 @@ foreach my $icontrol ( @icontrols ) {
     validate_vs_conf();
     validate_pool_conf();
 }
+
+clean_perforce_client( $dynamic_p4_client, $dynamic_p4_dir );
+
+exit 0;

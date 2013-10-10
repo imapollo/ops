@@ -27,6 +27,7 @@ BEGIN {
   @EXPORT       = qw();
   @EXPORT_OK    = qw(
                       &generate_vs_configs
+                      &generate_vs_separate_configs
                       &generate_not_excluded_vs_configs
                       &generate_pub_not_excluded_vs_configs
                     );
@@ -144,6 +145,21 @@ sub generate_vs_configs {
 }
 
 #
+# Generate virtual server configuration files separately based on
+# templates under a folder.
+#
+sub generate_vs_separate_configs {
+    my ( $templates_dir, $envid, $output_dir ) = @_;
+    opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
+    my @template_files = grep { ! -d } readdir DH;
+    closedir DH;
+    foreach my $virtual_server_template ( @template_files ) {
+        generate_vs_config( $output_dir, "$templates_dir/$virtual_server_template", $envid, 0 );
+    }
+    return $output_dir;
+}
+
+#
 # Generate virtual server configuration file based on template.
 #
 sub generate_vs_config {
@@ -154,6 +170,12 @@ sub generate_vs_config {
     Readonly my $IPADDR_TOKEN => '#{\S*env_id\S*\.com}';
 
     open TEMPLATE_FH, "<$template_file_path" or die $!;
+    # If $target_file_path is a directory, open new file to write.
+    if ( -d $target_file_path ) {
+        my $target_file_name = $template_file_path;
+        $target_file_name =~ s/.*\/(.*)/$1/;
+        $target_file_path = "$target_file_path/$target_file_name";
+    }
     open TARGET_FH, ">>$target_file_path" or die $!;
 
     my @lines = <TEMPLATE_FH>;
