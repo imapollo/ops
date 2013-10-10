@@ -43,6 +43,12 @@ use Stubhub::BigIP::System::Util qw (
 use Stubhub::BigIP::Pool::Handler qw (
                                     get_env_pool_list
                                 );
+use Stubhub::BigIP::Pool::ConfigGenerator qw (
+                                    generate_pool_separate_configs
+                                );
+use Stubhub::BigIP::Pool::Parser qw (
+                                    parse_pools
+                                );
 use Stubhub::BigIP::Virtual::Handler qw (
                                     get_env_virtual_servers
                                 );
@@ -124,12 +130,21 @@ sub get_expected_vs_list {
         push @expected_vs_list, $virtual_server_ref->{ 'name' };
     }
     print join "\n", @expected_vs_list;
+    return @expected_vs_list;
 }
 
 #
 # Get the expected pool list from P4.
 #
 sub get_expected_pool_list {
+    my ( $pool_configuration_dir ) = @_;
+    my $pools_ref = parse_pools( $pool_configuration_dir );
+    my @expected_pool_list;
+    foreach my $pool_ref ( @{ $pools_ref } ) {
+        push @expected_pool_list, $pool_ref->{ 'name' };
+    }
+    print join "\n", @expected_pool_list;
+    return @expected_pool_list;
 }
 
 #
@@ -169,10 +184,6 @@ sub get_bigip_templates {
 
 
     my ( $dynamic_p4_client, $dynamic_p4_dir ) = check_out_perforce_file( "/$p4_branch_path/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/..." );
-    # BIGIP_VS_SURDIR
-    # BIGIP_POOL_SUBDIR
-    # BIGIP_IRULE_SUBDIR
-    # ${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR
     return ( $dynamic_p4_client, $dynamic_p4_dir, $p4_branch_path );
 }
 
@@ -188,13 +199,15 @@ my %icontrols = (
 my ( $dynamic_p4_client, $dynamic_p4_dir, $p4_branch_path ) = get_bigip_templates( $branch );
 
 foreach my $ic_key ( keys %icontrols ) {
-    my $output_dir = File::Temp->newdir();
-    generate_vs_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_VS_SURDIR/$ic_key", $envid, $output_dir );
+    my $vs_output_dir = File::Temp->newdir();
+    my $pool_output_dir = File::Temp->newdir();
+    generate_vs_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_VS_SUBDIR/$ic_key", $envid, $vs_output_dir );
+    generate_pool_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_POOL_SUBDIR/$ic_key", $envid, $pool_output_dir );
 
     my @env_vs_list = get_env_virtual_servers( $icontrols{ $ic_key }, $envid );
-    my @env_expected_vs_list = get_expected_vs_list( $output_dir );
+    my @env_expected_vs_list = get_expected_vs_list( $vs_output_dir );
     my @env_pool_list = get_env_pool_list( $icontrols{ $ic_key }, $envid );
-    my @env_expected_pool_list = get_expected_pool_list();
+    my @env_expected_pool_list = get_expected_pool_list( $pool_output_dir );
 
     validate_vs_list();
     validate_pool_list();

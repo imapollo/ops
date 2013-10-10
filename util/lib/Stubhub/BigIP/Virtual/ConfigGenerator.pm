@@ -170,12 +170,14 @@ sub generate_vs_config {
     Readonly my $IPADDR_TOKEN => '#{\S*env_id\S*\.com}';
 
     open TEMPLATE_FH, "<$template_file_path" or die $!;
+
     # If $target_file_path is a directory, open new file to write.
     if ( -d $target_file_path ) {
         my $target_file_name = $template_file_path;
         $target_file_name =~ s/.*\/(.*)/$1/;
         $target_file_path = "$target_file_path/$target_file_name";
     }
+
     open TARGET_FH, ">>$target_file_path" or die $!;
 
     my @lines = <TEMPLATE_FH>;

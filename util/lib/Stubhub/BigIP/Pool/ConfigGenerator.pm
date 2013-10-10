@@ -28,6 +28,7 @@ BEGIN {
   @EXPORT_OK    = qw(
                       &generate_pool_config
                       &generate_pool_configs
+                      &generate_pool_separate_configs
                       &generate_not_excluded_pool_configs
                     );
   %EXPORT_TAGS  = ();
@@ -91,6 +92,21 @@ sub generate_pool_configs {
 }
 
 #
+# Generate pool configuration files based on templates
+# under a folder.
+#
+sub generate_pool_separate_configs {
+    my ( $templates_dir, $envid, $output_dir ) = @_;
+    opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
+    my @template_files = grep { ! -d } readdir DH;
+    closedir DH;
+    foreach my $pool_template ( @template_files ) {
+        generate_pool_config( $output_dir, "$templates_dir/$pool_template", $envid );
+    }
+    return $output_dir;
+}
+
+#
 # Generate pool configuration file based on template.
 #
 sub generate_pool_config {
@@ -103,6 +119,14 @@ sub generate_pool_config {
     Readonly my $FOREACH_END_TOKEN => '#{foreach}';
 
     open TEMPLATE_FH, "<$template_file_path" or die $!;
+
+    # If $target_file_path is a directory, open new file to write.
+    if ( -d $target_file_path ) {
+        my $target_file_name = $template_file_path;
+        $target_file_name =~ s/.*\/(.*)/$1/;
+        $target_file_path = "$target_file_path/$target_file_name";
+    }
+
     open TARGET_FH, ">>$target_file_path" or die $!;
 
     while ( my $line = <TEMPLATE_FH> ) {
