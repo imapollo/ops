@@ -66,9 +66,6 @@ use Stubhub::P4::Client qw (
                                     clean_perforce_client
                                 );
 use Stubhub::P4::Constants;
-# use Stubhub::Util::Host qw (
-#                             get_hostname_by_ip
-#                         );
 
 # Get options
 my $show_usage = qw{};
@@ -129,7 +126,6 @@ sub get_expected_vs_list {
     foreach my $virtual_server_ref ( @{ $virtual_servers_ref } ) {
         push @expected_vs_list, $virtual_server_ref->{ 'name' };
     }
-    print join "\n", @expected_vs_list;
     return @expected_vs_list;
 }
 
@@ -143,20 +139,69 @@ sub get_expected_pool_list {
     foreach my $pool_ref ( @{ $pools_ref } ) {
         push @expected_pool_list, $pool_ref->{ 'name' };
     }
-    print join "\n", @expected_pool_list;
     return @expected_pool_list;
+}
+
+#
+# Compare 2 list.
+# Return: \@match_list, \@extra_list, \@missing_list
+#
+sub compare_list {
+
+    my ( $list1_ref, $list2_ref ) = @_;
+
+    my %hash1 = map { $_ => 1 } @{ $list1_ref };
+    my %hash2 = map { $_ => 1 } @{ $list2_ref };
+
+    my @match_list;
+    my @extra_list;
+    my @missing_list;
+
+    foreach my $env_vs ( keys %hash1 ) {
+        if ( exists( $hash2{ $env_vs } ) ) {
+            delete $hash2{ $env_vs };
+            push @match_list, $env_vs;
+        } else {
+            push @extra_list, $env_vs;
+        }
+    }
+    foreach my $expected_vs ( keys %hash2 ) {
+        push @missing_list, $expected_vs;
+    }
+
+    return ( \@match_list, \@extra_list, \@missing_list );
 }
 
 #
 # Validate the virtual server list based on templates on P4.
 #
 sub validate_vs_list {
+    my ( $env_vs_list_ref, $expected_vs_list_ref ) = @_;
+
+    my ( $match_vs_list_ref, $env_extra_list_ref, $env_missing_list_ref ) = compare_list( $env_vs_list_ref, $expected_vs_list_ref );
+
+    print "\nmatch:\n";
+    print join ",", @{ $match_vs_list_ref };
+    print "\nextra:\n";
+    print join ",", @{ $env_extra_list_ref };
+    print "\nmissing:\n";
+    print join ",", @{ $env_missing_list_ref };
 }
 
 #
 # Validate the pool list based on templates on P4.
 #
 sub validate_pool_list {
+    my ( $env_pool_list_ref, $expected_pool_list_ref ) = @_;
+
+    my ( $match_pool_list_ref, $env_extra_list_ref, $env_missing_list_ref ) = compare_list( $env_pool_list_ref, $expected_pool_list_ref );
+
+    print "\nmatch:\n";
+    print join ",", @{ $match_pool_list_ref };
+    print "\nextra:\n";
+    print join ",", @{ $env_extra_list_ref };
+    print "\nmissing:\n";
+    print join ",", @{ $env_missing_list_ref };
 }
 
 #
@@ -181,8 +226,6 @@ sub validate_pool_conf {
 sub get_bigip_templates {
     my ( $branch ) = @_;
     my $p4_branch_path = get_p4_branch_path( $branch );
-
-
     my ( $dynamic_p4_client, $dynamic_p4_dir ) = check_out_perforce_file( "/$p4_branch_path/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/..." );
     return ( $dynamic_p4_client, $dynamic_p4_dir, $p4_branch_path );
 }
@@ -199,18 +242,24 @@ my %icontrols = (
 my ( $dynamic_p4_client, $dynamic_p4_dir, $p4_branch_path ) = get_bigip_templates( $branch );
 
 foreach my $ic_key ( keys %icontrols ) {
+
+    # Generate the configuration files based on templates on P4.
     my $vs_output_dir = File::Temp->newdir();
     my $pool_output_dir = File::Temp->newdir();
     generate_vs_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_VS_SUBDIR/$ic_key", $envid, $vs_output_dir );
     generate_pool_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_POOL_SUBDIR/$ic_key", $envid, $pool_output_dir );
 
     my @env_vs_list = get_env_virtual_servers( $icontrols{ $ic_key }, $envid );
+    # lowercase all the virtual server name for consistency
+    $_ = lc for @env_vs_list;
     my @env_expected_vs_list = get_expected_vs_list( $vs_output_dir );
     my @env_pool_list = get_env_pool_list( $icontrols{ $ic_key }, $envid );
+    # uppercase all the virtual server name for consistency
+    $_ = uc for @env_pool_list;
     my @env_expected_pool_list = get_expected_pool_list( $pool_output_dir );
 
-    validate_vs_list();
-    validate_pool_list();
+    validate_vs_list( \@env_vs_list, \@env_expected_vs_list );
+    validate_pool_list( \@env_pool_list, \@env_expected_pool_list );
     validate_vs_conf();
     validate_pool_conf();
 }
