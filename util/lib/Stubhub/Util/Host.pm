@@ -38,8 +38,9 @@ sub get_ip_by_hostname {
 
     Readonly my $DNS_COMMAND => '/usr/bin/host';
     Readonly my $GREP_COMMAND => '/bin/grep';
+    Readonly my $HEAD_COMMAND => '/usr/bin/head';
 
-    my $ip_address = `$DNS_COMMAND $hostname | $GREP_COMMAND "has address"`;
+    my $ip_address = `$DNS_COMMAND $hostname | $GREP_COMMAND "has address" | $HEAD_COMMAND -n 1`;
     $ip_address =~ s/.* has address (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/$1/;
     chomp $ip_address;
 
