@@ -39,11 +39,11 @@ sub parse_pools {
     opendir DH, $pools_config_dir or die "Cannot open $pools_config_dir: $!";
     my @pool_config_files = grep { ! -d } readdir DH;
     closedir DH;
-    my @pools;
+    my %pools;
     foreach my $pool_config_file ( @pool_config_files ) {
-        my $pool_ref = parse_pool("$pools_config_dir/$pool_config_file");
-        push @pools, $pool_ref;
+        my ( $pool_name, $pool_ref ) = parse_pool("$pools_config_dir/$pool_config_file");
+        $pools{ $pool_name } = $pool_ref;
     }
-    return \@pools;
+    return \%pools;
 }
 

@@ -129,8 +129,8 @@ sub get_expected_vs_list {
     my ( $vs_configuration_dir ) = @_;
     my $virtual_servers_ref = parse_virtual_servers( $vs_configuration_dir );
     my @expected_vs_list;
-    foreach my $virtual_server_ref ( @{ $virtual_servers_ref } ) {
-        push @expected_vs_list, $virtual_server_ref->{ 'name' };
+    foreach my $virtual_server_name ( keys %{ $virtual_servers_ref } ) {
+        push @expected_vs_list, $virtual_server_name;
     }
     return @expected_vs_list;
 }
@@ -142,8 +142,8 @@ sub get_expected_pool_list {
     my ( $pool_configuration_dir ) = @_;
     my $pools_ref = parse_pools( $pool_configuration_dir );
     my @expected_pool_list;
-    foreach my $pool_ref ( @{ $pools_ref } ) {
-        push @expected_pool_list, $pool_ref->{ 'name' };
+    foreach my $pool_name ( keys %{ $pools_ref } ) {
+        push @expected_pool_list, $pool_name;
     }
     return @expected_pool_list;
 }
@@ -229,6 +229,12 @@ sub validate_pool_list {
 # - Check if virtual server DNS/IP is correct.
 #
 sub validate_vs_conf {
+    my ( $match_vs_list_ref, $vs_configuration_dir ) = @_;
+    my $expected_vs_ref = parse_virtual_servers( $vs_configuration_dir );
+    foreach my $match_vs ( @{ $match_vs_list_ref } ) {
+        print $expected_vs_ref->{ $match_vs }{ 'default_pool' } . "\n" if defined $expected_vs_ref->{ $match_vs }{ 'default_pool' };
+        # TODO how to resolve the uc/lc issue. grep again in the list ...
+    }
 }
 
 #
@@ -278,8 +284,8 @@ foreach my $ic_key ( keys %icontrols ) {
 
     my @match_vs_list = validate_vs_list( \@env_vs_list, \@env_expected_vs_list );
     my @match_pool_list = validate_pool_list( \@env_pool_list, \@env_expected_pool_list );
-    validate_vs_conf( @match_vs_list );
-    validate_pool_conf( @match_pool_list );
+    validate_vs_conf( \@match_vs_list, $vs_output_dir );
+    validate_pool_conf( \@match_pool_list, $pool_output_dir );
 }
 
 clean_perforce_client( $dynamic_p4_client, $dynamic_p4_dir );

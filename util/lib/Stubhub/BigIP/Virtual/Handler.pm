@@ -27,11 +27,19 @@ BEGIN {
                         &get_env_virtual_servers
                         &get_pub_env_virtual_servers
                         &delete_not_excluded_env_virtual_servers
+                        &get_vs_default_pool
                     );
   %EXPORT_TAGS  = ();
 }
 
 our @EXPORT_OK;
+
+#
+# Get the default pool of a virtual server.
+#
+sub get_vs_default_pool {
+    my ( $iControl, $pool_name ) = @_;
+}
 
 #
 # Get all the virtual servers.
