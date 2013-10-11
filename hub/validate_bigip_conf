@@ -66,6 +66,11 @@ use Stubhub::P4::Client qw (
                                     clean_perforce_client
                                 );
 use Stubhub::P4::Constants;
+use Stubhub::Log::Util qw (
+                                    init
+                                    get_logger
+                                    get_logger_with_loglevel
+                                );
 
 # Get options
 my $show_usage = qw{};
@@ -80,6 +85,7 @@ my $options_okay = GetOptions (
 );
 
 Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
 
 #
 # Signal Handler
@@ -180,12 +186,18 @@ sub validate_vs_list {
 
     my ( $match_vs_list_ref, $env_extra_list_ref, $env_missing_list_ref ) = compare_list( $env_vs_list_ref, $expected_vs_list_ref );
 
-    print "\nmatch:\n";
-    print join ",", @{ $match_vs_list_ref };
-    print "\nextra:\n";
-    print join ",", @{ $env_extra_list_ref };
-    print "\nmissing:\n";
-    print join ",", @{ $env_missing_list_ref };
+    if ( scalar @{ $env_extra_list_ref } > 0 ) {
+        $logger->warn("Following virtual servers are not included in templates:");
+        $logger->warn( join ",", @{ $env_extra_list_ref } );
+        $logger->warn("");
+    }
+    if ( scalar @{ $env_missing_list_ref } > 0 ) {
+        $logger->warn("Following virtual servers are missing:");
+        $logger->warn( join ",", @{ $env_missing_list_ref } );
+        $logger->warn("");
+    }
+
+    return @{ $match_vs_list_ref };
 }
 
 #
@@ -196,12 +208,18 @@ sub validate_pool_list {
 
     my ( $match_pool_list_ref, $env_extra_list_ref, $env_missing_list_ref ) = compare_list( $env_pool_list_ref, $expected_pool_list_ref );
 
-    print "\nmatch:\n";
-    print join ",", @{ $match_pool_list_ref };
-    print "\nextra:\n";
-    print join ",", @{ $env_extra_list_ref };
-    print "\nmissing:\n";
-    print join ",", @{ $env_missing_list_ref };
+    if ( scalar @{ $env_extra_list_ref } > 0 ) {
+        $logger->warn("Following pools are not included in templates:");
+        $logger->warn( join ",", @{ $env_extra_list_ref } );
+        $logger->warn("");
+    }
+    if ( scalar @{ $env_missing_list_ref } > 0 ) {
+        $logger->warn("Following pools are missing:");
+        $logger->warn( join ",", @{ $env_missing_list_ref } );
+        $logger->warn("");
+    }
+
+    return @{ $match_pool_list_ref };
 }
 
 #
@@ -258,10 +276,10 @@ foreach my $ic_key ( keys %icontrols ) {
     $_ = uc for @env_pool_list;
     my @env_expected_pool_list = get_expected_pool_list( $pool_output_dir );
 
-    validate_vs_list( \@env_vs_list, \@env_expected_vs_list );
-    validate_pool_list( \@env_pool_list, \@env_expected_pool_list );
-    validate_vs_conf();
-    validate_pool_conf();
+    my @match_vs_list = validate_vs_list( \@env_vs_list, \@env_expected_vs_list );
+    my @match_pool_list = validate_pool_list( \@env_pool_list, \@env_expected_pool_list );
+    validate_vs_conf( @match_vs_list );
+    validate_pool_conf( @match_pool_list );
 }
 
 clean_perforce_client( $dynamic_p4_client, $dynamic_p4_dir );
