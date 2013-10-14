@@ -42,7 +42,7 @@ sub parse_virtual_servers {
     my %virtual_servers;
     foreach my $virtual_server_config_file ( @virtual_server_config_files ) {
         my ( $virtual_name, $virtual_server_ref ) = parse_virtual("$virtual_servers_config_dir/$virtual_server_config_file");
-        $virtual_servers{ $virtual_name } = $virtual_server_ref;
+        $virtual_servers{ $virtual_name } = $virtual_server_ref if ( defined $virtual_name );
     }
     return \%virtual_servers;
 }
