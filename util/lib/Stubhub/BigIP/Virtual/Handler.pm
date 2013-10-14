@@ -29,6 +29,7 @@ BEGIN {
                         &delete_not_excluded_env_virtual_servers
                         &get_vs_default_pool
                         &get_vs_irules
+                        &get_vs_destination
                     );
   %EXPORT_TAGS  = ();
 }
@@ -50,6 +51,14 @@ sub get_vs_default_pool {
 sub get_vs_irules {
     my ( $iControl, $vs_name ) = @_;
     return $iControl->get_ltm_vs_rules( $vs_name );
+}
+
+#
+# Get the destination ip of a virtual server.
+#
+sub get_vs_destination {
+    my ( $iControl, $vs_name ) = @_;
+    return $iControl->get_vs_destination( $vs_name );
 }
 
 #

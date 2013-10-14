@@ -53,6 +53,7 @@ use Stubhub::BigIP::Virtual::Handler qw (
                                     get_env_virtual_servers
                                     get_vs_default_pool
                                     get_vs_irules
+                                    get_vs_destination
                                 );
 use Stubhub::BigIP::Virtual::ConfigGenerator qw (
                                     generate_vs_separate_configs
@@ -236,10 +237,13 @@ sub validate_vs_conf {
     foreach my $match_vs ( @{ $match_vs_list_ref } ) {
         my $expected_default_pool = $expected_vs_ref->{ $match_vs }{ 'default_pool' };
         my $expected_irule = $expected_vs_ref->{ $match_vs }{ 'irule' };
+        my $expected_destination = $expected_vs_ref->{ $match_vs }{ 'destination' };
+        $expected_destination = replace_known_service_name_with_port( $expected_destination );
 
         my $match_vs_real_name;
         my $real_default_pool;
         my $real_irule;
+        my $real_destination;
 
         foreach my $env_vs ( @{ $env_vs_list_ref } ) {
             if ( $match_vs =~ /^$env_vs$/i ) {
@@ -247,6 +251,7 @@ sub validate_vs_conf {
                 $real_default_pool = get_vs_default_pool( $icontrol, $env_vs);
                 $real_default_pool = qw{} if $real_default_pool eq "";
                 $real_irule = join ",", sort( get_vs_irules( $icontrol , $env_vs ) ) if ( scalar get_vs_irules( $icontrol, $env_vs ) > 0 );
+                $real_destination = get_vs_destination( $icontrol, $env_vs);
                 last;
             }
         }
@@ -261,7 +266,7 @@ sub validate_vs_conf {
             $logger->warn( "Default pool for $match_vs_real_name should be $expected_default_pool, but not set instead." );
         }
 
-        if ( ( defined $real_irule and defined $expected_irule ) 
+        if ( ( defined $real_irule and defined $expected_irule )
                 and ( $real_irule ne $expected_irule ) ) {
             $logger->warn( "The virtual server $match_vs_real_name irule is epected as $expected_irule, but $real_irule" );
         } elsif ( defined $real_irule and not defined $expected_irule ) {
@@ -269,7 +274,23 @@ sub validate_vs_conf {
         } elsif ( not defined $real_irule and defined $expected_irule ) {
             $logger->warn( "iRule for $match_vs_real_name should be $expected_irule, but not set instead.");
         }
+
+        if ( ( defined $real_destination and defined $expected_destination )
+                and ( $real_destination ne $expected_destination ) ) {
+            $logger->warn( "The destination of virtual server $match_vs_real_name should be $expected_destination, but $real_destination instead.");
+        }
     }
+}
+
+#
+# Replace the service name with port number.
+#
+sub replace_known_service_name_with_port {
+    my ( $string ) = @_;
+    $string =~ s/:http$/:80/;
+    $string =~ s/:https$/:443/;
+    $string =~ s/:any$/:0/;
+    return $string;
 }
 
 #
