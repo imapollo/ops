@@ -235,6 +235,11 @@ sub validate_pool_list {
 sub validate_vs_conf {
     my ( $match_vs_list_ref, $env_vs_list_ref, $icontrol, $vs_configuration_dir ) = @_;
     my $expected_vs_ref = parse_virtual_servers( $vs_configuration_dir );
+
+    my @mismatch_pools;
+    my @mismatch_irules;
+    my @mismatch_destinations;
+
     foreach my $match_vs ( @{ $match_vs_list_ref } ) {
         my $expected_default_pool = $expected_vs_ref->{ $match_vs }{ 'default_pool' };
         my $expected_irule = $expected_vs_ref->{ $match_vs }{ 'irule' };
@@ -257,30 +262,69 @@ sub validate_vs_conf {
             }
         }
 
+        my %mismatch_pool = (
+            'vs'        => $match_vs_real_name,
+            'real'      => $real_default_pool,
+            'expected'  => $expected_default_pool,
+        );
+        my %mismatch_irule = (
+            'vs'        => $match_vs_real_name,
+            'real'      => $real_irule,
+            'expected'  => $expected_irule,
+        );
+        my %mismatch_destination = (
+            'vs'        => $match_vs_real_name,
+            'real'      => $real_destination,
+            'expected'  => $expected_destination,
+        );
+
         # Validate if matching.
         if ( ( defined $real_default_pool and defined $expected_default_pool )
                 and ( $real_default_pool ne $expected_default_pool ) ) {
-            $logger->warn( "The virtual server $match_vs_real_name default pool is expected as $expected_default_pool, but $real_default_pool.\n" );
+            push @mismatch_pools, \%mismatch_pool;
         } elsif ( defined $real_default_pool and not defined $expected_default_pool ) {
-            $logger->warn( "Default pool for $match_vs_real_name is $real_default_pool, but not defined in template." );
+            push @mismatch_pools, \%mismatch_pool;
         } elsif ( not defined $real_default_pool and defined $expected_default_pool ) {
-            $logger->warn( "Default pool for $match_vs_real_name should be $expected_default_pool, but not set instead." );
+            push @mismatch_pools, \%mismatch_pool;
         }
 
         if ( ( defined $real_irule and defined $expected_irule )
                 and ( $real_irule ne $expected_irule ) ) {
-            $logger->warn( "The virtual server $match_vs_real_name irule is epected as $expected_irule, but $real_irule" );
+            push @mismatch_irules, \%mismatch_irule;
         } elsif ( defined $real_irule and not defined $expected_irule ) {
-            $logger->warn( "iRule for $match_vs_real_name is $real_irule, but not defined in template.");
+            push @mismatch_irules, \%mismatch_irule;
         } elsif ( not defined $real_irule and defined $expected_irule ) {
-            $logger->warn( "iRule for $match_vs_real_name should be $expected_irule, but not set instead.");
+            push @mismatch_irules, \%mismatch_irule;
         }
 
         if ( ( defined $real_destination and defined $expected_destination )
                 and ( $real_destination ne $expected_destination ) ) {
-            $logger->warn( "The destination of virtual server $match_vs_real_name should be $expected_destination, but $real_destination instead.");
+            push @mismatch_destinations, \%mismatch_destination;
         }
     }
+
+    if ( scalar @mismatch_pools > 0 ) {
+        $logger->warn( "Following default pool mismatch:" );
+        foreach my $mismatch_pool_ref ( @mismatch_pools ) {
+            $logger->warn( "Virtual server [$mismatch_pool_ref->{ 'vs' }] default pool is [$mismatch_pool_ref->{ 'real' }], but expects [$mismatch_pool_ref->{ 'expected' }]" );
+        }
+        $logger->warn( "" );
+    }
+
+    if ( scalar @mismatch_irules > 0 ) {
+        $logger->warn( "Following irule mismatch:");
+        foreach my $mismatch_irule_ref ( @mismatch_irules ) {
+            $logger->warn( "Virtual server [$mismatch_irule_ref->{ 'vs' }] irule is [$mismatch_irule_ref->{ 'real' }], but expects [$mismatch_irule_ref->{ 'expected' }]" );
+        }
+    }
+
+    if ( scalar @mismatch_destinations > 0 ) {
+        $logger->warn( "Following irule mismatch:");
+        foreach my $mismatch_destination_ref ( @mismatch_destinations ) {
+            $logger->warn( "Virtual server [$mismatch_destination_ref->{ 'vs' }] destination is [$mismatch_destination_ref->{ 'real' }], but expects [$mismatch_destination_ref->{ 'expected' }]" );
+        }
+    }
+
 }
 
 #
@@ -290,6 +334,9 @@ sub validate_vs_conf {
 sub validate_pool_conf {
     my ( $match_pool_list_ref, $env_pool_list_ref, $icontrol, $pool_configuration_dir ) = @_;
     my $expected_pool_ref = parse_pools( $pool_configuration_dir );
+
+    my @mismatch_members;
+
     foreach my $match_pool ( @{ $match_pool_list_ref } ) {
         my $expected_members = $expected_pool_ref->{ $match_pool }{ 'members' };
         $expected_members = "empty" if $expected_members eq "";
@@ -306,10 +353,23 @@ sub validate_pool_conf {
             }
         }
 
+        my %mismatch_member = (
+            'pool'      => $match_pool_real_name,
+            'real'      => $real_members,
+            'expected'  => $expected_members,
+        );
+
         # Valiadte if matching.
         if ( ( defined $real_members and defined $expected_members )
                 and ( $real_members ne $expected_members ) ) {
-            $logger->warn( "The mebmers of pool $match_pool_real_name should be $expected_members, instead of $real_members." );
+            push @mismatch_members, \%mismatch_member;
+        }
+    }
+
+    if ( scalar @mismatch_members > 0 ) {
+        $logger->warn( "Following pool members mismatch:" );
+        foreach my $mismatch_member_ref ( @mismatch_members ) {
+            $logger->warn( "Pool [$mismatch_member_ref->{ 'pool' }] member(s) is [$mismatch_member_ref->{ 'real' }], but expects [$mismatch_member_ref->{ 'expected' }]");
         }
     }
 }
