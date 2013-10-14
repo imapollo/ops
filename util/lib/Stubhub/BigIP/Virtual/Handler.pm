@@ -38,7 +38,9 @@ our @EXPORT_OK;
 # Get the default pool of a virtual server.
 #
 sub get_vs_default_pool {
-    my ( $iControl, $pool_name ) = @_;
+    my ( $iControl, $vs_name ) = @_;
+    my $default_pool_name = $iControl->get_default_pool_name( $vs_name );
+    return $default_pool_name;
 }
 
 #
