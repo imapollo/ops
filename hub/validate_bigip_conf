@@ -52,6 +52,7 @@ use Stubhub::BigIP::Pool::Parser qw (
 use Stubhub::BigIP::Virtual::Handler qw (
                                     get_env_virtual_servers
                                     get_vs_default_pool
+                                    get_vs_irules
                                 );
 use Stubhub::BigIP::Virtual::ConfigGenerator qw (
                                     generate_vs_separate_configs
@@ -234,18 +235,39 @@ sub validate_vs_conf {
     my $expected_vs_ref = parse_virtual_servers( $vs_configuration_dir );
     foreach my $match_vs ( @{ $match_vs_list_ref } ) {
         my $expected_default_pool = $expected_vs_ref->{ $match_vs }{ 'default_pool' };
+        my $expected_irule = $expected_vs_ref->{ $match_vs }{ 'irule' };
+
         my $match_vs_real_name;
         my $real_default_pool;
+        my $real_irule;
+
         foreach my $env_vs ( @{ $env_vs_list_ref } ) {
             if ( $match_vs =~ /^$env_vs$/i ) {
                 $match_vs_real_name = $env_vs;
                 $real_default_pool = get_vs_default_pool( $icontrol, $env_vs);
+                $real_default_pool = qw{} if $real_default_pool eq "";
+                $real_irule = join ",", sort( get_vs_irules( $icontrol , $env_vs ) ) if ( scalar get_vs_irules( $icontrol, $env_vs ) > 0 );
                 last;
             }
         }
+
+        # Validate if matching.
         if ( ( defined $real_default_pool and defined $expected_default_pool )
                 and ( $real_default_pool ne $expected_default_pool ) ) {
             $logger->warn( "The virtual server $match_vs_real_name default pool is expected as $expected_default_pool, but $real_default_pool.\n" );
+        } elsif ( defined $real_default_pool and not defined $expected_default_pool ) {
+            $logger->warn( "Default pool for $match_vs_real_name is $real_default_pool, but not defined in template." );
+        } elsif ( not defined $real_default_pool and defined $expected_default_pool ) {
+            $logger->warn( "Default pool for $match_vs_real_name should be $expected_default_pool, but not set instead." );
+        }
+
+        if ( ( defined $real_irule and defined $expected_irule ) 
+                and ( $real_irule ne $expected_irule ) ) {
+            $logger->warn( "The virtual server $match_vs_real_name irule is epected as $expected_irule, but $real_irule" );
+        } elsif ( defined $real_irule and not defined $expected_irule ) {
+            $logger->warn( "iRule for $match_vs_real_name is $real_irule, but not defined in template.");
+        } elsif ( not defined $real_irule and defined $expected_irule ) {
+            $logger->warn( "iRule for $match_vs_real_name should be $expected_irule, but not set instead.");
         }
     }
 }

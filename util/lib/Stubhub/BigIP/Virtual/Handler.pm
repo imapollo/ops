@@ -28,6 +28,7 @@ BEGIN {
                         &get_pub_env_virtual_servers
                         &delete_not_excluded_env_virtual_servers
                         &get_vs_default_pool
+                        &get_vs_irules
                     );
   %EXPORT_TAGS  = ();
 }
@@ -39,8 +40,16 @@ our @EXPORT_OK;
 #
 sub get_vs_default_pool {
     my ( $iControl, $vs_name ) = @_;
-    my $default_pool_name = $iControl->get_default_pool_name( $vs_name );
-    return $default_pool_name;
+    return $iControl->get_default_pool_name( $vs_name );
+}
+
+#
+# Get the irules of a virtual server.
+# Return @irule.
+#
+sub get_vs_irules {
+    my ( $iControl, $vs_name ) = @_;
+    return $iControl->get_ltm_vs_rules( $vs_name );
 }
 
 #
