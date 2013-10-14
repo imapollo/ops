@@ -28,6 +28,7 @@ BEGIN {
                         &get_env_pool_list
                         &delete_not_excluded_env_pools
                         &get_pool_members_status
+                        &get_env_pool_members
                     );
   %EXPORT_TAGS  = ();
 }
@@ -91,3 +92,12 @@ sub get_pool_members_status {
     my $pool_members_status = $iControl->get_pool_member_status( $pool );
     return $pool_members_status;
 }
+
+#
+# Get the pool members.
+#
+sub get_env_pool_members {
+    my ( $iControl, $pool ) = @_;
+    return $iControl->get_pool_members( $pool );
+}
+

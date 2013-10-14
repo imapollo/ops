@@ -42,6 +42,7 @@ use Stubhub::BigIP::System::Util qw (
                                 );
 use Stubhub::BigIP::Pool::Handler qw (
                                     get_env_pool_list
+                                    get_env_pool_members
                                 );
 use Stubhub::BigIP::Pool::ConfigGenerator qw (
                                     generate_pool_separate_configs
@@ -283,21 +284,46 @@ sub validate_vs_conf {
 }
 
 #
-# Replace the service name with port number.
-#
-sub replace_known_service_name_with_port {
-    my ( $string ) = @_;
-    $string =~ s/:http$/:80/;
-    $string =~ s/:https$/:443/;
-    $string =~ s/:any$/:0/;
-    return $string;
-}
-
-#
 # Validate pool configurations.
 # - Check if pool DNS/IP is correct.
 #
 sub validate_pool_conf {
+    my ( $match_pool_list_ref, $env_pool_list_ref, $icontrol, $pool_configuration_dir ) = @_;
+    my $expected_pool_ref = parse_pools( $pool_configuration_dir );
+    foreach my $match_pool ( @{ $match_pool_list_ref } ) {
+        my $expected_members = $expected_pool_ref->{ $match_pool }{ 'members' };
+        $expected_members = "empty" if $expected_members eq "";
+        $expected_members = replace_known_service_name_with_port( $expected_members );
+
+        my $match_pool_real_name;
+        my $real_members;
+
+        foreach my $env_pool ( @{ $env_pool_list_ref } ) {
+            if ( $match_pool =~ /^$env_pool$/i ) {
+                $match_pool_real_name = $env_pool;
+                $real_members = join ",", sort( get_env_pool_members( $icontrol, $env_pool ) );
+                last;
+            }
+        }
+
+        # Valiadte if matching.
+        if ( ( defined $real_members and defined $expected_members )
+                and ( $real_members ne $expected_members ) ) {
+            $logger->warn( "The mebmers of pool $match_pool_real_name should be $expected_members, instead of $real_members." );
+        }
+    }
+}
+
+#
+# Replace the service name with port number.
+#
+sub replace_known_service_name_with_port {
+    my ( $string ) = @_;
+    $string =~ s/:http\b/:80/;
+    $string =~ s/:https\b/:443/;
+    $string =~ s/:any\b/:0/;
+    $string =~ s/:webcache\b/:8080/;
+    return $string;
 }
 
 #
