@@ -106,6 +106,7 @@ export PS1="[\u:${ENVPREFIX}${ENVID}@\h \W]\$ "
 export JBDF="/opt/jboss/server/default"
 export JBDP="${JBDF}/deploy"
 export JBLG="${JBDF}/log/jboss.log"
+export JBLGDIR="${JBDF}/log"
 
 #
 # Set Apache variables
@@ -122,7 +123,12 @@ export STCK="http://${ENVPREFIX}${ENVID}hub001.${ENVPREFIX}${ENVID}.com:8080/jmx
 # Useful URL
 #
 export SOLR="http://${ENVPREFIX}${ENVID}mci001.${ENVPREFIX}${ENVID}.com/solr"
+export SLR="http://${ENVPREFIX}${ENVID}mci001.${ENVPREFIX}${ENVID}.com/solr"
+export MCISLR="http://${ENVPREFIX}${ENVID}mci001.${ENVPREFIX}${ENVID}.com/solr"
+export LCXSLR="http://${ENVPREFIX}${ENVID}LCX001.${ENVPREFIX}${ENVID}.com/solr"
 export MQ="http://${ENVPREFIX}${ENVID}mqm001.${ENVPREFIX}${ENVID}.com:8161/admin/queues.jsp"
+export MQMMQ="http://${ENVPREFIX}${ENVID}mqm001.${ENVPREFIX}${ENVID}.com:8161/admin/queues.jsp"
+export LCMMQ="http://${ENVPREFIX}${ENVID}lcm001.${ENVPREFIX}${ENVID}.com:8161/admin/queues.jsp"
 export STBTX="https://stubtex.${ENVPREFIX}${ENVID}.com/cstool"
 export REIDX="http://${ENVPREFIX}${ENVID}lcm001.${ENVPREFIX}${ENVID}.com/jmx-console/HtmlAdaptor?action=inspectMBean&name=com.stubhub.framework.lcsmaster%3Aservice%3DrequestChainServletMonitor"
 export MYXRT="http://${ENVPREFIX}${ENVID}myx001.${ENVPREFIX}${ENVID}.com/jmx-console/HtmlAdaptor?action=inspectMBean&name=Stubhub-Properties-StubhubMYXRole%3Aname%3DStubHub+Properties"
