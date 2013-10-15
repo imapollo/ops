@@ -2,12 +2,12 @@
 #
 # Validate the BIG-IP configurations for specified environment.
 # Following items will be checked:
+#  - Check if any missing/extra VIPs.
+#  - Check if any missing/extra Pool.
 #  - Check if VIPs point to correct Pool.
 #  - Check if VIPs using correct iRule.
-#  - Check if any missing/extra VIPs.
 #  - Check if VIPs DNS/IP is correct.
 #  - Check if Pools DNS/IP is correct.
-#  - Check if any missing/extra Pool.
 #
 # Usage: validate_bigip_conf [options]
 #
@@ -113,6 +113,28 @@ if ( $show_usage ) {
 #
 sub usage {
    print <<END_OF_HELP
+
+Validate the BIG-IP configurations for specified environment.
+Following items will be checked:
+ - Check if any missing/extra VIPs.
+ - Check if any missing/extra Pool.
+ - Check if VIPs point to correct Pool.
+ - Check if VIPs using correct iRule.
+ - Check if VIPs DNS/IP is correct.
+ - Check if Pools DNS/IP is correct.
+
+Usage: validate_bigip_conf [options]
+
+Options:
+ -e | --env               Specify the environment ID. For example: srwd76.
+ -b | --branch            Specify the branch to check based on.
+                          Default: main.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ validate_bigip_conf -e srwd76
+ validate_bigip_conf -e srwd76 -b rb_ecomm_13_13
 
 END_OF_HELP
 }
