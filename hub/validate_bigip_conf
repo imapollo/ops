@@ -338,6 +338,7 @@ sub validate_vs_conf {
         foreach my $mismatch_irule_ref ( @mismatch_irules ) {
             $logger->warn( "Virtual server [$mismatch_irule_ref->{ 'vs' }] irule is [$mismatch_irule_ref->{ 'real' }], but expects [$mismatch_irule_ref->{ 'expected' }]" );
         }
+        $logger->warn( "" );
     }
 
     if ( scalar @mismatch_destinations > 0 ) {
@@ -345,6 +346,7 @@ sub validate_vs_conf {
         foreach my $mismatch_destination_ref ( @mismatch_destinations ) {
             $logger->warn( "Virtual server [$mismatch_destination_ref->{ 'vs' }] destination is [$mismatch_destination_ref->{ 'real' }], but expects [$mismatch_destination_ref->{ 'expected' }]" );
         }
+        $logger->warn( "" );
     }
 
 }
