@@ -89,10 +89,12 @@ do
     shortcut_long=`echo $ROLE | sed "s/${ENVPREFIX}${ENVID}\(.*00[0-9]\).*/\1/"`
     if echo $shortcut | grep -q "^[a-z]\+$"; then
         export $shortcut=$ROLE
-        export ${shortcut}jmx=http://${ROLE}/jmx-console/
+        export ${shortcut}jmx="http://${ROLE}/jmx-console/"
+        export ${shortcut}chk="http://${ROLE}/jmx-console/HtmlAdaptor?action=invokeOpByName&name=jboss.system%3Aservice%3DMainDeployer&methodName=checkIncompleteDeployments"
     fi
     export $shortcut_long=$ROLE
-    export ${shortcut_long}jmx=http://${ROLE}/jmx-console/
+    export ${shortcut_long}jmx="http://${ROLE}/jmx-console/"
+    export ${shortcut_long}chk="http://${ROLE}/jmx-console/HtmlAdaptor?action=invokeOpByName&name=jboss.system%3Aservice%3DMainDeployer&methodName=checkIncompleteDeployments"
 done
 
 #
