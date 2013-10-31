@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Fix the ilog rules version based on rule engine versions.
+# Fix the ilog rules version based on versions on rule engine.
 #
 # Usage: fix_ilog_rule_version [options]
 #
