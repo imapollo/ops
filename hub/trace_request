@@ -1,0 +1,165 @@
+#!/usr/bin/perl
+#
+# Trace the request to determine which back-end server really
+# getting the request. The script will determine the back-end
+# server with following rules:
+# - Based on the request path and irule if bond to virtual server.
+# - Based on the default pool if no irule bond or path not found.
+# - Based on the forward rule if going to API gateway.
+#
+# Usage: trace_request [options]
+#
+# Options:
+#  -u | --url               Request the url. Default protocol: http.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  trace_request api.srwd83.com
+#  trace_request https://payment.api.srwd83.com/paymentapi/ccping
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+
+# use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $request_url = qw{};
+my $options_okay = GetOptions (
+    'u|url=s'     => \$request_url,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+
+Trace the request to determine which back-end server really
+getting the request. The script will determine the back-end
+server with following rules:
+- Based on the request path and irule if bond to virtual server.
+- Based on the default pool if no irule bond or path not found.
+- Based on the forward rule if going to API gateway.
+
+Usage: trace_request [options]
+
+Options:
+ -u | --url               Request the url. Default protocol: http.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ trace_request api.srwd83.com
+ trace_request https://payment.api.srwd83.com/paymentapi/ccping
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $request_url ) {
+    $logger->error( "The pamameter '-u' must be set.\n" );
+    usage();
+    exit 1;
+}
+
+#
+# Find the vritual server based on the request.
+#
+sub find_virtual_server {
+    my ( $protocol, $virtual_server ) = @_;
+}
+
+#
+# Get the iRule for virtual server.
+#
+sub get_irule_for_virtual_server {
+    my ( $virtual_server ) = @_;
+}
+
+#
+# Get the default pool for virtual server.
+#
+sub get_default_pool_for_virtual_server {
+    my ( $virtual_server ) = @_;
+}
+
+#
+# Parse the irule and get which pool is redirected to.
+#
+sub parse_irule {
+    my ( $irule_on_f5, $url_path ) = @_;
+}
+
+#
+# Parse the gateway forward rule to determine which virtual server
+# is the request re-directed to.
+#
+sub parse_gateway_forward {
+    my ( $gateway_server, $url_path ) = @_;
+}
+
+#
+# Main
+#
+my $protocol = 'http';
+my $virtual_server = qw();
+
+# TODO when specify :8080
+if ( $request_url =~ "^http[s]?://" ) {
+    $protocol = $request_url;
+    $protocol =~ s"^(http[s]?)://.*"$1";
+}
+
+$virtual_server = $request_url;
+$virtual_server =~ s"(http[s]?://)?([^/]*)(/.*)?"$2";
+$url_path = $request_url;
+$url_path =~ s"(http[s]?://)?([^/]*)(/.*)?"$3";
+
+my $virtual_server_on_f5 = find_virtual_server( $protocol, $virtual_server);
+my $irule_on_f5 = get_irule_for_virtual_server( $virtual_server_on_f5 );
+my $default_pool_on_f5 = get_default_pool_for_virtual_server( $virtual_server_on_f5 );
+parse_irule( $irule_on_f5, $url_path );
+parse_gateway_forward( $gateway_server, $url_path );
+
+exit 0;
