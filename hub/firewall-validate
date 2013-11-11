@@ -91,7 +91,7 @@ do
     from_host=`echo $env_rule | awk -F: '{ print $1 }'`
     to_host=`echo $env_rule | awk -F: '{ print $2 }'`
     port=`echo $env_rule | awk -F: '{ print $3 }'`
-    ssh $from_host ". /nas/home/minjzhang/bin/base; $BIN/check_port $to_host $port" &> /dev/null < /dev/null
+    ssh -oPasswordAuthentication=no -ostricthostkeychecking=no $from_host ". /nas/home/minjzhang/bin/base; $BIN/check_port $to_host $port" &> /dev/null < /dev/null
     return_code=$?
     if [[ $return_code == 0 ]]; then
         echo "${from_host} -> ${to_host}:${port} : PASS"
