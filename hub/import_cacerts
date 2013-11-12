@@ -9,6 +9,7 @@
 #  -r | --role=..      Specify the role to import cacerts to.
 #  -u | --url=..       Specify the URL to import cacerts from.
 #                      For example: payments.api.srwd24.com
+#  -f | --file=..      Specify the key file path to import.
 #  -j | --jdkhome=..   Specify the path of the JDK. Default: /opt/jdk1.5.0_22.
 #                      cacerts file is located in $JDK_HOME/jre/lib/security/cacerts
 #  -v | --verbose      Print verbose messages.
@@ -41,6 +42,7 @@ Options:
  -r | --role=..      Specify the role to import cacerts to.
  -u | --url=..       Specify the URL to import certs from.
                      For example: payments.api.srwd24.com
+ -f | --file=..      Specify the key file path to import.
  -j | --jdkhome=..   Specify the path of the JDK. Default: /opt/jdk1.5.0_22.
                      cacerts file is located in \$JDK_HOME/jre/lib/security/cacerts
  -v | --verbose      Print verbose messages.
@@ -51,7 +53,7 @@ EOF
 #
 # Get options
 #
-OPTS=`getopt -o e:r:u:j:v -l envid:,role:,url:,jdk_home:,verbose -- $options`
+OPTS=`getopt -o e:r:u:f:j:v -l envid:,role:,url:,file:,jdk_home:,verbose -- $options`
 if [ $? != 0 ]; then
     echo "Error: Unrecognized parameters."
     _usage
@@ -65,6 +67,7 @@ while true ; do
         -e | --envid) envid="${2// }"; shift 2;;
         -r | --role) role="${2// }"; shift 2;;
         -u | --url) url="${2// }"; shift 2;;
+        -f | --file) key_file="${2// }"; shift 2;;
         -j | --jdkhome) jdk_home="${2// }"; shift 2;;
         -v | --verbose) verbose=1; shift;;
         --) shift; break;;
@@ -84,8 +87,14 @@ function _print_verbose_msg {
 #
 # Variable validation.
 #
-if [[ "$envid" == "" || "$role" == "" || "$url" == "" ]]; then
-    echo "Error: Pamaters '-e', '-r', '-u' must be set."
+if [[ "$envid" == "" || "$role" == "" || ( "$url" == "" && "$key_file" == "" ) ]]; then
+    echo "Error: Parameters '-e', '-r', either '-u' or '-f' must be set."
+    _usage
+    exit 1
+fi
+
+if [[ "$url" != "" && "$key_file" != "" ]]; then
+    echo "Error: Parameters '-u' and '-f', only one need to be set."
     _usage
     exit 1
 fi
@@ -96,12 +105,26 @@ fi
 tmp_certs="$(mktemp)"
 tmp_der_certs="$(mktemp)"
 tmp_yes="$(mktemp)"
-grep $envid /nas/reg/etc/dev-qa-hosts | grep $role | while read host
-do
-    ssh -oPasswordAuthentication=no -ostricthostkeychecking=no $host "echo 'yes' > $tmp_yes;
-    /nas/utl/devops/bin/timeout 5 openssl s_client -connect $url:443 > $tmp_certs;
-    openssl x509 -in $tmp_certs -outform DER -out $tmp_der_certs;
-    sudo $jdk_home/bin/keytool -import -keystore $jdk_home/jre/lib/security/cacerts -storepass changeit -file $tmp_der_certs -alias paymentkey < $tmp_yes" < /dev/null
-done
+key_name="key${RANDOM}"
+
+# Deploy certs from URL.
+if [[ "$url" != "" ]]; then
+    grep $envid /nas/reg/etc/dev-qa-hosts | grep $role | while read host
+    do
+        ssh -oPasswordAuthentication=no -ostricthostkeychecking=no $host "echo 'yes' > $tmp_yes;
+        /nas/utl/devops/bin/timeout 5 openssl s_client -connect $url:443 > $tmp_certs;
+        openssl x509 -in $tmp_certs -outform DER -out $tmp_der_certs;
+        sudo $jdk_home/bin/keytool -import -keystore $jdk_home/jre/lib/security/cacerts -storepass changeit -file $tmp_der_certs -alias $key_name < $tmp_yes" < /dev/null
+    done
+fi
+
+# Deploy certs from key file.
+if [[ "$key_file" != "" ]]; then
+   grep $envid /nas/reg/etc/dev-qa-hosts | grep $role | while read host
+    do
+        ssh -oPasswordAuthentication=no -ostricthostkeychecking=no $host "echo 'yes' > $tmp_yes;
+        sudo $jdk_home/bin/keytool -import -keystore $jdk_home/jre/lib/security/cacerts -storepass changeit -file $key_file -alias $key_name < $tmp_yes" < /dev/null
+    done
+fi
 
 exit 0
