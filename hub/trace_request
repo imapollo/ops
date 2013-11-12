@@ -33,6 +33,13 @@ use Stubhub::Log::Util qw (
                             init
                             get_logger_with_loglevel
                         );
+use Stubhub::BigIP::System::Util qw (
+                            get_icontrol
+                        );
+use Stubhub::BigIP::Virtual::Handler qw (
+                            get_env_virtual_servers
+                            get_vss_destinations
+                        );
 
 # Get options
 my $show_usage = qw{};
@@ -107,7 +114,15 @@ if ( ! defined $request_url ) {
 # Find the vritual server based on the request.
 #
 sub find_virtual_server {
-    my ( $protocol, $virtual_server ) = @_;
+    my ( $icontrols_ref, $envid, $protocol, $virtual_server ) = @_;
+    foreach my $icontrol ( @{ $icontrols_ref } ) {
+        my @virtual_servers = get_env_virtual_servers( $icontrol, $envid);
+        my @destinations = get_vss_destinations( $icontrol, @virtual_servers );
+        foreach my $destination ( @destinations ) {
+            print $destination->{ 'address' } . "\n";
+            print $destination->{ 'port' } . "\n";
+        }
+    }
 }
 
 #
@@ -143,23 +158,27 @@ sub parse_gateway_forward {
 # Main
 #
 my $protocol = 'http';
-my $virtual_server = qw();
-
 # TODO when specify :8080
 if ( $request_url =~ "^http[s]?://" ) {
     $protocol = $request_url;
     $protocol =~ s"^(http[s]?)://.*"$1";
 }
 
-$virtual_server = $request_url;
+my $virtual_server = $request_url;
 $virtual_server =~ s"(http[s]?://)?([^/]*)(/.*)?"$2";
-$url_path = $request_url;
+my $url_path = $request_url;
 $url_path =~ s"(http[s]?://)?([^/]*)(/.*)?"$3";
+my $envid = $virtual_server;
+$envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
 
-my $virtual_server_on_f5 = find_virtual_server( $protocol, $virtual_server);
+# List of internal and external bigip server.
+my @icontrols = get_icontrol( $envid );
+my ( $icontrol, $virtual_server_on_f5 ) = find_virtual_server( \@icontrols, $envid, $protocol, $virtual_server);
+exit 0;
 my $irule_on_f5 = get_irule_for_virtual_server( $virtual_server_on_f5 );
 my $default_pool_on_f5 = get_default_pool_for_virtual_server( $virtual_server_on_f5 );
 parse_irule( $irule_on_f5, $url_path );
+my $gateway_server = qw{};
 parse_gateway_forward( $gateway_server, $url_path );
 
 exit 0;

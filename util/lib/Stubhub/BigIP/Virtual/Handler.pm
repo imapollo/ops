@@ -30,6 +30,7 @@ BEGIN {
                         &get_vs_default_pool
                         &get_vs_irules
                         &get_vs_destination
+                        &get_vss_destinations
                     );
   %EXPORT_TAGS  = ();
 }
@@ -59,6 +60,14 @@ sub get_vs_irules {
 sub get_vs_destination {
     my ( $iControl, $vs_name ) = @_;
     return $iControl->get_vs_destination( $vs_name );
+}
+
+#
+# Get the destination ip of a virtual server.
+#
+sub get_vss_destinations {
+    my ( $iControl, @vss_name ) = @_;
+    return $iControl->get_vss_destinations( \@vss_name );
 }
 
 #
