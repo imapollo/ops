@@ -44,8 +44,14 @@ our $logger = get_logger();
 # Get BigIP partition name.
 #
 sub get_bigip_partition {
-    my ( $envid, $int_ext ) = @_;
-    my ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $int_ext );
+    my ( $envid, $type ) = @_;
+
+    if ( $type =~ /(int|ext)/ ) {
+        my ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $type );
+    } else {
+        my ( $bigip_server, $bigip_partition ) = _get_special_bigip_server_partition( $envid, $type );
+    }
+
     return $bigip_partition;
 }
 
@@ -53,8 +59,12 @@ sub get_bigip_partition {
 # Get BigIP server name.
 #
 sub get_bigip_server {
-    my ( $envid, $int_ext ) = @_;
-    my ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $int_ext );
+    my ( $envid, $type ) = @_;
+    if ( $type =~ /(int|ext)/ ) {
+        my ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $type );
+    } else {
+        my ( $bigip_server, $bigip_partition ) = _get_special_bigip_server_partition( $envid, $type );
+    }
     return $bigip_server;
 }
 
@@ -105,13 +115,33 @@ sub _get_bigip_server_partition {
         $internal_bigip_server = '10.80.159.40'; # srwd00lba012/013
         $external_bigip_server = '10.80.159.37'; # srwd00lba040/041
     }
-    # TODO For test
     # $internal_bigip_server = 'srwd00lba013.stubcorp.dev';
     # $external_bigip_server = 'srwd00lba041.stubcorp.dev';
 
     if ( $int_ext =~ /int/ ) {
         return ( $internal_bigip_server, $internal_partition );
-    } else {
+    } elsif ( $int_ext =~ /ext/ ) {
         return ( $external_bigip_server, $external_partition );
     }
+}
+
+#
+# Get special BigIP server and partition.
+#
+sub _get_special_bigip_server_partition {
+    my ( $envid, $type ) = @_;
+    my $bigip_server = qw{};
+    my $partition = "Common";
+
+    my $env_number = $envid;
+    my $env_prefix = $envid;
+    $env_number =~ s/srw[deq]//ig;
+    $env_prefix =~ s/(srw[deq]).*/$1/ig;
+    chomp $env_number;
+
+    if ( $type eq "apigateway" ) {
+        $bigip_server = '10.80.159.37'; # srwd00lba040/041
+    }
+
+    return ( $bigip_server, $partition );
 }

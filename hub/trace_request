@@ -17,6 +17,7 @@
 # Examples:
 #  trace_request -u api.srwd83.com
 #  trace_request -u https://payment.api.srwd83.com/paymentapi/ccping
+#  trace_request -u https://api-dev.srwd10.com/paymentapi -e srwd83
 #
 # Author: minjzhang
 #
@@ -35,6 +36,7 @@ use Stubhub::Log::Util qw (
                         );
 use Stubhub::BigIP::System::Util qw (
                             get_icontrol
+                            get_special_icontrol
                         );
 use Stubhub::BigIP::Virtual::Handler qw (
                             get_env_virtual_servers
@@ -109,6 +111,7 @@ Options:
 Examples:
  trace_request -u api.srwd83.com
  trace_request -u https://payment.api.srwd83.com/paymentapi/ccping
+ trace_request -u https://api-dev.srwd10.com/paymentapi -e srwd83
 
 END_OF_HELP
 }

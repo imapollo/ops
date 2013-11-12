@@ -39,6 +39,7 @@ BEGIN {
                         &deploy_configuration
                         &download_configuration
                         &get_icontrol
+                        &get_special_icontrol
                         &get_icontrol_instance
                         &set_partition
                         &save_configuration
@@ -97,6 +98,25 @@ sub get_icontrol {
     # set_partition( $external_ic, $external_partition );
 
     return ( $internal_ic, $external_ic );
+}
+
+#
+# Get special iControl instances, for example api gateway.
+#
+sub get_special_icontrol {
+    my ( $envid, $type ) = @_;
+
+    Readonly my $BIGIP_USERNAME => 'svcacctrelmgt';
+    Readonly my $BIGIP_PASSWORD => 'UjhiYml0U3Qzdw==';
+
+    my $bigip_server = get_bigip_server( $envid, $type );
+    my $partition = get_bigip_partition( $envid, $type );
+    
+    $logger->debug( "The BigIP server is: $bigip_server" );
+
+    my $icontrol = get_icontrol_instance( $bigip_server, $BIGIP_USERNAME, decode_base64( $BIGIP_PASSWORD ) );
+
+    return $icontrol;
 }
 
 #
