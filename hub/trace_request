@@ -39,6 +39,15 @@ use Stubhub::BigIP::System::Util qw (
 use Stubhub::BigIP::Virtual::Handler qw (
                             get_env_virtual_servers
                             get_vss_destinations
+                            get_vs_irules
+                            get_vs_default_pool
+                        );
+use Stubhub::BigIP::Pool::Handler qw (
+                            get_env_pool_members
+                        );
+use Stubhub::Util::Host qw (
+                            get_ip_by_hostname
+                            get_hostname_by_ip
                         );
 
 # Get options
@@ -115,35 +124,53 @@ if ( ! defined $request_url ) {
 #
 sub find_virtual_server {
     my ( $icontrols_ref, $envid, $protocol, $virtual_server ) = @_;
+
+    my $virtual_server_ip = get_ip_by_hostname( $virtual_server );
+    $protocol = "80" if $protocol eq "http";
+    $protocol = "443" if $protocol eq "https";
+
+    my $virtual_server_name = qw{};
+    my $selected_icontrol;
+
     foreach my $icontrol ( @{ $icontrols_ref } ) {
         my @virtual_servers = get_env_virtual_servers( $icontrol, $envid);
         my @destinations = get_vss_destinations( $icontrol, @virtual_servers );
+        my $vs_index = 0;
         foreach my $destination ( @destinations ) {
-            print $destination->{ 'address' } . "\n";
-            print $destination->{ 'port' } . "\n";
+            if ( $destination->{ 'address' } eq $virtual_server_ip
+                && $destination->{ 'port' } eq $protocol ) {
+                $virtual_server_name = $virtual_servers[ $vs_index ];
+                $selected_icontrol = $icontrol;
+                last;
+            }
+            $vs_index = $vs_index + 1;
         }
+        last if $virtual_server_name ne "";
     }
+    return ( $selected_icontrol, $virtual_server_name );
 }
 
 #
 # Get the iRule for virtual server.
 #
 sub get_irule_for_virtual_server {
-    my ( $virtual_server ) = @_;
+    my ( $icontrol, $virtual_server ) = @_;
+    return get_vs_irules( $icontrol, $virtual_server );
 }
 
 #
 # Get the default pool for virtual server.
 #
 sub get_default_pool_for_virtual_server {
-    my ( $virtual_server ) = @_;
+    my ( $icontrol, $virtual_server ) = @_;
+    return get_vs_default_pool( $icontrol, $virtual_server );
 }
 
 #
 # Parse the irule and get which pool is redirected to.
 #
 sub parse_irule {
-    my ( $irule_on_f5, $url_path ) = @_;
+    my ( $icontrol, $irules_on_f5_ref, $url_path ) = @_;
 }
 
 #
@@ -174,11 +201,23 @@ $envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
 # List of internal and external bigip server.
 my @icontrols = get_icontrol( $envid );
 my ( $icontrol, $virtual_server_on_f5 ) = find_virtual_server( \@icontrols, $envid, $protocol, $virtual_server);
-exit 0;
-my $irule_on_f5 = get_irule_for_virtual_server( $virtual_server_on_f5 );
-my $default_pool_on_f5 = get_default_pool_for_virtual_server( $virtual_server_on_f5 );
-parse_irule( $irule_on_f5, $url_path );
+my @irules_on_f5 = get_irule_for_virtual_server( $icontrol, $virtual_server_on_f5 );
+my $default_pool_on_f5 = get_default_pool_for_virtual_server( $icontrol, $virtual_server_on_f5 );
+
+my $go_pool = $default_pool_on_f5;
+
+if ( scalar @irules_on_f5 > 0 && $url_path ne "" ) {
+    $go_pool = parse_irule( $icontrol, \@irules_on_f5, $url_path )
+}
+
 my $gateway_server = qw{};
-parse_gateway_forward( $gateway_server, $url_path );
+if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
+    my $go_virtual = parse_gateway_forward( $gateway_server, $url_path )
+}
+
+my @pool_members = get_env_pool_members( $icontrol, $go_pool );
+foreach my $pool_member ( @pool_members ) {
+    print get_hostname_by_ip( $pool_member ) . "\n";
+}
 
 exit 0;
