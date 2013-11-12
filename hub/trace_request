@@ -45,6 +45,9 @@ use Stubhub::BigIP::Virtual::Handler qw (
 use Stubhub::BigIP::Pool::Handler qw (
                             get_env_pool_members
                         );
+use Stubhub::BigIP::Rule::Handler qw (
+                            get_rule_definition
+                        );
 use Stubhub::Util::Host qw (
                             get_ip_by_hostname
                             get_hostname_by_ip
@@ -151,26 +154,33 @@ sub find_virtual_server {
 }
 
 #
-# Get the iRule for virtual server.
-#
-sub get_irule_for_virtual_server {
-    my ( $icontrol, $virtual_server ) = @_;
-    return get_vs_irules( $icontrol, $virtual_server );
-}
-
-#
-# Get the default pool for virtual server.
-#
-sub get_default_pool_for_virtual_server {
-    my ( $icontrol, $virtual_server ) = @_;
-    return get_vs_default_pool( $icontrol, $virtual_server );
-}
-
-#
 # Parse the irule and get which pool is redirected to.
 #
 sub parse_irule {
     my ( $icontrol, $irules_on_f5_ref, $url_path ) = @_;
+    foreach my $rule ( @{ $irules_on_f5_ref } ) {
+        my $rule_definition = get_rule_definition( $icontrol, $rule ) . "\n";
+        my @rule_lines = split "\n", $rule_definition;
+        my $match_rule = 0;
+        my $go_pool = qw{};
+        foreach my $rule_line ( @rule_lines ) {
+            if ( $rule_line =~ /^\s*"\/.+"/ ) {
+                $rule_line =~ s/^\s*"*(\/.+)".*/$1/;
+                $rule_line =~ s/\*+$//;
+                if ( $url_path =~ "$rule_line" ) {
+                    $match_rule = 1;
+                }
+            }
+            if ( $match_rule && $rule_line =~ /^\s*pool\s+\S+/i ) {
+                $go_pool = $rule_line;
+                $go_pool =~ s/^\s*pool\s+(\S+)\s*/$1/;
+                last;
+            }
+        }
+        return $go_pool if defined $go_pool;
+    }
+    # If not found
+    return "";
 }
 
 #
@@ -201,13 +211,14 @@ $envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
 # List of internal and external bigip server.
 my @icontrols = get_icontrol( $envid );
 my ( $icontrol, $virtual_server_on_f5 ) = find_virtual_server( \@icontrols, $envid, $protocol, $virtual_server);
-my @irules_on_f5 = get_irule_for_virtual_server( $icontrol, $virtual_server_on_f5 );
-my $default_pool_on_f5 = get_default_pool_for_virtual_server( $icontrol, $virtual_server_on_f5 );
+my @irules_on_f5 = get_vs_irules( $icontrol, $virtual_server_on_f5 );
+my $default_pool_on_f5 = get_vs_default_pool( $icontrol, $virtual_server_on_f5 );
 
 my $go_pool = $default_pool_on_f5;
 
 if ( scalar @irules_on_f5 > 0 && $url_path ne "" ) {
-    $go_pool = parse_irule( $icontrol, \@irules_on_f5, $url_path )
+    my $temp_pool = parse_irule( $icontrol, \@irules_on_f5, $url_path );
+    $go_pool = $temp_pool if $temp_pool ne "";
 }
 
 my $gateway_server = qw{};

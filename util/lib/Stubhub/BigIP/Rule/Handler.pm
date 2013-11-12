@@ -25,6 +25,7 @@ BEGIN {
                         &delete_env_rules
                         &get_rules
                         &get_env_rules
+                        &get_rule_definition
                     );
   %EXPORT_TAGS  = ();
 }
@@ -57,4 +58,12 @@ sub delete_env_rules {
     my ( $iControl, $pattern ) = @_;
     my @rules = get_env_rules( $iControl, $pattern );
     $iControl->delete_rules( \@rules );
+}
+
+#
+# Get the definition of a specified rule.
+#
+sub get_rule_definition {
+    my ( $iControl, $rule ) = @_;
+    $iControl->get_rule( $rule );
 }
