@@ -15,8 +15,8 @@
 #  -h | --help              Show help information.
 #
 # Examples:
-#  trace_request api.srwd83.com
-#  trace_request https://payment.api.srwd83.com/paymentapi/ccping
+#  trace_request -u api.srwd83.com
+#  trace_request -u https://payment.api.srwd83.com/paymentapi/ccping
 #
 # Author: minjzhang
 #
@@ -107,8 +107,8 @@ Options:
  -h | --help              Show help information.
 
 Examples:
- trace_request api.srwd83.com
- trace_request https://payment.api.srwd83.com/paymentapi/ccping
+ trace_request -u api.srwd83.com
+ trace_request -u https://payment.api.srwd83.com/paymentapi/ccping
 
 END_OF_HELP
 }
@@ -189,6 +189,7 @@ sub parse_irule {
 #
 sub parse_gateway_forward {
     my ( $gateway_server, $url_path ) = @_;
+    print $gateway_server . "\n";
 }
 
 #
@@ -209,6 +210,8 @@ my $envid = $virtual_server;
 $envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
 
 # List of internal and external bigip server.
+# TODO icontrol wrong for api-dev.srwd10.com
+# TODO need to specify envid if requesting shared apigateway
 my @icontrols = get_icontrol( $envid );
 my ( $icontrol, $virtual_server_on_f5 ) = find_virtual_server( \@icontrols, $envid, $protocol, $virtual_server);
 my @irules_on_f5 = get_vs_irules( $icontrol, $virtual_server_on_f5 );
@@ -221,8 +224,9 @@ if ( scalar @irules_on_f5 > 0 && $url_path ne "" ) {
     $go_pool = $temp_pool if $temp_pool ne "";
 }
 
-my $gateway_server = qw{};
 if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
+    my @members = get_env_pool_members( $icontrol, $go_pool );
+    my $gateway_server = $members[0];
     my $go_virtual = parse_gateway_forward( $gateway_server, $url_path )
 }
 
