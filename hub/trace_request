@@ -238,10 +238,13 @@ my $go_pool = qw{};
 my $icontrol = qw{};
 
 if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
-    my @icontrols = [ get_special_icontrol( $envid, "apigateway" ) ];
+    my $icontrol_gateway = get_special_icontrol( $envid, "apigateway" );
+    my @icontrols = ( $icontrol_gateway );
     ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $envid, $protocol, $virtual_server, $url_path);
     my @members = get_env_pool_members( $icontrol, $go_pool );
     my $gateway_server = $members[0];
+    $gateway_server =~ s/(.*):.*/$1/;
+    $gateway_server = get_hostname_by_ip( $gateway_server );
     my $go_virtual = parse_gateway_forward( $gateway_server, $url_path );
     exit 0;
     $go_pool = get_backend_server( \@icontrols, $envid, $protocol, $go_virtual, $url_path);
