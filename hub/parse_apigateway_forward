@@ -1,0 +1,117 @@
+#!/usr/bin/perl
+#
+# Parse the API gateway forward rules from files.
+#
+# Usage: parse_apigateway_forward [options]
+#
+# Options:
+#  -s | --server            Specify the AGG host to check.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  parse_apigateway_forward -h srwd10agg001.srwd10.com
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+
+# use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+use lib '/nas/reg/lib/perl';
+
+use Readonly;
+use XML::XPath;
+use XML::XPath::XMLParser;
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $agg_host = qw{};
+my $options_okay = GetOptions (
+    's|server=s'  => \$agg_host,
+    'v|verbose'   => \$show_verbose,
+    'h|help'      => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+
+Parse the API gateway forward rules from files.
+
+Usage: parse_apigateway_forward [options]
+
+Options:
+ -s | --server            Specify the AGG host to check.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ parse_apigateway_forward -h srwd10agg001.srwd10.com
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $agg_host ) {
+    $logger->error( "The pamameter '-h' must be set.\n" );
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+Readonly my $RULE_DIR => '/opt/wso2am/repository/deployment/server/synapse-configs/default/api';
+
+my @rule_files = <$RULE_DIR/*.xml>;
+foreach my $rule_file ( @rule_files ) {
+    my $xp = XML::XPath->new( filename => $rule_file );
+    my $context_nodeset = $xp->find('/api/@context');
+    my @node = $context_nodeset->get_nodelist();
+    # print XML::XPath::XMLParser::as_string($node[0]);
+    # print $xp->getNodeText('/api/@context');
+    print $rule_file . "\n";
+    print $xp->getNodeText('/api/resource/@url-mapping') . "\n";
+    print $xp->getNodeText('/api/resource/@uri-template') . "\n";
+    # open RULE_FILE_FH "<$rule_file" or $logger->die( "Cannot open file: $rule_file" );
+    # exit 0;
+}
+
+exit 0;
