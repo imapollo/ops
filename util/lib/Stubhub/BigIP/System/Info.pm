@@ -45,11 +45,13 @@ our $logger = get_logger();
 #
 sub get_bigip_partition {
     my ( $envid, $type ) = @_;
+    my $bigip_server;
+    my $bigip_partition;
 
     if ( $type =~ /(int|ext)/ ) {
-        my ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $type );
+        ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $type );
     } else {
-        my ( $bigip_server, $bigip_partition ) = _get_special_bigip_server_partition( $envid, $type );
+        ( $bigip_server, $bigip_partition ) = _get_special_bigip_server_partition( $envid, $type );
     }
 
     return $bigip_partition;
@@ -60,11 +62,15 @@ sub get_bigip_partition {
 #
 sub get_bigip_server {
     my ( $envid, $type ) = @_;
+    my $bigip_server;
+    my $bigip_partition;
+
     if ( $type =~ /(int|ext)/ ) {
-        my ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $type );
+        ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $type );
     } else {
-        my ( $bigip_server, $bigip_partition ) = _get_special_bigip_server_partition( $envid, $type );
+        ( $bigip_server, $bigip_partition ) = _get_special_bigip_server_partition( $envid, $type );
     }
+
     return $bigip_server;
 }
 

@@ -196,6 +196,24 @@ sub parse_gateway_forward {
 }
 
 #
+# Get the back end server based on virtual server.
+#
+sub get_backend_server {
+    my ( $icontrols_ref, $envid, $protocol, $virtual_server, $url_path) = @_;
+    my ( $icontrol, $virtual_server_on_f5 ) = find_virtual_server( $icontrols_ref, $envid, $protocol, $virtual_server);
+    my @irules_on_f5 = get_vs_irules( $icontrol, $virtual_server_on_f5 );
+    my $default_pool_on_f5 = get_vs_default_pool( $icontrol, $virtual_server_on_f5 );
+
+    my $go_pool = $default_pool_on_f5;
+
+    if ( scalar @irules_on_f5 > 0 && $url_path ne "" ) {
+        my $temp_pool = parse_irule( $icontrol, \@irules_on_f5, $url_path );
+        $go_pool = $temp_pool if $temp_pool ne "";
+    }
+    return ( $go_pool, $icontrol );
+}
+
+#
 # Main
 #
 my $protocol = 'http';
@@ -215,22 +233,21 @@ $envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
 # List of internal and external bigip server.
 # TODO icontrol wrong for api-dev.srwd10.com
 # TODO need to specify envid if requesting shared apigateway
-my @icontrols = get_icontrol( $envid );
-my ( $icontrol, $virtual_server_on_f5 ) = find_virtual_server( \@icontrols, $envid, $protocol, $virtual_server);
-my @irules_on_f5 = get_vs_irules( $icontrol, $virtual_server_on_f5 );
-my $default_pool_on_f5 = get_vs_default_pool( $icontrol, $virtual_server_on_f5 );
 
-my $go_pool = $default_pool_on_f5;
-
-if ( scalar @irules_on_f5 > 0 && $url_path ne "" ) {
-    my $temp_pool = parse_irule( $icontrol, \@irules_on_f5, $url_path );
-    $go_pool = $temp_pool if $temp_pool ne "";
-}
+my $go_pool = qw{};
+my $icontrol = qw{};
 
 if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
+    my @icontrols = [ get_special_icontrol( $envid, "apigateway" ) ];
+    ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $envid, $protocol, $virtual_server, $url_path);
     my @members = get_env_pool_members( $icontrol, $go_pool );
     my $gateway_server = $members[0];
-    my $go_virtual = parse_gateway_forward( $gateway_server, $url_path )
+    my $go_virtual = parse_gateway_forward( $gateway_server, $url_path );
+    exit 0;
+    $go_pool = get_backend_server( \@icontrols, $envid, $protocol, $go_virtual, $url_path);
+} else {
+    my @icontrols = get_icontrol( $envid );
+    ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $envid, $protocol, $virtual_server, $url_path);
 }
 
 my @pool_members = get_env_pool_members( $icontrol, $go_pool );
