@@ -103,13 +103,24 @@ Readonly my $RULE_DIR => '/opt/wso2am/repository/deployment/server/synapse-confi
 my @rule_files = <$RULE_DIR/*.xml>;
 foreach my $rule_file ( @rule_files ) {
     my $xp = XML::XPath->new( filename => $rule_file );
-    my $context_nodeset = $xp->find('/api/@context');
-    my @node = $context_nodeset->get_nodelist();
     # print XML::XPath::XMLParser::as_string($node[0]);
     # print $xp->getNodeText('/api/@context');
-    print $rule_file . "\n";
-    print $xp->getNodeText('/api/resource/@url-mapping') . "\n";
-    print $xp->getNodeText('/api/resource/@uri-template') . "\n";
+
+    my $resource_nodeset = $xp->find('/api/resource');
+    my @resource_nodes = $resource_nodeset->get_nodelist();
+    my $node_index = 1;
+    foreach my $resource_node ( @resource_nodes ) {
+        print $xp->getNodeText('/api/resource[' . $node_index . ']/@url-mapping') . "\n";
+        print $xp->getNodeText('/api/resource[' . $node_index . ']/@uri-template') . "\n";
+        print $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/class/property[@name=\'url\']/@value') . "\n";
+        print $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/filter/then/class/property[@name=\'url\']/@value') . "\n";
+        $node_index = $node_index + 1;
+        # print XML::XPath::XMLParser::as_string( $resource_node ) .  "\n";
+    }
+
+    # print $rule_file . "\n";
+    # print $xp->getNodeText('/api/resource/@url-mapping') . "\n";
+    # print $xp->getNodeText('/api/resource/@uri-template') . "\n";
     # open RULE_FILE_FH "<$rule_file" or $logger->die( "Cannot open file: $rule_file" );
     # exit 0;
 }
