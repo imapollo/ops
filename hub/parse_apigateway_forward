@@ -6,11 +6,12 @@
 #
 # Options:
 #  -s | --server            Specify the AGG host to check.
+#  -e | --envid             Specify the environment Id.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
 # Examples:
-#  parse_apigateway_forward -h srwd10agg001.srwd10.com
+#  parse_apigateway_forward -h srwd10agg001.srwd10.com -e srwd83
 #
 # Author: minjzhang
 #
@@ -36,8 +37,10 @@ use Stubhub::Log::Util qw (
 my $show_usage = qw{};
 my $show_verbose = qw{};
 my $agg_host = qw{};
+my $envid = qw{};
 my $options_okay = GetOptions (
     's|server=s'  => \$agg_host,
+    'e|envid=s'   => \$envid,
     'v|verbose'   => \$show_verbose,
     'h|help'      => \$show_usage,
 );
@@ -77,11 +80,12 @@ Usage: parse_apigateway_forward [options]
 
 Options:
  -s | --server            Specify the AGG host to check.
+ -e | --envid             Specify the environment Id.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
 Examples:
- parse_apigateway_forward -h srwd10agg001.srwd10.com
+ parse_apigateway_forward -h srwd10agg001.srwd10.com -e srwd83
 
 END_OF_HELP
 }
@@ -89,8 +93,8 @@ END_OF_HELP
 #
 # Parameter validation
 #
-if ( ! defined $agg_host ) {
-    $logger->error( "The pamameter '-h' must be set.\n" );
+if ( ! defined $agg_host || ! defined $envid ) {
+    $logger->error( "The pamameter '-h', '-e' must be set.\n" );
     usage();
     exit 1;
 }
@@ -102,27 +106,29 @@ Readonly my $RULE_DIR => '/opt/wso2am/repository/deployment/server/synapse-confi
 
 my @rule_files = <$RULE_DIR/*.xml>;
 foreach my $rule_file ( @rule_files ) {
+    print "filename: " . $rule_file . "\n";
     my $xp = XML::XPath->new( filename => $rule_file );
-    # print XML::XPath::XMLParser::as_string($node[0]);
-    # print $xp->getNodeText('/api/@context');
+    my $context_path = $xp->getNodeText('/api/@context');
+    print "context path: " . $context_path . "\n";
 
     my $resource_nodeset = $xp->find('/api/resource');
     my @resource_nodes = $resource_nodeset->get_nodelist();
     my $node_index = 1;
     foreach my $resource_node ( @resource_nodes ) {
-        print $xp->getNodeText('/api/resource[' . $node_index . ']/@url-mapping') . "\n";
-        print $xp->getNodeText('/api/resource[' . $node_index . ']/@uri-template') . "\n";
-        print $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/class/property[@name=\'url\']/@value') . "\n";
-        print $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/filter/then/class/property[@name=\'url\']/@value') . "\n";
-        $node_index = $node_index + 1;
-        # print XML::XPath::XMLParser::as_string( $resource_node ) .  "\n";
-    }
 
-    # print $rule_file . "\n";
-    # print $xp->getNodeText('/api/resource/@url-mapping') . "\n";
-    # print $xp->getNodeText('/api/resource/@uri-template') . "\n";
-    # open RULE_FILE_FH "<$rule_file" or $logger->die( "Cannot open file: $rule_file" );
-    # exit 0;
+        my $url_path = $xp->getNodeText('/api/resource[' . $node_index . ']/@url-mapping');
+        $url_path = $xp->getNodeText('/api/resource[' . $node_index . ']/@uri-template') if ( not defined $url_path or $url_path eq "" );
+
+        my $forward_url = $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/class/property[@name=\'url\']/@value');
+        $forward_url = $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/filter/then/class/property[@name=\'url\']/@value') if ( not defined $forward_url or $forward_url eq "");
+        $forward_url = $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/filter/then/send/endpoint/address/@uri') if ( not defined $forward_url or $forward_url eq "");
+        $forward_url = $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/switch/case/send/endpoint/address/@uri') if ( not defined $forward_url or $forward_url eq "");
+        $forward_url =~ s/{HOST_NAME}/$envid/;
+
+        print "url path: " . $url_path . "\n";
+        print "forward url: " . $forward_url . "\n";
+        $node_index = $node_index + 1;
+    }
 }
 
 exit 0;
