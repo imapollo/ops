@@ -12,7 +12,8 @@
 #  -h | --help              Show help information.
 #
 # Examples:
-#  parse_apigateway_forward -h srwd10agg001.srwd10.com -e srwd83
+#  parse_apigateway_forward -s srwd10agg001.srwd10.com -e srwd83
+#  parse_apigateway_forward -s srwd10agg001.srwd10.com -e srwd83 -j
 #
 # Author: minjzhang
 #
@@ -21,6 +22,7 @@ use strict;
 use warnings;
 use Carp;
 use Getopt::Long;
+use Cwd 'abs_path';
 
 # use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/home/minjzhang/ops/util/lib';
@@ -35,6 +37,11 @@ use Stubhub::Log::Util qw (
                             init
                             get_logger_with_loglevel
                         );
+use Stubhub::Util::Command qw (
+                            ssh_cmd
+                        );
+
+my $all_options = join " ", @ARGV;
 
 # Get options
 my $show_usage = qw{};
@@ -86,11 +93,13 @@ Usage: parse_apigateway_forward [options]
 Options:
  -s | --server            Specify the AGG host to check.
  -e | --envid             Specify the environment Id.
+ -j | --json              Return the JSON format status.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
 Examples:
- parse_apigateway_forward -h srwd10agg001.srwd10.com -e srwd83
+ parse_apigateway_forward -s srwd10agg001.srwd10.com -e srwd83
+ parse_apigateway_forward -s srwd10agg001.srwd10.com -e srwd83 -j
 
 END_OF_HELP
 }
@@ -99,9 +108,19 @@ END_OF_HELP
 # Parameter validation
 #
 if ( ! defined $agg_host || ! defined $envid ) {
-    $logger->error( "The pamameter '-h', '-e' must be set.\n" );
+    $logger->error( "The pamameter '-s', '-e' must be set.\n" );
     usage();
     exit 1;
+}
+
+my $hostname = `/bin/hostname`;
+chomp $hostname;
+
+if ( $hostname ne "$agg_host" ) {
+    my $command = abs_path($0) . " " . $all_options;
+    my ( $rc, @output ) = ssh_cmd( $agg_host, $command );
+    print join "\n", @output;
+    exit $rc;
 }
 
 #
