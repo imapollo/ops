@@ -149,6 +149,27 @@ sub print_list {
 }
 
 #
+# Get current timestamp.
+#
+sub get_current_time {
+    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) = localtime(time);
+    my $nice_timestamp = sprintf( "%04d-%02d-%02d %02d:%02d:%02d",
+                            $year+1900, $mon+1, $mday, $hour, $min, $sec);
+    return $nice_timestamp;
+}
+
+#
+# Write to log file.
+#
+sub write_log {
+    my ( $string ) = @_;
+    Readonly my $LOG_PATH => '/nas/utl/tools/Cloak-uncloak.log';
+    open LOG_FH, ">>$LOG_PATH" or die "Unable to open file: $LOG_PATH";
+    print LOG_FH $string;
+    close LOG_FH;
+}
+
+#
 # Main
 #
 
@@ -262,6 +283,7 @@ if ( $action eq "list" ) {
         if ( $confirm =~ /y/i ) {
             execute_ssh($ssh, $command);
             print_list( $ssh, $listname );
+            write_log( get_current_time() . " $lba_username add [$ip_address] to [$listname].\n");
         }
     } elsif ( $action eq "delete" ) {
         print "Enter the IP address you want to $action from $listname. For example:\n";
@@ -278,6 +300,7 @@ if ( $action eq "list" ) {
         if ( $confirm =~ /y/i ) {
             execute_ssh($ssh, $command);
             print_list( $ssh, $listname );
+            write_log( get_current_time() . " $lba_username delete [$ip_address] from [$listname].\n");
         }
     }
 }
