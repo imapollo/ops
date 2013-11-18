@@ -7,6 +7,7 @@
 # Options:
 #  -s | --server            Specify the AGG host to check.
 #  -e | --envid             Specify the environment Id.
+#  -j | --json              Return the JSON format status.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
@@ -25,7 +26,9 @@ use Getopt::Long;
 use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
 
+use Data::Dumper;
 use Readonly;
+use JSON;
 use XML::XPath;
 use XML::XPath::XMLParser;
 use Stubhub::Log::Util qw (
@@ -37,10 +40,12 @@ use Stubhub::Log::Util qw (
 my $show_usage = qw{};
 my $show_verbose = qw{};
 my $agg_host = qw{};
+my $return_json = qw{};
 my $envid = qw{};
 my $options_okay = GetOptions (
     's|server=s'  => \$agg_host,
     'e|envid=s'   => \$envid,
+    'j|json'      => \$return_json,
     'v|verbose'   => \$show_verbose,
     'h|help'      => \$show_usage,
 );
@@ -104,16 +109,18 @@ if ( ! defined $agg_host || ! defined $envid ) {
 #
 Readonly my $RULE_DIR => '/opt/wso2am/repository/deployment/server/synapse-configs/default/api';
 
+my %redirect_rules;
+
 my @rule_files = <$RULE_DIR/*.xml>;
 foreach my $rule_file ( @rule_files ) {
-    print "filename: " . $rule_file . "\n";
     my $xp = XML::XPath->new( filename => $rule_file );
     my $context_path = $xp->getNodeText('/api/@context');
-    print "context path: " . $context_path . "\n";
 
     my $resource_nodeset = $xp->find('/api/resource');
     my @resource_nodes = $resource_nodeset->get_nodelist();
     my $node_index = 1;
+
+
     foreach my $resource_node ( @resource_nodes ) {
 
         my $url_path = $xp->getNodeText('/api/resource[' . $node_index . ']/@url-mapping');
@@ -123,11 +130,19 @@ foreach my $rule_file ( @rule_files ) {
         $forward_url = $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/filter/then/class/property[@name=\'url\']/@value') if ( not defined $forward_url or $forward_url eq "");
         $forward_url = $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/filter/then/send/endpoint/address/@uri') if ( not defined $forward_url or $forward_url eq "");
         $forward_url = $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/switch/case/send/endpoint/address/@uri') if ( not defined $forward_url or $forward_url eq "");
-        $forward_url =~ s/{HOST_NAME}/$envid/;
+        $forward_url =~ s/{HOST_NAME}/$envid/g;
 
-        print "url path: " . $url_path . "\n";
-        print "forward url: " . $forward_url . "\n";
+        $redirect_rules{ "${context_path}${url_path}" } = $forward_url;
+
         $node_index = $node_index + 1;
+    }
+}
+if ( $return_json ) {
+    my $json_result = to_json( \%redirect_rules, { allow_blessed=>1 } );
+    print $json_result;
+} else {
+    foreach my $key ( keys %redirect_rules ) {
+        print "$key => $redirect_rules{ $key }\n";
     }
 }
 
