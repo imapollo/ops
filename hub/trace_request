@@ -30,7 +30,9 @@ use Getopt::Long;
 
 # use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/home/minjzhang/ops/util/lib';
+use lib '/nas/reg/lib/perl';
 
+use JSON;
 use Stubhub::Log::Util qw (
                             init
                             get_logger_with_loglevel
@@ -198,7 +200,19 @@ sub parse_gateway_forward {
     my ( $gateway_server, $url_path, $envid ) = @_;
     my $parse_rules_command = "/nas/home/minjzhang/bin/parse_apigateway_forward -s $gateway_server -e $envid -j";
     my $parse_rules = `$parse_rules_command`; 
-    print $parse_rules;
+    my $gateway_forward_ref = from_json( $parse_rules );
+    foreach my $key ( keys %{ $gateway_forward_ref } ) {
+        my $forward_rule_pattern = $key;
+        $forward_rule_pattern =~ s/\*$//;
+        $forward_rule_pattern =~ s/\?$//;
+        $forward_rule_pattern =~ s/\/$//;
+        $forward_rule_pattern =~ s/{.*id.*}/[0-9]+/i;
+        $forward_rule_pattern =~ s/{giftCardNumber}/[0-9]+/i;
+        $forward_rule_pattern =~ s/{ccPanToken}/[A-Z0-9]+/i;
+        if ( $url_path =~ "$forward_rule_pattern" ) {
+            return $gateway_forward_ref->{ $key };
+        }
+    }
 }
 
 #
@@ -220,21 +234,36 @@ sub get_backend_server {
 }
 
 #
-# Main
+# Get the prameters from URL.
 #
-my $protocol = 'http';
-# TODO when specify :8080
-if ( $request_url =~ "^http[s]?://" ) {
-    $protocol = $request_url;
-    $protocol =~ s"^(http[s]?)://.*"$1";
+sub get_params_from_url {
+    my ( $request_url ) = @_;
+    my $protocol = 'http';
+
+    # TODO when specify :8080
+    if ( $request_url =~ "^http[s]?://" ) {
+        $protocol = $request_url;
+        $protocol =~ s"^(http[s]?)://.*"$1";
+    }
+
+    my $virtual_server = $request_url;
+    $virtual_server =~ s"(http[s]?://)?([^/]*)(/.*)?"$2";
+    my $url_path = $request_url;
+    $url_path =~ s"(http[s]?://)?([^/]*)(/.*)?"$3";
+    my $url_envid = $virtual_server;
+    $url_envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
+
+    if ( not defined $envid ) {
+        $envid = $url_envid;
+    }
+
+    return ( $protocol, $virtual_server, $url_path, $url_envid );
 }
 
-my $virtual_server = $request_url;
-$virtual_server =~ s"(http[s]?://)?([^/]*)(/.*)?"$2";
-my $url_path = $request_url;
-$url_path =~ s"(http[s]?://)?([^/]*)(/.*)?"$3";
-my $url_envid = $virtual_server;
-$url_envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
+#
+# Main
+#
+my ( $protocol, $virtual_server, $url_path, $url_envid ) = get_params_from_url( $request_url );
 
 if ( not defined $envid ) {
     $envid = $url_envid;
@@ -255,9 +284,11 @@ if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
     my $gateway_server = $members[0];
     $gateway_server =~ s/(.*):.*/$1/;
     $gateway_server = get_hostname_by_ip( $gateway_server );
-    my $go_virtual = parse_gateway_forward( $gateway_server, $url_path, $envid );
-    exit 0;
-    $go_pool = get_backend_server( \@icontrols, $envid, $protocol, $go_virtual, $url_path);
+    print $gateway_server . "\n";
+    my $go_url = parse_gateway_forward( $gateway_server, $url_path, $envid );
+    ( $protocol, $virtual_server, $url_path, $url_envid ) = get_params_from_url( $go_url );
+    @icontrols = get_icontrol( $envid );
+    ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $envid, $protocol, $virtual_server, $url_path);
 } else {
     my @icontrols = get_icontrol( $envid );
     ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $envid, $protocol, $virtual_server, $url_path);
