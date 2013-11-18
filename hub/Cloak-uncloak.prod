@@ -152,8 +152,8 @@ sub print_list {
 # Main
 #
 
-Readonly my $HOSTNAME => 'lbaxxx';
-Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME";
+Readonly my $HOSTNAME => 'srwp01lba040';
+Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubprod.com";
 Readonly my $TMSH_EXEC => 'tmsh';
 
 print "-------------------------------------------------------------------
