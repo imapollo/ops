@@ -11,6 +11,7 @@
 #
 # Options:
 #  -u | --url               Request the url. Default protocol: http.
+#  -e | --envid             Specify the environment Id if necessary.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
 #
@@ -59,8 +60,10 @@ use Stubhub::Util::Host qw (
 my $show_usage = qw{};
 my $show_verbose = qw{};
 my $request_url = qw{};
+my $envid = qw{};
 my $options_okay = GetOptions (
     'u|url=s'     => \$request_url,
+    'e|envid=s'   => \$envid,
     'v|verbose'   => \$show_verbose,
     'h|help'      => \$show_usage,
 );
@@ -105,6 +108,7 @@ Usage: trace_request [options]
 
 Options:
  -u | --url               Request the url. Default protocol: http.
+ -e | --envid             Specify the environment Id if necessary.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
 
@@ -191,8 +195,10 @@ sub parse_irule {
 # is the request re-directed to.
 #
 sub parse_gateway_forward {
-    my ( $gateway_server, $url_path ) = @_;
-    print $gateway_server . "\n";
+    my ( $gateway_server, $url_path, $envid ) = @_;
+    my $parse_rules_command = "/nas/home/minjzhang/bin/parse_apigateway_forward -s $gateway_server -e $envid -j";
+    my $parse_rules = `$parse_rules_command`; 
+    print $parse_rules;
 }
 
 #
@@ -227,8 +233,12 @@ my $virtual_server = $request_url;
 $virtual_server =~ s"(http[s]?://)?([^/]*)(/.*)?"$2";
 my $url_path = $request_url;
 $url_path =~ s"(http[s]?://)?([^/]*)(/.*)?"$3";
-my $envid = $virtual_server;
-$envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
+my $url_envid = $virtual_server;
+$url_envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
+
+if ( not defined $envid ) {
+    $envid = $url_envid;
+}
 
 # List of internal and external bigip server.
 # TODO icontrol wrong for api-dev.srwd10.com
@@ -238,14 +248,14 @@ my $go_pool = qw{};
 my $icontrol = qw{};
 
 if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
-    my $icontrol_gateway = get_special_icontrol( $envid, "apigateway" );
+    my $icontrol_gateway = get_special_icontrol( $url_envid, "apigateway" );
     my @icontrols = ( $icontrol_gateway );
-    ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $envid, $protocol, $virtual_server, $url_path);
+    ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $url_envid, $protocol, $virtual_server, $url_path);
     my @members = get_env_pool_members( $icontrol, $go_pool );
     my $gateway_server = $members[0];
     $gateway_server =~ s/(.*):.*/$1/;
     $gateway_server = get_hostname_by_ip( $gateway_server );
-    my $go_virtual = parse_gateway_forward( $gateway_server, $url_path );
+    my $go_virtual = parse_gateway_forward( $gateway_server, $url_path, $envid );
     exit 0;
     $go_pool = get_backend_server( \@icontrols, $envid, $protocol, $go_virtual, $url_path);
 } else {
