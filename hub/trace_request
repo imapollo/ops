@@ -251,7 +251,7 @@ sub get_params_from_url {
     my ( $request_url ) = @_;
     my $protocol = 'http';
 
-    if ( $request_url !~ "(http[s]?://)?([^/]*\.srw[deq][0-9]+\.com)(/.*)?" ) {
+    if ( $request_url !~ '^(http[s]?://)?([^/]*\.srw[deq][0-9]+\.com)(/.*)?$' ) {
         $logger->error( "URL format is wrong [$request_url]." );
         usage();
         exit 1;
@@ -287,7 +287,7 @@ sub get_params_from_url {
 my ( $protocol, $virtual_server, $url_path, $url_envid ) = get_params_from_url( $request_url );
 
 if ( defined $envid ) {
-    if ( $envid !~ /srw[deq][0-9]+/ ) {
+    if ( $envid !~ /^srw[deq][0-9]+$/ ) {
         $logger->error( "Env Id format is wrong [$envid].");
         usage();
         exit 1;
