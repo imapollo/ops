@@ -169,6 +169,8 @@ sub parse_irule {
     my ( $icontrol, $irules_on_f5_ref, $url_path ) = @_;
     foreach my $rule ( @{ $irules_on_f5_ref } ) {
         my $rule_definition = get_rule_definition( $icontrol, $rule ) . "\n";
+        $logger->debug( "[iRule] definition for $rule" );
+        $logger->debug( "\n$rule_definition" );
         my @rule_lines = split "\n", $rule_definition;
         my $match_rule = 0;
         my $go_pool = qw{};
@@ -201,6 +203,7 @@ sub parse_gateway_forward {
     my $parse_rules_command = "/nas/home/minjzhang/bin/parse_apigateway_forward -s $gateway_server -e $envid -j";
     my $parse_rules = `$parse_rules_command`; 
     my $gateway_forward_ref = from_json( $parse_rules );
+    my $go_url = qw{};
     foreach my $key ( keys %{ $gateway_forward_ref } ) {
         my $forward_rule_pattern = $key;
         $forward_rule_pattern =~ s/\*$//;
@@ -209,10 +212,13 @@ sub parse_gateway_forward {
         $forward_rule_pattern =~ s/{.*id.*}/[0-9]+/i;
         $forward_rule_pattern =~ s/{giftCardNumber}/[0-9]+/i;
         $forward_rule_pattern =~ s/{ccPanToken}/[A-Z0-9]+/i;
+        $gateway_forward_ref->{ $key } = "null" if not defined $gateway_forward_ref->{ $key };
+        $logger->debug( "[APIGW] Forward $forward_rule_pattern to $gateway_forward_ref->{ $key }" );
         if ( $url_path =~ "$forward_rule_pattern" ) {
-            return $gateway_forward_ref->{ $key };
+            $go_url = $gateway_forward_ref->{ $key };
         }
     }
+    return $go_url;
 }
 
 #
@@ -270,8 +276,6 @@ if ( not defined $envid ) {
 }
 
 # List of internal and external bigip server.
-# TODO icontrol wrong for api-dev.srwd10.com
-# TODO need to specify envid if requesting shared apigateway
 
 my $go_pool = qw{};
 my $icontrol = qw{};
@@ -284,7 +288,7 @@ if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
     my $gateway_server = $members[0];
     $gateway_server =~ s/(.*):.*/$1/;
     $gateway_server = get_hostname_by_ip( $gateway_server );
-    print $gateway_server . "\n";
+    $logger->debug( "[APIGW] Go to $gateway_server.");
     my $go_url = parse_gateway_forward( $gateway_server, $url_path, $envid );
     ( $protocol, $virtual_server, $url_path, $url_envid ) = get_params_from_url( $go_url );
     @icontrols = get_icontrol( $envid );
@@ -296,7 +300,11 @@ if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
 
 my @pool_members = get_env_pool_members( $icontrol, $go_pool );
 foreach my $pool_member ( @pool_members ) {
-    print get_hostname_by_ip( $pool_member ) . "\n";
+    if ( not $show_verbose ) {
+        print get_hostname_by_ip( $pool_member ) . "\n";
+    } else {
+        $logger->info( "Go to " . get_hostname_by_ip( $pool_member ) );
+    }
 }
 
 exit 0;
