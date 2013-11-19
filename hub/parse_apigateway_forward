@@ -151,13 +151,17 @@ foreach my $rule_file ( @rule_files ) {
         $forward_url = $xp->getNodeText('/api/resource[' . $node_index . ']/inSequence/switch/case/send/endpoint/address/@uri') if ( not defined $forward_url or $forward_url eq "");
         $forward_url =~ s/{HOST_NAME}/$envid/g;
 
+        # stringification $forward_url
+        $forward_url = join "", $forward_url;
+
         $redirect_rules{ "${context_path}${url_path}" } = $forward_url;
 
         $node_index = $node_index + 1;
     }
 }
+
 if ( $return_json ) {
-    my $json_result = to_json( \%redirect_rules, { allow_blessed=>1 } );
+    my $json_result = to_json( \%redirect_rules, { allow_blessed => 1 } );
     print $json_result;
 } else {
     foreach my $key ( keys %redirect_rules ) {

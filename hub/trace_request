@@ -17,8 +17,9 @@
 #
 # Examples:
 #  trace_request -u api.srwd83.com
-#  trace_request -u https://payment.api.srwd83.com/paymentapi/ccping
-#  trace_request -u https://api-dev.srwd10.com/paymentapi -e srwd83
+#  trace_request -u https://payments.api.srwd83.com/paymentapi/ccping
+#  trace_request -u https://api-dev.srwe05.com/inventory/eligibility
+#  trace_request -u https://api-dev.srwd10.com/inventory/eligibility -e srwd83
 #
 # Author: minjzhang
 #
@@ -116,8 +117,9 @@ Options:
 
 Examples:
  trace_request -u api.srwd83.com
- trace_request -u https://payment.api.srwd83.com/paymentapi/ccping
- trace_request -u https://api-dev.srwd10.com/paymentapi -e srwd83
+ trace_request -u https://payments.api.srwd83.com/paymentapi/ccping
+ trace_request -u https://api-dev.srwe05.com/inventory/eligibility
+ trace_request -u https://api-dev.srwd10.com/inventory/eligibility -e srwd83
 
 END_OF_HELP
 }
@@ -157,7 +159,10 @@ sub find_virtual_server {
             }
             $vs_index = $vs_index + 1;
         }
-        last if $virtual_server_name ne "";
+        last if defined $virtual_server_name and $virtual_server_name ne "";
+    }
+    if ( not defined $virtual_server_name or $virtual_server_name eq "" ) {
+        $logger->logdie( "Cannot fine virtual server for $virtual_server" );
     }
     return ( $selected_icontrol, $virtual_server_name );
 }
@@ -246,6 +251,12 @@ sub get_params_from_url {
     my ( $request_url ) = @_;
     my $protocol = 'http';
 
+    if ( $request_url !~ "(http[s]?://)?([^/]*\.srw[deq][0-9]+\.com)(/.*)?" ) {
+        $logger->error( "URL format is wrong [$request_url]." );
+        usage();
+        exit 1;
+    }
+
     # TODO when specify :8080
     if ( $request_url =~ "^http[s]?://" ) {
         $protocol = $request_url;
@@ -255,7 +266,11 @@ sub get_params_from_url {
     my $virtual_server = $request_url;
     $virtual_server =~ s"(http[s]?://)?([^/]*)(/.*)?"$2";
     my $url_path = $request_url;
-    $url_path =~ s"(http[s]?://)?([^/]*)(/.*)?"$3";
+    if ( $url_path =~ "(http[s]?://)?([^/]*)/.+" ) {
+        $url_path =~ s"(http[s]?://)?([^/]*)(/.*)?"$3";
+    } else {
+        $url_path = "";
+    }
     my $url_envid = $virtual_server;
     $url_envid =~ s".*\.(srw[deq][0-9]+)\.com"$1";
 
@@ -270,6 +285,14 @@ sub get_params_from_url {
 # Main
 #
 my ( $protocol, $virtual_server, $url_path, $url_envid ) = get_params_from_url( $request_url );
+
+if ( defined $envid ) {
+    if ( $envid !~ /srw[deq][0-9]+/ ) {
+        $logger->error( "Env Id format is wrong [$envid].");
+        usage();
+        exit 1;
+    }
+}
 
 if ( not defined $envid ) {
     $envid = $url_envid;
@@ -290,6 +313,9 @@ if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
     $gateway_server = get_hostname_by_ip( $gateway_server );
     $logger->debug( "[APIGW] Go to $gateway_server.");
     my $go_url = parse_gateway_forward( $gateway_server, $url_path, $envid );
+    if ( not defined $go_url or $go_url eq "" or $go_url eq "null" ) {
+        $logger->logdie( "Cannot get forwarding URL from API Gateway $gateway_server." );
+    }
     ( $protocol, $virtual_server, $url_path, $url_envid ) = get_params_from_url( $go_url );
     @icontrols = get_icontrol( $envid );
     ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $envid, $protocol, $virtual_server, $url_path);
@@ -300,10 +326,11 @@ if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
 
 my @pool_members = get_env_pool_members( $icontrol, $go_pool );
 foreach my $pool_member ( @pool_members ) {
+    my $pool_hostname = get_hostname_by_ip( $pool_member );
     if ( not $show_verbose ) {
-        print get_hostname_by_ip( $pool_member ) . "\n";
+        print "$pool_hostname\n" if $pool_hostname ne "";
     } else {
-        $logger->info( "Go to " . get_hostname_by_ip( $pool_member ) );
+        $logger->info( "Go to $pool_hostname" ) if $pool_hostname ne "";
     }
 }
 
