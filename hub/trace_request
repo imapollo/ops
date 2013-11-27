@@ -223,6 +223,7 @@ sub parse_gateway_forward {
             $go_url = $gateway_forward_ref->{ $key };
         }
     }
+    $logger->debug( "[APIGW] Forward to $go_url" );
     return $go_url;
 }
 
