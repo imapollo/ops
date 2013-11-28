@@ -178,12 +178,16 @@ sub parse_irule {
         $logger->debug( "\n$rule_definition" );
         my @rule_lines = split "\n", $rule_definition;
         my $match_rule = 0;
+        my $go_default = 0;
         my $go_pool = qw{};
         foreach my $rule_line ( @rule_lines ) {
             if ( $rule_line =~ /^\s*"\/.+"/ ) {
                 $rule_line =~ s/^\s*"*(\/.+)".*/$1/;
                 $rule_line =~ s/\*+$//;
                 if ( $url_path =~ "$rule_line" ) {
+                    $logger->debug( "[iRule] iRule matching:" );
+                    $logger->debug( "[iRule] URL Path: $url_path" );
+                    $logger->debug( "[iRule] Rule line: $rule_line" );
                     $match_rule = 1;
                 }
             }
@@ -192,10 +196,22 @@ sub parse_irule {
                 $go_pool =~ s/^\s*pool\s+(\S+)\s*/$1/;
                 last;
             }
+            if ( $rule_line =~ /^\s*default\s*{\s*$/ ) {
+                $go_default = 1;
+                next;
+            }
+            if ( $go_default ) {
+                $rule_line =~ s/^\s*//;
+                $logger->error( "No url path matching found for irule: $rule.");
+                $logger->error( "Return $rule_line" );
+                exit 1;
+            }
         }
+        $logger->debug( "[iRule] Redirect to $go_pool" ) if defined $go_pool;
         return $go_pool if defined $go_pool;
     }
     # If not found
+    $logger->debug( "[iRule] Not found pool in iRule. Go to default pool." );
     return "";
 }
 
@@ -237,6 +253,7 @@ sub get_backend_server {
     my $default_pool_on_f5 = get_vs_default_pool( $icontrol, $virtual_server_on_f5 );
 
     my $go_pool = $default_pool_on_f5;
+    $logger->debug( "Default pool for virtual server: $go_pool" );
 
     if ( scalar @irules_on_f5 > 0 && $url_path ne "" ) {
         my $temp_pool = parse_irule( $icontrol, \@irules_on_f5, $url_path );
