@@ -37,6 +37,7 @@ use JSON;
 use Stubhub::Log::Util qw (
                             init
                             get_logger_with_loglevel
+                            add_syslog_appender
                         );
 use Stubhub::BigIP::System::Util qw (
                             get_icontrol
@@ -76,6 +77,7 @@ my $options_okay = GetOptions (
 #
 Stubhub::Log::Util->init();
 our $logger = get_logger_with_loglevel( $show_verbose );
+# add_syslog_appender( $logger, "trace_request" );
 
 #
 # Signal Handler

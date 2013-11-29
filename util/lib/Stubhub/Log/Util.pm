@@ -26,6 +26,7 @@ BEGIN {
                         &init
                         &get_logger
                         &get_logger_with_loglevel
+                        &add_syslog_appender
                     );
   %EXPORT_TAGS  = ();
 }
@@ -43,8 +44,30 @@ sub init {
         log4perl.appender.Screen.layout = Log::Log4perl::Layout::PatternLayout
         log4perl.appender.Screen.layout.ConversionPattern = %d %C [%p] %m%n
     );
+
     Log::Log4perl->init( \$conf );
 }
+
+#
+# Add syslog logger appender.
+#
+sub add_syslog_appender {
+    my ( $logger, $ident ) = @_;
+    my $syslog_appender = Log::Log4perl::Appender->new(
+        "Log::Dispatch::Syslog",
+        min_level => 'info',
+        ident     => $ident,
+        facility  => 'user',
+        layout    => Log::Log4perl::Layout::SimpleLayout->new(),
+        socket    => {
+            type => 'udp',
+            host => 'srwd00dvo002.stubcorp.dev',
+            port => 514,
+        },
+    );
+    $logger->add_appender( $syslog_appender );
+}
+
 
 #
 # Get the Logger instance and set log level.
@@ -68,5 +91,6 @@ sub get_logger_with_loglevel {
 #
 sub get_logger {
     my $logger = Log::Log4perl->get_logger("DevOps::Logger");
+
     return $logger;
 }
