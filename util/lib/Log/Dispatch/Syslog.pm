@@ -1,6 +1,6 @@
 package Log::Dispatch::Syslog;
 {
-  $Log::Dispatch::Syslog::VERSION = '2.41';
+  $Log::Dispatch::Syslog::VERSION = '2.42';
 }
 
 use strict;
@@ -13,7 +13,7 @@ use base qw( Log::Dispatch::Output );
 use Params::Validate qw(validate ARRAYREF SCALAR HASHREF);
 Params::Validate::validation_options( allow_extra => 1 );
 
-use Sys::Syslog 0.25 ();
+use Sys::Syslog 0.33 ();
 
 sub new {
     my $proto = shift;
