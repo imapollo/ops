@@ -85,6 +85,7 @@ use Stubhub::Log::Util qw (
                             init
                             get_logger
                             get_logger_with_loglevel
+                            add_syslog_appender
                            );
 
 # Get options
@@ -136,6 +137,7 @@ if ( $show_usage ) {
 
 Stubhub::Log::Util->init();
 our $logger = get_logger_with_loglevel( $show_verbose );
+add_syslog_appender( $logger, "deploy_bigip", "$envid" );
 
 #
 # Usage

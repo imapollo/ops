@@ -77,7 +77,6 @@ my $options_okay = GetOptions (
 #
 Stubhub::Log::Util->init();
 our $logger = get_logger_with_loglevel( $show_verbose );
-# add_syslog_appender( $logger, "trace_request" );
 
 #
 # Signal Handler
