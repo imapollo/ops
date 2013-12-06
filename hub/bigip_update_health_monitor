@@ -97,8 +97,7 @@ sub exclude_pools {
     my ( @pools ) = @_;
     my @filtered_pools;
     foreach my $pool ( @pools ) {
-        if ( $pool !~ /^SRW[DQE][0-9]+-HUB$/i
-                and $pool !~ /^SRW[DQE][0-9]+-G3_JOBS$/i ) {
+        if ( $pool !~ /^SRW[DQE][0-9]+-HUB$/i ) {
             push @filtered_pools, $pool;
         }
     }
