@@ -18,6 +18,8 @@ set matchpairs+=<:>
 set autoindent
 set smarttab
 
+set foldmethod=indent
+
 " enable file type
 filetype plugin on
 filetype indent on
