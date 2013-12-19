@@ -112,11 +112,11 @@ sub generate_pool_separate_configs {
 sub generate_pool_config {
     my ( $target_file_path, $template_file_path, $envid ) = @_;
 
-    Readonly my $UC_ENVID_TOKEN => '#{uc_env_id}';
-    Readonly my $ENVID_TOKEN => '#{env_id}';
-    Readonly my $IPADDR_TOKEN => '#{env_id\..*\.ip}';
-    Readonly my $FOREACH_BEGIN_TOKEN => '#{foreach .*}';
-    Readonly my $FOREACH_END_TOKEN => '#{foreach}';
+    Readonly my $UC_ENVID_TOKEN => '%{uc_env_id}';
+    Readonly my $ENVID_TOKEN => '%{env_id}';
+    Readonly my $IPADDR_TOKEN => '%{env_id\..*\.ip}';
+    Readonly my $FOREACH_BEGIN_TOKEN => '%{foreach .*}';
+    Readonly my $FOREACH_END_TOKEN => '%{foreach}';
 
     open TEMPLATE_FH, "<$template_file_path" or die $!;
 
@@ -132,10 +132,10 @@ sub generate_pool_config {
     while ( my $line = <TEMPLATE_FH> ) {
         if ( $line =~ /$FOREACH_BEGIN_TOKEN/ ) {
 
-            $line =~ s/^\s*#{foreach (.*)}\s*$/$1/;
+            $line =~ s/^\s*%{foreach (.*)}\s*$/$1/;
             my $token = $line;
 
-            # Read the lines inside #{foreach}
+            # Read the lines inside %{foreach}
             my @foreach_lines;
             while ( $line = <TEMPLATE_FH> ) {
                 if ( $line !~ /$FOREACH_END_TOKEN/ ) {
@@ -145,7 +145,7 @@ sub generate_pool_config {
                 }
             }
 
-            # Print the lines inside #{foreach}
+            # Print the lines inside %{foreach}
             my @pool_members = _get_ip_by_hostname_token( $token, $envid );
             $token =~ s/env_id\.(.*)\.ip/$1/;
             if ( $#pool_members == 0 ) {
