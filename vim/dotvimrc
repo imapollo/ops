@@ -18,7 +18,13 @@ set matchpairs+=<:>
 set autoindent
 set smarttab
 
-set foldmethod=indent
+" cofigure python fold
+" set foldmethod=indent
+
+" configure ctag and taglist
+let Tlist_Show_One_File = 1
+let Tlist_Exit_OnlyWindow = 1
+let Tlist_Use_Right_Window = 1   
 
 " enable file type
 filetype plugin on
