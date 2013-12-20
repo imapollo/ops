@@ -2,12 +2,23 @@
 #
 # Configure block/unblock list interactively.
 #
-# Usage: Cloak-Uncloak [options]
+# Usage: Cloak-uncloak [options] [ip address / hackercracker]
 #
 # Options:
 #  -u | --username          Specify the username to login to LBA server.
 #  -x | --password          Specify the password to login to LBA server.
+#  -l | --list              Specify the list to show.
+#  -a | --add               Specify the list to add to.
+#  -d | --delete            Specify the list to delete from.
 #  -h | --help              Show help information.
+#
+# Examples:
+#  Cloak-uncloak
+#  Cloak-uncloak -l blacklist
+#  Cloak-uncloak -a whitelist 1.1.1.1
+#  Cloak-uncloak -a whitelist 1.1.1.1 2.2.2.2
+#  Cloak-uncloak -d whitelist 1.1.1.1
+#  Cloak-uncloak -a hackercrackerlist "Mozilla/5.0 (Windows NT 6.1; WOW64)"
 #
 
 use strict;
@@ -26,12 +37,26 @@ my $show_usage = qw{};
 my $show_verbose = qw{};
 my $lba_username = qw{};
 my $lba_password = qw{};
+my $list_listname = qw{};
+my $add_listname = qw{};
+my $del_listname = qw{};
+my $ip_address = qw{};
 my $options_okay = GetOptions (
    'u|username=s' => \$lba_username,
    'x|password=s' => \$lba_password,
+   'l|list=s'     => \$list_listname,
+   'a|add=s'      => \$add_listname,
+   'd|delete=s'   => \$del_listname,
    'v|verbose'    => \$show_verbose,
    'h|help'       => \$show_usage,
 );
+
+foreach my $rest_arg ( @ARGV ) {
+    $rest_arg = "\"$rest_arg\"";
+    $ip_address .= $rest_arg . " ";
+}
+$ip_address =~ s/ $// if defined $ip_address;
+@ARGV = qw{};
 
 #
 # Signal Handler
@@ -61,6 +86,24 @@ sub usage {
 | Usage: Cloak-Uncloak [options]                                  |
 | Options:                                                        |
 -------------------------------------------------------------------
+Usage: Cloak-uncloak [options] [ip address / hackercracker]
+
+Options:
+ -u | --username          Specify the username to login to LBA server.
+ -x | --password          Specify the password to login to LBA server.
+ -l | --list              Specify the list to show.
+ -a | --add               Specify the list to add to.
+ -d | --delete            Specify the list to delete from.
+ -h | --help              Show help information.
+
+Examples:
+ Cloak-uncloak
+ Cloak-uncloak -l blacklist
+ Cloak-uncloak -a whitelist 1.1.1.1
+ Cloak-uncloak -a whitelist 1.1.1.1 2.2.2.2
+ Cloak-uncloak -d whitelist 1.1.1.1
+ Cloak-uncloak -a hackercrackerlist "Mozilla/5.0 (Windows NT 6.1; WOW64)"
+
 END_OF_HELP
 }
 
@@ -84,7 +127,8 @@ sub login_ssh {
     $ssh->send("$password\n");
     my $login_welcome = $ssh->exec("show sys version");
 
-    if ( $login_welcome !~ m/Last login/ ) {
+    if ( not defined $login_welcome or $login_welcome !~ m/Last login/ ) {
+        die "Login has failed. No output." if not defined $login_welcome;
         die "Login has failed. Login output was $login_welcome";
     }
 
@@ -170,31 +214,45 @@ sub write_log {
 }
 
 #
+# Get username and password.
+#
+sub get_username_password {
+    my ( $lba_username, $lba_password ) = @_;
+
+    if ( not defined $lba_username ) {
+        print "Username: ";
+        $lba_username = <>;
+        chomp $lba_username;
+    }
+    if ( not defined $lba_password ) {
+        print "Password: ";
+        system("stty -echo");
+        $lba_password = <>;
+        chomp $lba_password;
+        system("stty echo");
+        print "\n";
+    }
+
+    return ( $lba_username, $lba_password );
+}
+
+#
 # Main
 #
 
+# Readonly my $HOSTNAME => 'srwd00lba041';
 Readonly my $HOSTNAME => 'srwp01lba040';
+# Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME";
 Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME.stubprod.com";
 Readonly my $TMSH_EXEC => 'tmsh';
 
+if ( not defined $list_listname and not defined $add_listname and not defined $del_listname ) {
 print "-------------------------------------------------------------------
 | The script helps to configure block/unblock list interactively. |
 -------------------------------------------------------------------
 ";
 
-if ( not defined $lba_username ) {
-    print "Username: ";
-    $lba_username = <>;
-    chomp $lba_username;
-}
-if ( not defined $lba_password ) {
-    print "Password: ";
-    system("stty -echo");
-    $lba_password = <>;
-    chomp $lba_password;
-    system("stty echo");
-    print "\n";
-}
+( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
 
 my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
 
@@ -266,7 +324,7 @@ Readonly my $IP_EXAMPLES =>
 if ( $action eq "list" ) {
     print_list( $ssh, $listname );
 } else {
-    my $ip_address = qw{};
+    $ip_address = qw{};
     my $command = qw{};
     my $confirm = qw{};
     if ( $action eq "add" ) {
@@ -303,9 +361,47 @@ if ( $action eq "list" ) {
             write_log( get_current_time() . " $lba_username delete [$ip_address] from [$listname].\n");
         }
     }
+    close_ssh($ssh);
 }
 
 } # end of while loop
 
-close_ssh($ssh);
+} else {
+
+    if ( defined $list_listname && not defined $add_listname && not defined $del_listname ) {
+        ( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
+        my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
+        print_list( $ssh, $list_listname );
+        close_ssh($ssh);
+    } elsif ( defined $add_listname && not defined $del_listname && not defined $list_listname ) {
+        if ( not defined $ip_address ) {
+            print "ERROR: ip address or hackercrakcer must be specified when adding to list.\n";
+            exit 1;
+        }
+        ( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
+        my $command = "modify ltm data-group $add_listname records add {$ip_address}";
+        my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
+        mute_execute_ssh($ssh, $command);
+        print_list( $ssh, $add_listname );
+        write_log( get_current_time() . " $lba_username add [$ip_address] to [$add_listname].\n");
+        close_ssh($ssh);
+    } elsif ( defined $del_listname && not defined $add_listname && not defined $list_listname ) {
+        if ( not defined $ip_address ) {
+            print "ERROR: ip address or hackercrakcer must be specified when deleting from list.\n";
+            exit 1;
+        }
+        ( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
+        my $command = "modify ltm data-group $del_listname records delete {$ip_address}";
+        my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
+        mute_execute_ssh($ssh, $command);
+        print_list( $ssh, $del_listname );
+        write_log( get_current_time() . " $lba_username delete [$ip_address] from [$del_listname].\n");
+        close_ssh($ssh);
+    } else {
+        print "ERROR: Only one option can be defined '-l', '-a' and '-d'.\n";
+        exit 1;
+    }
+}
+
+
 exit 0;

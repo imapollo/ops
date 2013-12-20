@@ -165,9 +165,9 @@ sub generate_vs_separate_configs {
 sub generate_vs_config {
     my ( $target_file_path, $template_file_path, $envid, $public_ip ) = @_;
 
-    Readonly my $UC_ENVID_TOKEN => '#{uc_env_id}';
-    Readonly my $ENVID_TOKEN => '#{env_id}';
-    Readonly my $IPADDR_TOKEN => '#{\S*env_id\S*\.com}';
+    Readonly my $UC_ENVID_TOKEN => '%{uc_env_id}';
+    Readonly my $ENVID_TOKEN => '%{env_id}';
+    Readonly my $IPADDR_TOKEN => '%{\S*env_id\S*\.com}';
 
     open TEMPLATE_FH, "<$template_file_path" or die $!;
 
@@ -197,7 +197,7 @@ sub generate_vs_config {
 
     foreach my $line ( @lines ) {
         if ( $public_ip ) {
-            if ( $line =~ /^virtual #{/ ) {
+            if ( $line =~ /^virtual %{/ ) {
                 $line =~ s/virtual (.*)/virtual pub-$1/;
             }
         }
