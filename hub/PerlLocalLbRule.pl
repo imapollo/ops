@@ -131,7 +131,7 @@ sub getiRuleDefinitions()
   my($rulename) = (@_);
   if ( $rulename eq "" )
   {
-    $soapResponse = $LocalLBRule->query_all_rules();
+    $soapResponse = $LocalLBRule->get_list();
     &checkResponse($soapResponse);
     @RuleDefinitionList = @{$soapResponse->result};
     return @RuleDefinitionList;
@@ -325,7 +325,7 @@ sub doesiRuleExist()
     my @RuleDefinitionList = &getiRuleDefinitions();
     foreach $RuleDefinition (@RuleDefinitionList)
     {
-      $rule_name = $RuleDefinition->{"rule_name"};
+      $rule_name = $RuleDefinition;
       if ( $rule_name eq $name )
       {
 	$exists = 1;
