@@ -21,6 +21,8 @@ def main():
     client = InstagramClient()
     searched_medias = client.tag_search( "vsco" , 100 )*
     for searched_media in searched_medias:
+        # TODO sleep 2 seconds
+        # TODO install python-instagram
         # client.media_likes( searched_media )
         client.like_media( searched_media )
 
