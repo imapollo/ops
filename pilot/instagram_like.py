@@ -8,6 +8,7 @@
 
 from instagram.client import InstagramAPI
 import commands
+import datetime
 
 # Client for instagram REST API.
 class InstagramClient():
@@ -23,8 +24,8 @@ def main():
     for searched_media in searched_medias[0]:
         commands.getoutput( '/bin/sleep 2' )
         likes = client.api.media_likes( searched_media.id )
-        if ( len(likes) > 0 ):
-            print searched_media.id
+        if ( len(likes) > 4 ):
+            print ("%s: %s" % ( datetime.datetime.now(), searched_media.id ) )
             client.api.like_media( searched_media.id )
 
 if __name__ == "__main__":
