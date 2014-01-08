@@ -51,12 +51,10 @@ use Stubhub::P4::Client qw (
                             clean_perforce_client
                            );
 use Stubhub::BigIP::Virtual::ConfigGenerator qw (
-                            generate_vs_configs
                             generate_not_excluded_vs_configs
                             generate_pub_not_excluded_vs_configs
                            );
 use Stubhub::BigIP::Pool::ConfigGenerator qw (
-                            generate_pool_configs
                             generate_not_excluded_pool_configs
                            );
 use Stubhub::BigIP::System::Util qw (

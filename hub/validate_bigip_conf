@@ -45,7 +45,7 @@ use Stubhub::BigIP::Pool::Handler qw (
                                     get_env_pool_members
                                 );
 use Stubhub::BigIP::Pool::ConfigGenerator qw (
-                                    generate_pool_separate_configs
+                                    generate_not_excluded_pool_separate_configs
                                 );
 use Stubhub::BigIP::Pool::Parser qw (
                                     parse_pools
@@ -57,7 +57,7 @@ use Stubhub::BigIP::Virtual::Handler qw (
                                     get_vs_destination
                                 );
 use Stubhub::BigIP::Virtual::ConfigGenerator qw (
-                                    generate_vs_separate_configs
+                                    generate_not_excluded_vs_separate_configs
                                 );
 use Stubhub::BigIP::Virtual::Parser qw (
                                     parse_virtual_servers
@@ -70,6 +70,9 @@ use Stubhub::P4::Client qw (
                                     clean_perforce_client
                                 );
 use Stubhub::P4::Constants;
+use Stubhub::BigIP::System::Info qw (
+                            get_exclude_list
+                           );
 use Stubhub::Log::Util qw (
                                     init
                                     get_logger
@@ -433,6 +436,21 @@ my %icontrols = (
     'ext' => $external_ic
 );
 
+my @internal_excluded_vs = get_exclude_list( $envid, "internal", "virtual" );
+my @external_excluded_vs = get_exclude_list( $envid, "external", "virtual" );
+my @internal_excluded_pool = get_exclude_list( $envid, "internal", "pool" );
+my @external_excluded_pool = get_exclude_list( $envid, "external", "pool" );
+
+my %excluded_pools = (
+    'int' => \@internal_excluded_pool,
+    'ext' => \@external_excluded_pool
+);
+my %excluded_vs = (
+    'int' => \@internal_excluded_vs,
+    'ext' => \@external_excluded_vs
+);
+my @empty_list = qw{};
+
 my ( $dynamic_p4_client, $dynamic_p4_dir, $p4_branch_path ) = get_bigip_templates( $branch );
 
 foreach my $ic_key ( keys %icontrols ) {
@@ -450,8 +468,8 @@ foreach my $ic_key ( keys %icontrols ) {
     # Generate the configuration files based on templates on P4.
     my $vs_output_dir = File::Temp->newdir();
     my $pool_output_dir = File::Temp->newdir();
-    generate_vs_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_VS_SUBDIR/$ic_key", $envid, $vs_output_dir );
-    generate_pool_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_POOL_SUBDIR/$ic_key", $envid, $pool_output_dir );
+    generate_not_excluded_vs_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_VS_SUBDIR/$ic_key", $envid, $vs_output_dir, $excluded_vs{ $ic_key }, \@empty_list );
+    generate_not_excluded_pool_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_POOL_SUBDIR/$ic_key", $envid, $pool_output_dir, $excluded_pools{ $ic_key}, \@empty_list );
 
     my @env_vs_list = get_env_virtual_servers( $icontrols{ $ic_key }, $envid );
     # lowercase all the virtual server name for consistency

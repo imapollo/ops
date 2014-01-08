@@ -29,6 +29,7 @@ BEGIN {
                       &generate_vs_configs
                       &generate_vs_separate_configs
                       &generate_not_excluded_vs_configs
+                      &generate_not_excluded_vs_separate_configs
                       &generate_pub_not_excluded_vs_configs
                     );
   %EXPORT_TAGS  = ();
@@ -126,6 +127,47 @@ sub generate_not_excluded_vs_configs {
         generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid, 0 );
     }
     return $output_file;
+}
+
+#
+# Generate separate virtual server configuration files based on templates
+# under a folder.
+#
+sub generate_not_excluded_vs_separate_configs {
+    my ( $templates_dir, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref ) = @_;
+    my @excluded_virtual_servers = @{ $excluded_virtual_servers_ref };
+    my @only_include_vs = @{ $only_include_vs_ref };
+    opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
+    my @template_files = grep { ! -d } readdir DH;
+    closedir DH;
+    foreach my $virtual_server_template ( @template_files ) {
+        my $vs_template_filename = $virtual_server_template;
+        $vs_template_filename =~ s/.*\/(.*)/$1/;
+
+        # Generate or not
+        if ( scalar @only_include_vs  > 0 ) {
+            my $included = 0;
+            foreach my $only_include ( @only_include_vs ) {
+                if ( $only_include eq $vs_template_filename ) {
+                    $included = 1;
+                    last;
+                }
+            }
+            next if not $included;
+        } else {
+            my $excluded = 0;
+            foreach my $excluded_virtual_server ( @excluded_virtual_servers ) {
+                if ( $excluded_virtual_server eq $vs_template_filename ) {
+                    $excluded = 1;
+                    last;
+                }
+            }
+            next if $excluded;
+        }
+
+        generate_vs_config( $output_dir, "$templates_dir/$virtual_server_template", $envid, 0 );
+    }
+    return $output_dir;
 }
 
 #
