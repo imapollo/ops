@@ -4,7 +4,7 @@
 use strict;
 use warnings;
 
-use lib '/nas/home/minjzhang/ops/util/lib';
+use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/reg/lib/perl';
 
 use Cwd;
@@ -32,6 +32,10 @@ use Stubhub::P4::Client qw (
                   check_out_perforce_file
                   clean_perforce_client
                 );
+use Stubhub::BigIP::System::Info qw (
+                            get_bigip_server
+                            get_exclude_list
+                           );
 use REG::RedeemTokens qw ( redeem_tokens );
 use Sys::Hostname;
 
@@ -116,6 +120,16 @@ if ( -d "/nas/release/$env/$BRANCH/config-f5/conf/etc/stubhub/f5/irules" ) {
   $iruleDir = get_irule_from_p4( $env, $BRANCH );
 }
 
+# Get the internal / external rule
+my %excluded_rule = ();
+my @internal_excluded_rules = get_exclude_list( $ENVIRONMENT, "internal", "rule" );
+my %internal_excluded_rules_hash = map { $_ => 1 } @internal_excluded_rules;
+my @external_excluded_rules = get_exclude_list( $ENVIRONMENT, "external", "rule" );
+my %external_excluded_rules_hash = map { $_ => 1 } @external_excluded_rules;
+ 
+$excluded_rule{ "int" } = \%internal_excluded_rules_hash;
+$excluded_rule{ "ext" } = \%external_excluded_rules_hash;
+
 foreach my $intExt ("int", "ext") {
   logwarn "Irules dir not found: $iruleDir" && exit 0 unless -d $iruleDir;
     
@@ -136,11 +150,15 @@ foreach my $intExt ("int", "ext") {
         }
         next unless $included;
     }
+    my %excluded_rule_hash = %{ $excluded_rule{ $intExt } };
+    if ( exists( $excluded_rule_hash{ $iRuleFile } ) ) {
+        next;
+    }
     logecho "===================================";
-    #my $cmd = "/nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
-    my $cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
-    #$cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
-    $cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
+    my $cmd = "/nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
+    #my $cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
+    $cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
+    #$cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
 
     value_echo('cmd', $cmd);
 
