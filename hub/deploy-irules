@@ -4,7 +4,8 @@
 use strict;
 use warnings;
 
-use lib '/nas/utl/devops/lib/perl';
+#use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
 
 use Cwd;
@@ -35,6 +36,12 @@ use Stubhub::P4::Client qw (
 use Stubhub::BigIP::System::Info qw (
                             get_bigip_server
                             get_exclude_list
+                           );
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger
+                            get_logger_with_loglevel
+                            add_syslog_appender
                            );
 use REG::RedeemTokens qw ( redeem_tokens );
 use Sys::Hostname;
@@ -73,6 +80,7 @@ options:
   -v,--verbose           Select verbose output mode.
 _END_OF_USAGE_
 
+
 Readonly my $BATCHMODE => not ( -t );
 
 not @ARGV and clean_die $usage;
@@ -101,6 +109,11 @@ Readonly my $VERBOSE         => defined $optargs->{ verbose };
 Readonly my $BRANCH          => $optargs->{ branch };
 Readonly my $ENVIRONMENT     => $optargs->{ environment };
 Readonly my $IRULE           => $optargs->{ irule };
+
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $VERBOSE );
+add_syslog_appender( $logger, "deploy_bigip", "$ENVIRONMENT" );
+
 
 value_echo( 'cmd',      "$pgm @ORIGINAL_ARGV");
 defined $BRANCH         and value_echo( 'branch',      $BRANCH );
@@ -155,10 +168,10 @@ foreach my $intExt ("int", "ext") {
         next;
     }
     logecho "===================================";
-    my $cmd = "/nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
-    #my $cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
-    $cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
-    #$cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
+    #my $cmd = "/nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
+    my $cmd = "/nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $iRuleFile";
+    #$cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/utl/devops/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
+    $cmd = "/usr/bin/ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=no srwd00mon005 /nas/home/minjzhang/bin/PerlLocalLbRule.pl $intExt load $ENVIRONMENT $iRuleFile";
 
     value_echo('cmd', $cmd);
 

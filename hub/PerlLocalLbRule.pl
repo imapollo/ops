@@ -30,11 +30,25 @@
 #----------------------------------------------------------------------------
 #use SOAP::Lite + trace => qw(method debug);
 
+use lib '/nas/home/minjzhang/ops/util/lib';
+#use lib '/nas/reg/lib/perl';
+
 use SOAP::Lite;
 use File::Basename;
 use Math::BigInt;
 use Data::Dumper;
 
+use BigIP::iControl;
+use Stubhub::BigIP::System::Util qw (
+                                    add_object_prefix
+                                    get_bigip
+                                );
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger
+                            get_logger_with_loglevel
+                            add_syslog_appender
+                           );
  
 #----------------------------------------------------------------------------
 # Validate Arguments
@@ -51,25 +65,9 @@ my $sArg3 = $ARGV[4];
 #my $sHost = "10.80.9.10";
 #$sHost = "10.80.9.16" if $intExt =~ /int/;
 
-my $sHost;
-my $env_num = $sArg1;
-my $env_prefix = $sArg1;
-$env_num =~ s/srw[deq]//ig;
-$env_prefix =~ s/(srw[deq]).*/$1/ig;
-chomp($env_num);
-
-if ( $env_num >= 76 or $env_prefix =~ /srwq/i ) {
-    $sHost = "10.80.159.3"; # srwd00lba042
-    $sHost = "10.80.158.5" if $intExt =~ /int/; # srwd00lba014/015
-    $sHost = "10.80.157.5" if $env_prefix =~ /srwq/i and $intExt =~ /int/; # srwd00lba017/018
-} else{
-    $sHost = "10.80.159.37"; # srwd00lba040/041
-    $sHost = "10.80.159.40" if $intExt =~ /int/; # srwd00lba012/013
-}
-
-# TODO Test server
-# $sHost = "srwd00lba041.stubcorp.dev";
-# $sHost = "srwd00lba013.stubcorp.dev" if $intExt =~ /int/;
+my $bigip_refs = get_bigip( $sArg1 );
+our $bigip_ref = $bigip_refs->{ $intExt };
+my $sHost = $bigip_ref->{ "server" };
 
 #============================================================================
 sub usage()
@@ -91,39 +89,6 @@ if ( ($sHost eq "") or ($sUID eq "") or ($sPWD eq "") )
     usage();
 }
  
-#----------------------------------------------------------------------------
-# Transport Information
-#----------------------------------------------------------------------------
-BEGIN {
-sub SOAP::Transport::HTTP::Client::get_basic_credentials
-{
-    return "$sUID" => "$sPWD";
-}
-}
- 
-sub SOAP::Deserializer::typecast
-{
-    my ($self, $value, $name, $attrs, $children, $type) = @_;
-    my $retval = undef;
-    if ( "{urn:iControl}Common.StatisticType" eq $type ) { $retval = $value; }
-    return $retval;
-}
- 
-$LocalLBRule = SOAP::Lite
-    -> uri('urn:iControl:LocalLB/Rule')
-    -> readable(1)
-    -> proxy("https://$sHost/iControl/iControlPortal.cgi");
- 
-#print Dumper $LocalLBRule;
-#----------------------------------------------------------------------------
-# Attempt to add auth headers to avoid dual-round trip
-#----------------------------------------------------------------------------
-eval { $LocalLBRule->transport->http_request->header
-(
-        'Authorization' =>
-        'Basic ' . MIME::Base64::encode("$sUID:$sPWD", '')
-); };
-
 #============================================================================
 sub getiRuleDefinitions()
 #============================================================================
@@ -131,20 +96,11 @@ sub getiRuleDefinitions()
   my($rulename) = (@_);
   if ( $rulename eq "" )
   {
-    $soapResponse = $LocalLBRule->get_list();
-    &checkResponse($soapResponse);
-    @RuleDefinitionList = @{$soapResponse->result};
-    return @RuleDefinitionList;
+    $bigip_ref->{ "iControl" }->get_rule_list();
   }
   else
   {
-    $soapResponse = $LocalLBRule->query_rule(
-      SOAP::Data->name(rule_names => [$rulename])
-    );
-    &checkResponse($soapResponse);
-    @RuleDefinitionList = @{$soapResponse->result};
-    $RuleDefinition = @RuleDefinitionList[0];
-    return $RuleDefinition;
+    $bigip_ref->{ "iControl" }->get_rule();
   }
 }
    
@@ -212,6 +168,9 @@ sub loadiRule()
   $iRuleName = &basename($file);
   $iRuleName =~ s/.tcl$//g;
   $iRuleName =~ s/^/$env-/g;
+  $iRuleName = add_object_prefix( $bigip_ref, $iRuleName );
+
+  print "iRule $iRuleName deploying ...\n";
    
   $iRuleDefinition = {
     rule_name => $iRuleName,
@@ -222,19 +181,13 @@ sub loadiRule()
   if ( $exists )
   {
     # Modify existing iRule
-    $soapResponse = $LocalLBRule->modify_rule(
-      SOAP::Data->name(rules => [$iRuleDefinition])
-    );
-    &checkResponse($soapResponse);
+    $bigip_ref->{ "iControl" }->modify_rule( $iRuleDefinition );
     print "iRule $iRuleName successfully updated\n";
   }
   else
   {
     # Create new iRule
-    $soapResponse = $LocalLBRule->create(
-      SOAP::Data->name(rules => [$iRuleDefinition])
-    );
-    &checkResponse($soapResponse);
+    $bigip_ref->{ "iControl" }->create_rule( $iRuleDefinition );
     print "iRule $iRuleName successfully created\n";
   }
 }
@@ -266,49 +219,12 @@ sub build64()
     return $value64;
 }
  
- 
-#============================================================================
-sub getiRuleStats()
-#============================================================================
-{
-  my($name) = (@_);
-  $soapResponse = $LocalLBRule->get_statistics(
-    SOAP::Data->name(rule_names => [$name])
-  );
-  &checkResponse($soapResponse);
-   
-  my $RuleStatistics = $soapResponse->result;
- 
-  my @statistics = @{$RuleStatistics->{"statistics"}};
-  foreach $RuleStatisticEntry (@statistics)
-  {
-    $rule_name = $RuleStatisticEntry->{"rule_name"};
-    $event_name = $RuleStatisticEntry->{"event_name"};
-    $priority = $RuleStatisticEntry->{"priority"};
-    @StatisticA = @{$RuleStatisticEntry->{"statistics"}};
-    print "--------------------------------------\n";
-    print "RULE '$rule_name' STATISTICS\n";
-    print "-------------------- + ---------------\n";
-    foreach $Statistic (@StatisticA)
-    {
-      $type = $Statistic->{"type"};
-      $type =~ s/STATISTIC_RULE_//g;
-      $value = &build64($Statistic->{"value"});
-      printf "%20s | %s\n", $type, $value;
-    }
-    print "-------------------- + ---------------\n";
-  }
-}
- 
 #============================================================================
 sub deleteiRule()
 #============================================================================
 {
   my($name) = (@_);
-  $soapResponse = $LocalLBRule->delete_rule(
-    SOAP::Data->name(rule_names => [$name])
-  );
-  &checkResponse($soapResponse);
+  $bigip_ref->{ "iControl" }->delete_rules( [ $name ] );
   print "iRule '$name' successfully deleted.\n";
    
 }
