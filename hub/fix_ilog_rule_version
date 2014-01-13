@@ -71,9 +71,11 @@ function _print_debug_msg {
 #
 # Get the ilog rules version from rule engine tables
 #
-ILOG_SID=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.url /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*SERVICE_NAME\s*=\s*\([A-Z0-9]\+\).*/\1/'" < /dev/null`
-ILOG_USER=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.username /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
-ILOG_PASSWD=`ssh ${envid}ilg001.${envid}.com "grep jdbc.ilog.password /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
+SSH_COMMAND='ssh -oPasswordAuthentication=no -ostricthostkeychecking=no'
+
+ILOG_SID=`$SSH_COMMAND ${envid}ilg001.${envid}.com "grep jdbc.ilog.url /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*SERVICE_NAME\s*=\s*\([A-Z0-9]\+\).*/\1/'" < /dev/null`
+ILOG_USER=`$SSH_COMMAND ${envid}ilg001.${envid}.com "grep jdbc.ilog.username /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
+ILOG_PASSWD=`$SSH_COMMAND ${envid}ilg001.${envid}.com "grep jdbc.ilog.password /etc/stubhub/properties/ENV.stubhub.properties | sed 's/.*=\(.*\)/\1/'" < /dev/null`
 ILOG_PASSWD="d$ILOG_USER";
 
 ILOG_QUERY="$(mktemp)"
@@ -86,7 +88,7 @@ select NAME, MAJOR_VERSION, MINOR_VERSION from RULESETS;" > $ILOG_QUERY
 . /nas/home/minjzhang/bin/setora
 
 if [[ "$branch" == "" ]]; then
-    branch=`ssh ${envid}ilg001.${envid}.com "ls -l /opt/jboss/server/default/deploy/stubhub" | awk '{ print $11 }' | awk -F/ '{ print $4 }' | sed 's/\(.*\)-[0-9\.]\+-[0-9]\+/\1/'`
+    branch=`$SSH_COMMAND ${envid}ilg001.${envid}.com "ls -l /opt/jboss/server/default/deploy/stubhub" | awk '{ print $11 }' | awk -F/ '{ print $4 }' | sed 's/\(.*\)-[0-9\.]\+-[0-9]\+/\1/'`
 fi
 
 #
