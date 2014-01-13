@@ -164,7 +164,9 @@ foreach my $intExt ("int", "ext") {
         next unless $included;
     }
     my %excluded_rule_hash = %{ $excluded_rule{ $intExt } };
-    if ( exists( $excluded_rule_hash{ $iRuleFile } ) ) {
+    my $iRuleFileName = $iRuleFile;
+    $iRuleFileName =~ s".*/(.*)"$1";
+    if ( exists( $excluded_rule_hash{ $iRuleFileName } ) ) {
         next;
     }
     logecho "===================================";
