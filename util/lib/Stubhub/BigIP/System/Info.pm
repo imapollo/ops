@@ -32,6 +32,7 @@ BEGIN {
   @EXPORT_OK    = qw(
                         &get_bigip_server
                         &get_bigip_partition
+                        &get_bigip_version
                         &get_exclude_list
                     );
   %EXPORT_TAGS  = ();
@@ -47,14 +48,33 @@ sub get_bigip_partition {
     my ( $envid, $type ) = @_;
     my $bigip_server;
     my $bigip_partition;
+    my $bigip_version;
 
     if ( $type =~ /(int|ext)/ ) {
-        ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $type );
+        ( $bigip_server, $bigip_partition, $bigip_version ) = _get_bigip_server_partition( $envid, $type );
     } else {
-        ( $bigip_server, $bigip_partition ) = _get_special_bigip_server_partition( $envid, $type );
+        ( $bigip_server, $bigip_partition, $bigip_version ) = _get_special_bigip_server_partition( $envid, $type );
     }
 
     return $bigip_partition;
+}
+
+#
+# Get BigIP version.
+#
+sub get_bigip_version {
+    my ( $envid, $type ) = @_;
+    my $bigip_server;
+    my $bigip_partition;
+    my $bigip_version;
+
+    if ( $type =~ /(int|ext)/ ) {
+        ( $bigip_server, $bigip_partition, $bigip_version ) = _get_bigip_server_partition( $envid, $type );
+    } else {
+        ( $bigip_server, $bigip_partition, $bigip_version ) = _get_special_bigip_server_partition( $envid, $type );
+    }
+
+    return $bigip_version;
 }
 
 #
@@ -64,11 +84,12 @@ sub get_bigip_server {
     my ( $envid, $type ) = @_;
     my $bigip_server;
     my $bigip_partition;
+    my $bigip_version;
 
     if ( $type =~ /(int|ext)/ ) {
-        ( $bigip_server, $bigip_partition ) = _get_bigip_server_partition( $envid, $type );
+        ( $bigip_server, $bigip_partition, $bigip_version ) = _get_bigip_server_partition( $envid, $type );
     } else {
-        ( $bigip_server, $bigip_partition ) = _get_special_bigip_server_partition( $envid, $type );
+        ( $bigip_server, $bigip_partition, $bigip_version ) = _get_special_bigip_server_partition( $envid, $type );
     }
 
     return $bigip_server;
@@ -107,6 +128,8 @@ sub _get_bigip_server_partition {
     my $external_bigip_server = qw{};
     my $internal_partition = "Common";
     my $external_partition = "Common";
+    my $internal_bigip_version = qw{};
+    my $external_bigip_version = qw{};
 
     my $env_number = $envid;
     my $env_prefix = $envid;
@@ -117,17 +140,22 @@ sub _get_bigip_server_partition {
         $internal_bigip_server = '10.80.158.5'; # srwd00lba014/015
         $internal_bigip_server = '10.80.157.5' if $env_prefix =~ /srwq/i ; # srwd00lba017/018
         $external_bigip_server = '10.80.159.3'; # srwd00lba042
+        $internal_bigip_version = "10";
+        $internal_bigip_version = "11" if $env_prefix =~ /srwq/i ; # Only srwd00lba017/018 is 11.x 2014-01-13
+        $external_bigip_version = "10";
     } else {
         $internal_bigip_server = '10.80.159.40'; # srwd00lba012/013
         $external_bigip_server = '10.80.159.37'; # srwd00lba040/041
+        $internal_bigip_version = "10";
+        $external_bigip_version = "10";
     }
     # $internal_bigip_server = 'srwd00lba013.stubcorp.dev';
     # $external_bigip_server = 'srwd00lba041.stubcorp.dev';
 
     if ( $int_ext =~ /int/ ) {
-        return ( $internal_bigip_server, $internal_partition );
+        return ( $internal_bigip_server, $internal_partition, $internal_bigip_version );
     } elsif ( $int_ext =~ /ext/ ) {
-        return ( $external_bigip_server, $external_partition );
+        return ( $external_bigip_server, $external_partition, $external_bigip_version );
     }
 }
 
@@ -138,6 +166,7 @@ sub _get_special_bigip_server_partition {
     my ( $envid, $type ) = @_;
     my $bigip_server = qw{};
     my $partition = "Common";
+    my $version = qw{};
 
     my $env_number = $envid;
     my $env_prefix = $envid;
@@ -147,6 +176,7 @@ sub _get_special_bigip_server_partition {
 
     if ( $type eq "apigateway" ) {
         $bigip_server = '10.80.159.37'; # srwd00lba040/041
+        $version = "10";
     }
 
     return ( $bigip_server, $partition );

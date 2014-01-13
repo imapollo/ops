@@ -13,6 +13,9 @@ use lib '/nas/reg/lib/perl';
 use Readonly;
 use Data::Dumper;
 use BigIP::iControl;
+use Stubhub::BigIP::System::Util qw (
+                                    add_object_prefix
+                                );
 
 BEGIN {
   use Exporter();
@@ -39,8 +42,8 @@ our @EXPORT_OK;
 # Get pool list for all the environments.
 #
 sub get_pool_list {
-    my ( $iControl ) = @_;
-    my @pool_list = $iControl->get_pool_list();
+    my ( $bigip_ref ) = @_;
+    my @pool_list = $bigip_ref->{ "iControl" }->get_pool_list();
     return sort @pool_list;
 }
 
@@ -48,9 +51,10 @@ sub get_pool_list {
 # Get environment specific pool list.
 #
 sub get_env_pool_list {
-    my ( $iControl, $pattern ) = @_;
-    my @full_pool_list = get_pool_list( $iControl );
-    my @pool_list = grep /^$pattern/i, @full_pool_list;
+    my ( $bigip_ref, $pattern ) = @_;
+    my @full_pool_list = get_pool_list( $bigip_ref );
+    $pattern = add_object_prefix( $bigip_ref, $pattern );
+    my @pool_list = grep m\^$pattern\i, @full_pool_list;
     return @pool_list;
 }
 
@@ -88,8 +92,8 @@ sub delete_not_excluded_env_pools {
 # Get pool_members status.
 #
 sub get_pool_members_status {
-    my ( $iControl, $pool ) = @_;
-    my $pool_members_status = $iControl->get_pool_member_status( $pool );
+    my ( $bigip_ref, $pool ) = @_;
+    my $pool_members_status = $bigip_ref->{ "iControl" }->get_pool_member_status( $pool );
     return $pool_members_status;
 }
 

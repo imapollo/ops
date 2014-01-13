@@ -21,6 +21,7 @@ use Stubhub::Util::SSH qw (
 use Stubhub::BigIP::System::Info qw (
                                     get_bigip_server
                                     get_bigip_partition
+                                    get_bigip_version
                                 );
 use Stubhub::Log::Util qw (
                             get_logger
@@ -38,7 +39,11 @@ BEGIN {
   @EXPORT_OK    = qw(
                         &deploy_configuration
                         &download_configuration
+                        &get_bigip
                         &get_icontrol
+                        &add_object_prefix
+                        &del_object_prefix
+                        &get_object_prefix
                         &get_special_icontrol
                         &get_icontrol_instance
                         &set_partition
@@ -72,6 +77,47 @@ sub get_icontrol_instance {
                                 proto    => "$BIGIP_PROTOCOL"
                             );
     return $iControl;
+}
+
+#
+# Get the bigip reference.
+#
+# Return \%bigip => {
+#   int => {
+#     iControl  => xxx,
+#     server    => xxx,
+#     partition => xxx,
+#     version   => xxx,
+#   },
+#   ext => {
+#     iControl  => xxx,
+#     server    => xxx,
+#     partition => xxx,
+#     version   => xxx,
+#   }
+# }
+#
+sub get_bigip {
+    my ( $envid ) = @_;
+    my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
+
+    my %bigip = ();
+    my %internal_bigip = ();
+    my %external_bigip = ();
+
+    $internal_bigip{ "iControl" } = $internal_ic;
+    $internal_bigip{ "server" } = get_bigip_server( $envid, "int" );
+    $internal_bigip{ "partition" } = get_bigip_partition( $envid, "int" );
+    $internal_bigip{ "version" } = get_bigip_version( $envid, "int" );
+    $external_bigip{ "iControl" } = $external_ic;
+    $external_bigip{ "server" } = get_bigip_server( $envid, "ext" );
+    $external_bigip{ "partition" } = get_bigip_partition( $envid, "ext" );
+    $external_bigip{ "version" } = get_bigip_version( $envid, "ext" );
+
+    $bigip{ "int" } = \%internal_bigip;
+    $bigip{ "ext" } = \%external_bigip;
+
+    return \%bigip;
 }
 
 #
@@ -127,6 +173,39 @@ sub set_partition {
     $logger->debug( "Set partition $partition_name." );
     $iControl->set_active_partition( $partition_name );
     return;
+}
+
+#
+# Get the prefix for the object.
+# - Partition name like /Common/ if BigIP version is 11.
+# - No partition name if BigIP version is 10.
+#
+sub get_object_prefix {
+    my ( $bigip_ref ) = @_;
+    my $prefix = "";
+    if ( $bigip_ref->{ "version" } eq "11" ) {
+        $prefix = "/$bigip_ref->{ 'partition' }/";
+    }
+    return $prefix;
+}
+
+#
+# Add the prefix to the object name.
+#
+sub add_object_prefix {
+    my ( $bigip_ref, $object_name ) = @_;
+    my $prefix = get_object_prefix ( $bigip_ref );
+    return $prefix . $object_name;
+}
+
+#
+# Remove the prefix from the object name.
+#
+sub del_object_prefix {
+    my ( $bigip_ref, $object_name ) = @_;
+    my $prefix = get_object_prefix ( $bigip_ref );
+    $object_name =~ s"$prefix"";
+    return $object_name;
 }
 
 #

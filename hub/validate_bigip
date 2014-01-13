@@ -38,6 +38,8 @@ use BigIP::iControl;
 use MIME::Base64;
 use Stubhub::BigIP::System::Util qw (
                                     get_icontrol
+                                    get_bigip
+                                    del_object_prefix
                                 );
 use Stubhub::BigIP::Pool::Handler qw (
                                     get_env_pool_list
@@ -115,12 +117,12 @@ END_OF_HELP
 # Validate Pool status for specific environment.
 #
 sub validate_env_pool_status {
-    my ( $iControl, $pattern ) = @_;
-    my @pool_list = get_env_pool_list( $iControl, $pattern );
+    my ( $bigip_ref, $pattern ) = @_;
+    my @pool_list = get_env_pool_list( $bigip_ref, $pattern );
     my @filtered_pool_list = filter_pool_list( @pool_list );
     my @pools_status;
     foreach my $pool ( @filtered_pool_list ) {
-        my $pool_members_ref = get_pool_members_status( $iControl, $pool );
+        my $pool_members_ref = get_pool_members_status( $bigip_ref, $pool );
         my $pool_members_status_ref = ${ $pool_members_ref }[0];
         my @pool_no_bless_members_status;
 
@@ -137,8 +139,8 @@ sub validate_env_pool_status {
         my %pool_status;
 
         $pool_status{ 'pool' } = $pool;
-        $pool_status{ 'status' } = $iControl->get_ltm_pool_availability_status( $pool );
-        $pool_status{ 'status_description' } = $iControl->get_ltm_pool_status_as_string( $pool );
+        $pool_status{ 'status' } = $bigip_ref->{ "iControl" }->get_ltm_pool_availability_status( $pool );
+        $pool_status{ 'status_description' } = $bigip_ref->{ "iControl" }->get_ltm_pool_status_as_string( $pool );
         $pool_status{ 'members' } = \@pool_no_bless_members_status;
 
         push @pools_status, \%pool_status;
@@ -150,9 +152,9 @@ sub validate_env_pool_status {
 # Print the pool status.
 #
 sub print_pool_status {
-    my ( $iControl, $pattern ) = @_;
+    my ( $bigip_ref, $pattern ) = @_;
 
-    my $pools_status_ref = validate_env_pool_status( $iControl, $pattern );
+    my $pools_status_ref = validate_env_pool_status( $bigip_ref, $pattern );
     my $pass_count = 0;
     my $fail_count = 0;
 
@@ -161,17 +163,20 @@ sub print_pool_status {
         my $pool_members_status_ref = $pool_status{ 'members' };
 
         my $pass = 0;
+
+        my $pool_name = $pool_status{ 'pool' };
+        $pool_name = del_object_prefix( $bigip_ref, $pool_name );
         
         if ( $pool_status{ 'status_description' } =~ /either don't have service checking enabled/ ) {
-            printf "%-50s %-20s\n", $pool_status{ 'pool' }, "WARN";
+            printf "%-50s %-20s\n", $pool_name, "WARN";
             $pass = 0;
             $pass_count += 1;
         } elsif ( $pool_status{ 'status_description' } !~ /The pool is available/ ) {
-            printf "%-50s %-20s\n", $pool_status{ 'pool' }, "FAIL";
+            printf "%-50s %-20s\n", $pool_name, "FAIL";
             $pass = 1;
             $fail_count += 1;
         } else {
-            printf "%-50s %-20s\n", $pool_status{ 'pool' }, "PASS" if $show_verbose;
+            printf "%-50s %-20s\n", $pool_name, "PASS" if $show_verbose;
             $pass = 0;
             $pass_count += 1;
         }
@@ -256,11 +261,13 @@ if ( ! defined $envid) {
 #
 # Main
 #
-my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
+my $bigip_ref = get_bigip( $envid );
+my $internal_bigip_ref = $bigip_ref->{ "int" };
+my $external_bigip_ref = $bigip_ref->{ "ext" };
 
 if ( not $return_json ) {
-    my ( $ext_pass_count, $ext_fail_count ) = print_pool_status( $external_ic, $envid );
-    my ( $int_pass_count, $int_fail_count ) = print_pool_status( $internal_ic, $envid );
+    my ( $int_pass_count, $int_fail_count ) = print_pool_status( $internal_bigip_ref, $envid );
+    my ( $ext_pass_count, $ext_fail_count ) = print_pool_status( $external_bigip_ref, $envid );
 
     my $overall_pass_rate = ( $ext_pass_count + $ext_fail_count + $int_pass_count + $int_fail_count ) / ( $ext_pass_count + $int_pass_count );
 
@@ -280,8 +287,8 @@ if ( not $return_json ) {
     }
     exit 0;
 } else {
-    my $internal_status_ref = validate_env_pool_status( $internal_ic, $envid );
-    my $external_status_ref = validate_env_pool_status( $external_ic, $envid );
+    my $internal_status_ref = validate_env_pool_status( $internal_bigip_ref, $envid );
+    my $external_status_ref = validate_env_pool_status( $external_bigip_ref, $envid );
     my %env_status;
     $env_status{ 'internal' } = $internal_status_ref;
     $env_status{ 'external' } = $external_status_ref;
