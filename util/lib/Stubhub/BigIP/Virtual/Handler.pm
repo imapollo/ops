@@ -12,6 +12,9 @@ use lib '/nas/reg/lib/perl';
 
 use Readonly;
 use BigIP::iControl;
+use Stubhub::BigIP::System::Util qw (
+                                    add_object_prefix
+                                );
 
 BEGIN {
   use Exporter();
@@ -41,8 +44,8 @@ our @EXPORT_OK;
 # Get the default pool of a virtual server.
 #
 sub get_vs_default_pool {
-    my ( $iControl, $vs_name ) = @_;
-    return $iControl->get_default_pool_name( $vs_name );
+    my ( $bigip_ref, $vs_name ) = @_;
+    return $bigip_ref->{ "iControl" }->get_default_pool_name( $vs_name );
 }
 
 #
@@ -50,32 +53,32 @@ sub get_vs_default_pool {
 # Return @irule.
 #
 sub get_vs_irules {
-    my ( $iControl, $vs_name ) = @_;
-    return $iControl->get_ltm_vs_rules( $vs_name );
+    my ( $bigip_ref, $vs_name ) = @_;
+    return $bigip_ref->{ "iControl" }->get_ltm_vs_rules( $vs_name );
 }
 
 #
 # Get the destination ip of a virtual server.
 #
 sub get_vs_destination {
-    my ( $iControl, $vs_name ) = @_;
-    return $iControl->get_vs_destination( $vs_name );
+    my ( $bigip_ref, $vs_name ) = @_;
+    return $bigip_ref->{ "iControl" }->get_vs_destination( $vs_name );
 }
 
 #
 # Get the destination ip of a virtual server.
 #
 sub get_vss_destinations {
-    my ( $iControl, @vss_name ) = @_;
-    return $iControl->get_vss_destinations( \@vss_name );
+    my ( $bigip_ref, @vss_name ) = @_;
+    return $bigip_ref->{ "iControl" }->get_vss_destinations( \@vss_name );
 }
 
 #
 # Get all the virtual servers.
 #
 sub get_virtual_servers {
-    my ( $iControl ) = @_;
-    my @virtual_servers = $iControl->get_vs_list();
+    my ( $bigip_ref ) = @_;
+    my @virtual_servers = $bigip_ref->{ "iControl" }->get_vs_list();
     return sort @virtual_servers;
 }
 
@@ -83,9 +86,10 @@ sub get_virtual_servers {
 # Get environment specific virtual servers.
 #
 sub get_env_virtual_servers {
-    my ( $iControl, $pattern ) = @_;
-    my @full_virtual_servers = get_virtual_servers( $iControl );
-    my @virtual_servers = grep /^$pattern/i, @full_virtual_servers;
+    my ( $bigip_ref, $pattern ) = @_;
+    my @full_virtual_servers = get_virtual_servers( $bigip_ref );
+    $pattern = add_object_prefix( $bigip_ref, $pattern );
+    my @virtual_servers = grep m\^$pattern\i, @full_virtual_servers;
     return @virtual_servers;
 }
 
@@ -93,9 +97,11 @@ sub get_env_virtual_servers {
 # Get environment specific virtual servers.
 #
 sub get_pub_env_virtual_servers {
-    my ( $iControl, $pattern ) = @_;
-    my @full_virtual_servers = get_virtual_servers( $iControl );
-    my @virtual_servers = grep /^pub-$pattern/i, @full_virtual_servers;
+    my ( $bigip_ref, $pattern ) = @_;
+    my @full_virtual_servers = get_virtual_servers( $bigip_ref );
+    $pattern = "pub-$pattern";
+    $pattern = add_object_prefix( $bigip_ref, $pattern );
+    my @virtual_servers = grep m\^$pattern\i, @full_virtual_servers;
     return @virtual_servers;
 }
 
@@ -103,25 +109,27 @@ sub get_pub_env_virtual_servers {
 # Delete virtual servers.
 #
 sub delete_env_virtual_servers {
-    my ( $iControl, $envid ) = @_;
-    my @virtual_servers = get_env_virtual_servers( $iControl, $envid );
-    $iControl->delete_virtual_servers( \@virtual_servers );
-    my @pub_virtual_servers = get_pub_env_virtual_servers( $iControl, $envid );
-    $iControl->delete_virtual_servers( \@pub_virtual_servers );
+    my ( $bigip_ref, $envid ) = @_;
+    my @virtual_servers = get_env_virtual_servers( $bigip_ref, $envid );
+    $bigip_ref->{ "iControl" }->delete_virtual_servers( \@virtual_servers );
+    my @pub_virtual_servers = get_pub_env_virtual_servers( $bigip_ref, $envid );
+    $bigip_ref->{ "iControl" }->delete_virtual_servers( \@pub_virtual_servers );
 }
 
 #
 # Delete virtual servers, not including the excluded virtual servers.
 #
 sub delete_not_excluded_env_virtual_servers {
-    my ( $iControl, $envid, @exclude_virtual_servers ) = @_;
+    my ( $bigip_ref, $envid, @exclude_virtual_servers ) = @_;
 
-    my @virtual_servers = get_env_virtual_servers( $iControl, $envid );
+    my @virtual_servers = get_env_virtual_servers( $bigip_ref, $envid );
     my @filtered_virtual_servers;
     foreach my $virtual_server ( @virtual_servers ) {
         my $exclude = 0;
         foreach my $excluding_virtual_server ( @exclude_virtual_servers ) {
-            if ( $virtual_server =~ /^$envid-$excluding_virtual_server$/i ) {
+            $excluding_virtual_server = "$envid-$excluding_virtual_server";
+            $excluding_virtual_server = add_object_prefix( $bigip_ref, $excluding_virtual_server );
+            if ( $virtual_server =~ m\^$excluding_virtual_server$\i ) {
                 $exclude = 1;
             }
         }
@@ -129,14 +137,16 @@ sub delete_not_excluded_env_virtual_servers {
             push @filtered_virtual_servers, $virtual_server;
         }
     }
-    $iControl->delete_virtual_servers( \@filtered_virtual_servers );
+    $bigip_ref->{ "iControl" }->delete_virtual_servers( \@filtered_virtual_servers );
 
-    my @pub_virtual_servers = get_pub_env_virtual_servers( $iControl, $envid );
+    my @pub_virtual_servers = get_pub_env_virtual_servers( $bigip_ref, $envid );
     my @pub_filtered_virtual_servers;
     foreach my $virtual_server ( @pub_virtual_servers ) {
         my $exclude = 0;
         foreach my $excluding_virtual_server ( @exclude_virtual_servers ) {
-            if ( $virtual_server =~ /^pub-$envid-$excluding_virtual_server$/i ) {
+            my $excludeing_virtual_server = "pub-$envid-$excluding_virtual_server";
+            $excluding_virtual_server = add_object_prefix( $bigip_ref, $excluding_virtual_server );
+            if ( $virtual_server =~ m\^$excluding_virtual_server$\i ) {
                 $exclude = 1;
             }
         }
@@ -144,6 +154,6 @@ sub delete_not_excluded_env_virtual_servers {
             push @pub_filtered_virtual_servers, $virtual_server;
         }
     }
-    $iControl->delete_virtual_servers( \@pub_filtered_virtual_servers );
+    $bigip_ref->{ "iControl" }->delete_virtual_servers( \@pub_filtered_virtual_servers );
 }
 

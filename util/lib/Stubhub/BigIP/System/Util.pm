@@ -212,10 +212,10 @@ sub del_object_prefix {
 # Download configuration from BigIP server.
 #
 sub download_configuration {
-    my ( $iControl, $remote_file, $local_file ) = @_;
+    my ( $bigip_ref, $remote_file, $local_file ) = @_;
     open LOCAL_FILE_FH, ">$local_file"
         or $logger->logdie( "Failed to open file: $local_file" );
-    print LOCAL_FILE_FH $iControl->download_file($remote_file);
+    print LOCAL_FILE_FH $bigip_ref->{ "iControl" }->download_file($remote_file);
     close LOCAL_FILE_FH;
     $logger->debug( "Successfully download $remote_file to $local_file." );
     return $local_file;
@@ -225,18 +225,23 @@ sub download_configuration {
 # Deploy configuration onto BigIP server.
 #
 sub deploy_configuration {
-    my ( $envid, $int_ext, $iControl, $file_name ) = @_;
+    my ( $envid, $int_ext, $bigip_ref, $file_name ) = @_;
     my $ssh = _init_ssh( get_bigip_server( $envid, $int_ext ) );
 
     my $remote_file_name = $file_name;
     $remote_file_name =~ s/.*\/(.*)/$1/;
     $remote_file_name = "/config/deploy/$remote_file_name";
 
-    if ( not _upload_file( $iControl, $remote_file_name, $file_name) ) {
+    if ( not _upload_file( $bigip_ref, $remote_file_name, $file_name) ) {
         $logger->logdie( "Failed to upload file $file_name: $!" );
     }
 
-    my @output = mute_execute_ssh( $ssh, "merge $remote_file_name" );
+    my @output;
+    if ( $bigip_ref->{ "version" } eq "10" ) {
+        @output = mute_execute_ssh( $ssh, "merge $remote_file_name" );
+    } elsif ( $bigip_ref->{ "version"} eq "11" ) {
+        @output = mute_execute_ssh( $ssh, "load /sys config file $remote_file_name merge" );
+    }
     if ( grep /error/i, @output ) {
         foreach my $line ( @output ) {
             $logger->error( $line );
@@ -253,18 +258,18 @@ sub deploy_configuration {
 # Save configuration on BigIP server.
 #
 sub save_configuration {
-    my ( $iControl ) = @_;
+    my ( $bigip_ref ) = @_;
     $logger->info( "Save the configuration successfully." );
-    $iControl->save_configuration( 'today' );
+    $bigip_ref->{ "iControl" }->save_configuration( 'today' );
 }
 
 #
 # Sync configurations to the Standby BigIP server.
 #
 sub sync_configuration {
-    my ( $iControl, $envid, $int_ext ) = @_;
+    my ( $bigip_ref, $envid, $int_ext ) = @_;
     my $ssh = _init_ssh( get_bigip_server( $envid, $int_ext ) );
-    if ( check_failover_state( $iControl ) eq 'FAILOVER_STATE_ACTIVE') {
+    if ( check_failover_state( $bigip_ref ) eq 'FAILOVER_STATE_ACTIVE') {
         my @output = mute_execute_ssh( $ssh, "config sync all" );
         if ( grep /error/i, @output ) {
             foreach my $line ( @output ) {
@@ -284,18 +289,18 @@ sub sync_configuration {
 # Check the failover status for BigIP server.
 #
 sub check_failover_state {
-    my ( $iControl ) = @_;
-    $logger->debug( "The bigip failover state is: " . $iControl->get_failover_state() );
-    return $iControl->get_failover_state();
+    my ( $bigip_ref ) = @_;
+    $logger->debug( "The bigip failover state is: " . $bigip_ref->{ "iControl" }->get_failover_state() );
+    return $bigip_ref->{ "iControl" }->get_failover_state();
 }
 
 #
 # Upload file onto BigIP server.
 #
 sub _upload_file {
-    my ( $iControl, $remote_file_name, $local_file_name ) = @_;
+    my ( $bigip_ref, $remote_file_name, $local_file_name ) = @_;
     $logger->debug( "Successfully uploaded $local_file_name to $remote_file_name." );
-    my $success = $iControl->upload_file( $remote_file_name, $local_file_name);
+    my $success = $bigip_ref->{ "iControl" }->upload_file( $remote_file_name, $local_file_name);
     return $success;
 }
 

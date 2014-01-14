@@ -58,6 +58,7 @@ use Stubhub::BigIP::Pool::ConfigGenerator qw (
                             generate_not_excluded_pool_configs
                            );
 use Stubhub::BigIP::System::Util qw (
+                            get_bigip
                             get_icontrol
                             deploy_configuration
                             save_configuration
@@ -187,7 +188,7 @@ sub uniq {
 # including virtual server, pool.
 #
 sub generate_configuration {
-    my ( $env_id, $branch_name, $tmpdir, $intext, $excluded_vs_ref, $excluded_pool_ref, $only_include_vs_ref, $only_include_pool_ref ) = @_;
+    my ( $env_id, $branch_name, $tmpdir, $intext, $excluded_vs_ref, $excluded_pool_ref, $only_include_vs_ref, $only_include_pool_ref, $bigip_ref ) = @_;
     my $p4_f5_dir = qw{};
     my $p4_f5_subdir = "templates/fsroot/etc/stubhub/f5";
     if ( $branch_name eq "main" ) {
@@ -209,10 +210,10 @@ sub generate_configuration {
     my $vs_file;
     if ( $intext eq "ext" ) {
         $vs_file = generate_pub_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext",
-            "$public_ip_list_dir$PUBLIC_IP_LIST", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref );
+            "$public_ip_list_dir$PUBLIC_IP_LIST", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref, $bigip_ref );
     }
-    $vs_file = generate_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref );
-    my $pool_file = generate_not_excluded_pool_configs( "$dynamic_perforce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir", $excluded_pool_ref, $only_include_pool_ref  );
+    $vs_file = generate_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref, $bigip_ref );
+    my $pool_file = generate_not_excluded_pool_configs( "$dynamic_perforce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir", $excluded_pool_ref, $only_include_pool_ref, $bigip_ref );
     clean_perforce_client( $dynamic_perforce_client, $dynamic_perforce_dir );
     clean_perforce_client( $public_ip_chkout_client, $public_ip_list_dir);
     return ( $vs_file, $pool_file );
@@ -286,17 +287,16 @@ sub clean_and_exit {
 #
 # Main
 #
-
-my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
+my $bigip_refs = get_bigip( $envid );
 my $bigip_lock_file = check_deployment_lock( $envid );
+my $internal_bigip_ref = $bigip_refs->{ "int" };
+my $external_bigip_ref = $bigip_refs->{ "ext" };
 
 # Backup the configuration file.
-my $internal_bigip_server = get_bigip_server( $envid, "int" );
-my $external_bigip_server = get_bigip_server( $envid, "ext" );
 system("/usr/bin/sudo /bin/mkdir -p /var/log/bigip");
 system("/usr/bin/sudo /bin/chmod ugo+w /var/log/bigip");
-download_configuration( $internal_ic, '/config/bigip.conf', "/var/log/bigip/$internal_bigip_server-int-bigip.conf." . get_timestamp() );
-download_configuration( $external_ic, '/config/bigip.conf', "/var/log/bigip/$external_bigip_server-ext-bigip.conf." . get_timestamp() );
+download_configuration( $internal_bigip_ref, '/config/bigip.conf', "/var/log/bigip/$internal_bigip_ref->{ 'server' }-int-bigip.conf." . get_timestamp() );
+download_configuration( $external_bigip_ref, '/config/bigip.conf', "/var/log/bigip/$external_bigip_ref->{ 'server' }-ext-bigip.conf." . get_timestamp() );
 
 my @internal_excluded_vs = get_exclude_list( $envid, "internal", "virtual" );
 my @external_excluded_vs = get_exclude_list( $envid, "external", "virtual" );
@@ -318,30 +318,33 @@ $deploy_all = 0 if ( $only_vs or $only_irule or $only_pool or $only_pool_name or
 if ( $deploy_all ) {
     # Remove the virtual servers, rules and pools for specific environment.
     $logger->info( "Deleting virtual servers for $envid ..." );
-    delete_not_excluded_env_virtual_servers( $external_ic, $envid, @final_external_excluded_vs );
-    delete_not_excluded_env_virtual_servers( $internal_ic, $envid, @final_internal_excluded_vs );
+    delete_not_excluded_env_virtual_servers( $external_bigip_ref, $envid, @final_external_excluded_vs );
+    delete_not_excluded_env_virtual_servers( $internal_bigip_ref, $envid, @final_internal_excluded_vs );
     $logger->info( "Deleting rules for $envid ..." );
-    delete_env_rules( $internal_ic, $envid );
-    delete_env_rules( $external_ic, $envid );
+    delete_env_rules( $internal_bigip_ref, $envid );
+    delete_env_rules( $external_bigip_ref, $envid );
     $logger->info( "Deleting pools for $envid ..." );
-    delete_not_excluded_env_pools( $external_ic, $envid, @final_external_excluded_pool );
-    delete_not_excluded_env_pools( $internal_ic, $envid, @final_internal_excluded_pool );
+    delete_not_excluded_env_pools( $external_bigip_ref, $envid, @final_external_excluded_pool );
+    delete_not_excluded_env_pools( $internal_bigip_ref, $envid, @final_internal_excluded_pool );
 }
 
 # Deploy virtual servers, rules and pools for specific environment.
 my $int_tmpdir = File::Temp->newdir();
 my $ext_tmpdir = File::Temp->newdir();
 $logger->info( "Generating virtual server, pool configuration files ..." );
-my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext", \@final_external_excluded_vs, \@final_external_excluded_pool, \@only_include_vs, \@only_include_pool );
-my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int", \@final_internal_excluded_vs, \@final_internal_excluded_pool, \@only_include_vs, \@only_include_pool );
+my ($external_vs_conf, $external_pool_conf) = generate_configuration( $envid, $branch, $ext_tmpdir, "ext", \@final_external_excluded_vs, \@final_external_excluded_pool, \@only_include_vs, \@only_include_pool, $external_bigip_ref );
+my ($internal_vs_conf, $internal_pool_conf) = generate_configuration( $envid, $branch, $int_tmpdir, "int", \@final_internal_excluded_vs, \@final_internal_excluded_pool, \@only_include_vs, \@only_include_pool, $internal_bigip_ref );
+
+system( "/bin/cp $external_vs_conf /nas/home/minjzhang/temp");
+system( "/bin/cp $external_pool_conf /nas/home/minjzhang/temp");
 
 my $deploy_success = 0;
 
 if ( $only_pool_name or $only_pool or $deploy_all ) {
     $logger->info( "Deploying pools for $envid ..." );
-    $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_pool_conf ) if ( -e $external_pool_conf );
+    $deploy_success = deploy_configuration( $envid, "ext", $external_bigip_ref, $external_pool_conf ) if ( -e $external_pool_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
-    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_pool_conf ) if ( -e $internal_pool_conf );
+    $deploy_success = deploy_configuration( $envid, "int", $internal_bigip_ref, $internal_pool_conf ) if ( -e $internal_pool_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
 }
 if ( $only_rule_name or $only_irule or $deploy_all ) {
@@ -355,17 +358,17 @@ if ( $only_rule_name or $only_irule or $deploy_all ) {
 }
 if ( $only_vs_name or $only_vs or $deploy_all ) {
     $logger->info("Deploying virtual servers for $envid ...");
-    $deploy_success = deploy_configuration( $envid, "ext", $external_ic, $external_vs_conf ) if ( -e $external_vs_conf );
+    $deploy_success = deploy_configuration( $envid, "ext", $external_bigip_ref, $external_vs_conf ) if ( -e $external_vs_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
-    $deploy_success = deploy_configuration( $envid, "int", $internal_ic, $internal_vs_conf ) if ( -e $internal_vs_conf );
+    $deploy_success = deploy_configuration( $envid, "int", $internal_bigip_ref, $internal_vs_conf ) if ( -e $internal_vs_conf );
     clean_and_exit( $bigip_lock_file ) if $deploy_success != 0;
 }
 
 if ( not $ignore_save ) {
-    save_configuration( $internal_ic );
-    save_configuration( $external_ic );
-    sync_configuration( $internal_ic, $envid, "int" );
-    sync_configuration( $external_ic, $envid, "ext" );
+    save_configuration( $internal_bigip_ref );
+    save_configuration( $external_bigip_ref );
+    sync_configuration( $internal_bigip_ref, $envid, "int" );
+    sync_configuration( $external_bigip_ref, $envid, "ext" );
 }
 
 system( "/bin/rm $bigip_lock_file" );

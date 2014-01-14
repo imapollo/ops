@@ -16,6 +16,9 @@ use Stubhub::Util::Host qw (
                            get_ip_by_hostname 
                            get_public_ip_by_hostname
                         );
+use Stubhub::BigIP::System::Util qw (
+                                    get_object_prefix
+                                );
 
 BEGIN {
   use Exporter();
@@ -43,7 +46,7 @@ our @EXPORT_OK;
 # Return empty string if no public ip for the environment.
 #
 sub generate_pub_not_excluded_vs_configs {
-    my ( $templates_dir, $public_ip_list, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref ) = @_;
+    my ( $templates_dir, $public_ip_list, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref, $bigip_ref ) = @_;
     my @excluded_virtual_servers = @{ $excluded_virtual_servers_ref };
     my @only_include_vs = @{ $only_include_vs_ref };
     my $public_vs = _get_env_public_vs( $public_ip_list, $envid );
@@ -81,7 +84,7 @@ sub generate_pub_not_excluded_vs_configs {
         }
 
         if ( exists $public_vs->{ "pub-$envid-$vs_template_filename" } ) {
-            generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid, 1 );
+            generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid, 1, $bigip_ref );
         }
     }
     return $output_file;
@@ -92,7 +95,7 @@ sub generate_pub_not_excluded_vs_configs {
 # under a folder.
 #
 sub generate_not_excluded_vs_configs {
-    my ( $templates_dir, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref ) = @_;
+    my ( $templates_dir, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref, $bigip_ref ) = @_;
     my @excluded_virtual_servers = @{ $excluded_virtual_servers_ref };
     my @only_include_vs = @{ $only_include_vs_ref };
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
@@ -124,7 +127,7 @@ sub generate_not_excluded_vs_configs {
             next if $excluded;
         }
 
-        generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid, 0 );
+        generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid, 0, $bigip_ref );
     }
     return $output_file;
 }
@@ -134,7 +137,7 @@ sub generate_not_excluded_vs_configs {
 # under a folder.
 #
 sub generate_not_excluded_vs_separate_configs {
-    my ( $templates_dir, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref ) = @_;
+    my ( $templates_dir, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref, $bigip_ref ) = @_;
     my @excluded_virtual_servers = @{ $excluded_virtual_servers_ref };
     my @only_include_vs = @{ $only_include_vs_ref };
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
@@ -165,7 +168,7 @@ sub generate_not_excluded_vs_separate_configs {
             next if $excluded;
         }
 
-        generate_vs_config( $output_dir, "$templates_dir/$virtual_server_template", $envid, 0 );
+        generate_vs_config( $output_dir, "$templates_dir/$virtual_server_template", $envid, 0, $bigip_ref );
     }
     return $output_dir;
 }
@@ -191,12 +194,12 @@ sub generate_vs_configs {
 # templates under a folder.
 #
 sub generate_vs_separate_configs {
-    my ( $templates_dir, $envid, $output_dir ) = @_;
+    my ( $templates_dir, $envid, $output_dir, $bigip_ref ) = @_;
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
     my @template_files = grep { ! -d } readdir DH;
     closedir DH;
     foreach my $virtual_server_template ( @template_files ) {
-        generate_vs_config( $output_dir, "$templates_dir/$virtual_server_template", $envid, 0 );
+        generate_vs_config( $output_dir, "$templates_dir/$virtual_server_template", $envid, 0, $bigip_ref );
     }
     return $output_dir;
 }
@@ -205,11 +208,13 @@ sub generate_vs_separate_configs {
 # Generate virtual server configuration file based on template.
 #
 sub generate_vs_config {
-    my ( $target_file_path, $template_file_path, $envid, $public_ip ) = @_;
+    my ( $target_file_path, $template_file_path, $envid, $public_ip, $bigip_ref ) = @_;
 
     Readonly my $UC_ENVID_TOKEN => '%{uc_env_id}';
     Readonly my $ENVID_TOKEN => '%{env_id}';
     Readonly my $IPADDR_TOKEN => '%{\S*env_id\S*\.com}';
+
+    my $object_prefix = get_object_prefix( $bigip_ref );
 
     open TEMPLATE_FH, "<$template_file_path" or die $!;
 
@@ -237,10 +242,21 @@ sub generate_vs_config {
         }
     }
 
+    my $profile_begin = 0;
+    my $profile_end   = 0;
     foreach my $line ( @lines ) {
         if ( $public_ip ) {
             if ( $line =~ /^virtual %{/ ) {
-                $line =~ s/virtual (.*)/virtual pub-$1/;
+                $line =~ s\virtual (.*)\virtual ${object_prefix}pub-$1\;
+                if ( $object_prefix ne "" ) {
+                    $line = "ltm $line";
+                }
+            }
+        }
+        if ( $line =~ /^virtual %{/ ) {
+            $line =~ s\virtual (.*)\virtual ${object_prefix}$1\;
+            if ( $object_prefix ne "" ) {
+                $line = "ltm $line";
             }
         }
         if ( $line =~ /$ENVID_TOKEN/ ) {
@@ -257,6 +273,35 @@ sub generate_vs_config {
                 $ip_address = _replace_token_hostname_by_ip( $line, $envid, 1 );
             }
             $line =~ s/$IPADDR_TOKEN/$ip_address/;
+        }
+        # For BigIP version 11.
+        if ( $bigip_ref->{ "version" } eq "11" ) {
+            if ( $line =~ /\bip protocol\b/ ) {
+                $line =~ s/ip protocol/ip-protocol/;
+            }
+            if ( $line =~ /^\s*pool\s+/ ) {
+                $line =~ s/^(\s*pool\s+)/$1$object_prefix/;
+            }
+            if ( $line =~ /^\s*destination\s+/ ) {
+                $line =~ s/^(\s*destination\s+)/$1$object_prefix/;
+            }
+            if ( $line =~ /^\s*rules\s+/ ) {
+                $line =~ s/^(\s*rules\s+)(\S+)/$1 \{ $object_prefix$2 \}/;
+            }
+            if ( $line =~ /^\s*profiles\s+{\s*$/ ) {
+                $profile_begin = 1;
+                print TARGET_FH $line;
+                next;
+            }
+            if ( $profile_begin ) {
+                if ( $line =~ /^\s*\S+\s+{/ ) {
+                    $line =~ s/(\S+\s+{)/$object_prefix$1/;
+                } elsif ( $line =~ /^\s*clientside\s*$/ ) {
+                    $line =~ s/clientside/context clientside/;
+                } elsif ( $line =~ /^\s*serverside\s*$/ ) {
+                    $line =~ s/serverside/context serverside/;
+                }
+            }
         }
         print TARGET_FH $line;
     }

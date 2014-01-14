@@ -12,6 +12,9 @@ use lib '/nas/reg/lib/perl';
 
 use Readonly;
 use BigIP::iControl;
+use Stubhub::BigIP::System::Util qw (
+                                    add_object_prefix
+                                );
 
 BEGIN {
   use Exporter();
@@ -36,8 +39,8 @@ our @EXPORT_OK;
 # Get all the rules.
 #
 sub get_rules {
-    my ( $iControl ) = @_;
-    my @rules = $iControl->get_rule_list();
+    my ( $bigip_ref ) = @_;
+    my @rules = $bigip_ref->{ "iControl" }->get_rule_list();
     return sort @rules;
 }
 
@@ -45,9 +48,10 @@ sub get_rules {
 # Get rules for specified environments.
 #
 sub get_env_rules {
-    my ( $iControl, $pattern ) = @_;
-    my @full_rules = get_rules( $iControl );
-    my @rules = grep /^$pattern/i, @full_rules;
+    my ( $bigip_ref, $pattern ) = @_;
+    my @full_rules = get_rules( $bigip_ref );
+    $pattern = add_object_prefix( $bigip_ref, $pattern );
+    my @rules = grep m\^$pattern\i, @full_rules;
     return @rules;
 }
 
@@ -55,15 +59,15 @@ sub get_env_rules {
 # Delete rules.
 #
 sub delete_env_rules {
-    my ( $iControl, $pattern ) = @_;
-    my @rules = get_env_rules( $iControl, $pattern );
-    $iControl->delete_rules( \@rules );
+    my ( $bigip_ref, $pattern ) = @_;
+    my @rules = get_env_rules( $bigip_ref, $pattern );
+    $bigip_ref->{ "iControl" }->delete_rules( \@rules );
 }
 
 #
 # Get the definition of a specified rule.
 #
 sub get_rule_definition {
-    my ( $iControl, $rule ) = @_;
-    $iControl->get_rule( $rule );
+    my ( $bigip_ref, $rule ) = @_;
+    $bigip_ref->{ "iControl" }->get_rule( $rule );
 }

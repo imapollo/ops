@@ -62,17 +62,17 @@ sub get_env_pool_list {
 # Delete pools.
 #
 sub delete_env_pools {
-    my ( $iControl, $pattern ) = @_;
-    my @pools = get_env_pool_list( $iControl, $pattern );
-    $iControl->delete_pools( \@pools );
+    my ( $bigip_ref, $pattern ) = @_;
+    my @pools = get_env_pool_list( $bigip_ref, $pattern );
+    $bigip_ref->{ "iControl" }->delete_pools( \@pools );
 }
 
 #
 # Delete pools with exclude list.
 #
 sub delete_not_excluded_env_pools {
-    my ( $iControl, $pattern, @exclude_pools ) = @_;
-    my @pools = get_env_pool_list( $iControl, $pattern );
+    my ( $bigip_ref, $pattern, @exclude_pools ) = @_;
+    my @pools = get_env_pool_list( $bigip_ref, $pattern );
     my @filtered_pools;
     foreach my $pool ( @pools ) {
         my $exclude = 0;
@@ -85,7 +85,7 @@ sub delete_not_excluded_env_pools {
             push @filtered_pools, $pool;
         }
     }
-    $iControl->delete_pools( \@filtered_pools );
+    $bigip_ref->{ "iControl" }->delete_pools( \@filtered_pools );
 }
 
 #
@@ -101,7 +101,7 @@ sub get_pool_members_status {
 # Get the pool members.
 #
 sub get_env_pool_members {
-    my ( $iControl, $pool ) = @_;
-    return $iControl->get_pool_members( $pool );
+    my ( $bigip_ref, $pool ) = @_;
+    return $bigip_ref->{ "iControl" }->get_pool_members( $pool );
 }
 

@@ -16,6 +16,9 @@ use Log::Transcript;
 use Stubhub::Util::Host qw (
                             get_ip_by_hostname
                         );
+use Stubhub::BigIP::System::Util qw (
+                                    get_object_prefix
+                                );
 
 BEGIN {
   use Exporter();
@@ -41,7 +44,7 @@ our @EXPORT_OK;
 # under a folder, including not excluded pools.
 #
 sub generate_not_excluded_pool_configs {
-    my ( $templates_dir, $envid, $output_dir, $excluded_pools_ref, $only_include_pool_ref ) = @_;
+    my ( $templates_dir, $envid, $output_dir, $excluded_pools_ref, $only_include_pool_ref, $bigip_ref ) = @_;
     my @excluded_pools = @{ $excluded_pools_ref };
     my @only_include_pool = @{ $only_include_pool_ref };
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
@@ -71,7 +74,7 @@ sub generate_not_excluded_pool_configs {
             next if $excluded;
         }
 
-        generate_pool_config( $output_file, "$templates_dir/$pool_template", $envid );
+        generate_pool_config( $output_file, "$templates_dir/$pool_template", $envid, $bigip_ref );
     }
     return $output_file;
 }
@@ -81,7 +84,7 @@ sub generate_not_excluded_pool_configs {
 # under a folder, including not excluded pools.
 #
 sub generate_not_excluded_pool_separate_configs {
-    my ( $templates_dir, $envid, $output_dir, $excluded_pools_ref, $only_include_pool_ref ) = @_;
+    my ( $templates_dir, $envid, $output_dir, $excluded_pools_ref, $only_include_pool_ref, $bigip_ref ) = @_;
     my @excluded_pools = @{ $excluded_pools_ref };
     my @only_include_pool = @{ $only_include_pool_ref };
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
@@ -110,7 +113,7 @@ sub generate_not_excluded_pool_separate_configs {
             next if $excluded;
         }
 
-        generate_pool_config( $output_dir, "$templates_dir/$pool_template", $envid );
+        generate_pool_config( $output_dir, "$templates_dir/$pool_template", $envid, $bigip_ref );
     }
     return $output_dir;
 }
@@ -121,13 +124,13 @@ sub generate_not_excluded_pool_separate_configs {
 # under a folder.
 #
 sub generate_pool_configs {
-    my ( $templates_dir, $envid, $output_dir ) = @_;
+    my ( $templates_dir, $envid, $output_dir, $bigip_ref ) = @_;
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
     my @template_files = grep { ! -d } readdir DH;
     closedir DH;
     my $output_file = "$output_dir/pool_$envid.conf";
     foreach my $pool_template ( @template_files ) {
-        generate_pool_config( $output_file, "$templates_dir/$pool_template", $envid );
+        generate_pool_config( $output_file, "$templates_dir/$pool_template", $envid, $bigip_ref );
     }
     return $output_file;
 }
@@ -137,12 +140,12 @@ sub generate_pool_configs {
 # under a folder.
 #
 sub generate_pool_separate_configs {
-    my ( $templates_dir, $envid, $output_dir ) = @_;
+    my ( $templates_dir, $envid, $output_dir, $bigip_ref ) = @_;
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
     my @template_files = grep { ! -d } readdir DH;
     closedir DH;
     foreach my $pool_template ( @template_files ) {
-        generate_pool_config( $output_dir, "$templates_dir/$pool_template", $envid );
+        generate_pool_config( $output_dir, "$templates_dir/$pool_template", $envid, $bigip_ref );
     }
     return $output_dir;
 }
@@ -151,13 +154,15 @@ sub generate_pool_separate_configs {
 # Generate pool configuration file based on template.
 #
 sub generate_pool_config {
-    my ( $target_file_path, $template_file_path, $envid ) = @_;
+    my ( $target_file_path, $template_file_path, $envid, $bigip_ref ) = @_;
 
     Readonly my $UC_ENVID_TOKEN => '%{uc_env_id}';
     Readonly my $ENVID_TOKEN => '%{env_id}';
     Readonly my $IPADDR_TOKEN => '%{env_id\..*\.ip}';
     Readonly my $FOREACH_BEGIN_TOKEN => '%{foreach .*}';
     Readonly my $FOREACH_END_TOKEN => '%{foreach}';
+
+    my $object_prefix = get_object_prefix( $bigip_ref );
 
     open TEMPLATE_FH, "<$template_file_path" or die $!;
 
@@ -170,7 +175,18 @@ sub generate_pool_config {
 
     open TARGET_FH, ">>$target_file_path" or die $!;
 
+    my $members_begin_line = 0;
+    my $members_end_line = 0;
     while ( my $line = <TEMPLATE_FH> ) {
+        if ( $line =~ /^\s*members\s*{\s*$/ ) {
+            $members_begin_line = 1;
+            next;
+        } elsif ( $line =~ /^\s*}\s*$/ and $members_begin_line and
+                ( $members_end_line == 0 ) ) {
+            $members_end_line = 1;
+            next;
+        }
+
         if ( $line =~ /$FOREACH_BEGIN_TOKEN/ ) {
 
             $line =~ s/^\s*%{foreach (.*)}\s*$/$1/;
@@ -189,19 +205,72 @@ sub generate_pool_config {
             # Print the lines inside %{foreach}
             my @pool_members = _get_ip_by_hostname_token( $token, $envid );
             $token =~ s/env_id\.(.*)\.ip/$1/;
-            if ( $#pool_members == 0 ) {
-                # logger->warn( "No pool members for " . uc( $token ) );
+            if ( scalar @pool_members == 0 ) {
+                # $logger->warn( "No pool members for " . uc( $token ) );
+            } else {
+                print TARGET_FH "members {\n";
             }
             foreach my $pool_member ( @pool_members ) {
                 foreach my $foreach_line ( @foreach_lines ) {
                     my $replacing_line = $foreach_line;
                     if ( $replacing_line =~ /$IPADDR_TOKEN/ ) {
-                        $replacing_line =~ s/$IPADDR_TOKEN/$pool_member/;
+                        if ( $bigip_ref->{ "version" } eq "10" ) {
+                            $replacing_line =~ s/$IPADDR_TOKEN/$pool_member/;
+                        } elsif ( $bigip_ref->{ "version" } eq "11" ) {
+                            # For Bigip version 11.
+                            $replacing_line =~ s\$IPADDR_TOKEN\$object_prefix$pool_member\;
+                            my $pool_member_without_port = $pool_member;
+                            $pool_member_without_port =~ s/(.*):.*/$1/;
+                            $replacing_line =~ s/{}/{ address $pool_member_without_port }/;
+                        }
                     }
                     print TARGET_FH $replacing_line;
                 }
             }
+            if ( scalar @pool_members > 0 ) {
+                print TARGET_FH "}\n";
+            }
             next;
+        }
+
+        if ( $line =~ /^pool %{/ ) {
+            $line =~ s\pool (.*)\pool ${object_prefix}$1\;
+            if ( $object_prefix ne "" ) {
+                $line = "ltm $line";
+            }
+        }
+        # For BigIP version 11.
+        if ( $bigip_ref->{ "version" } eq "11" ) {
+            if ( $line =~ /\bmin active members\b/ ) {
+                $line =~ s/min active members/min-active-members/;
+            }
+            if ( $line =~ /\bslow ramp time\b/ ) {
+                $line =~ s/slow ramp time/slow-ramp-time/;
+            }
+            if ( $line =~ /\blb method\b/ ) {
+                $line =~ s/lb method/load-balancing-mode/;
+            }
+            if ( $line =~ /\bfastest app resp\b/ ) {
+                $line =~ s/fastest app resp/fastest-app-response/;
+            }
+            if ( $line =~ /\bmember least conn\b/ ) {
+                $line =~ s/member least conn/least-connections-member/;
+            }
+            if ( $line =~ /^\s*monitor/ ) {
+                $line =~ s/^\s*monitor\s*//;
+                my @monitors = split( /\s+/, $line );
+                $line = "monitor ";
+                foreach my $monitor ( @monitors ) {
+                    if ( $monitor eq "all" ) {
+                        next;
+                    }
+                    if ( $monitor ne "and" ) {
+                        $monitor = $object_prefix . $monitor;
+                    }
+                    $line = $line . "$monitor ";
+                }
+                $line = $line . "\n";
+            }
         }
         if ( $line =~ /$ENVID_TOKEN/ ) {
             $line =~ s/$ENVID_TOKEN/$envid/;
