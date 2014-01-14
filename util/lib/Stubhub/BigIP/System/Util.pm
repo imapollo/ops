@@ -12,6 +12,7 @@ use lib '/nas/reg/lib/perl';
 
 use Readonly;
 use MIME::Base64;
+use Data::Dumper;
 use Stubhub::Util::SSH qw (
                             login_ssh
                             close_ssh
@@ -44,6 +45,7 @@ BEGIN {
                         &add_object_prefix
                         &del_object_prefix
                         &get_object_prefix
+                        &get_special_bigip
                         &get_special_icontrol
                         &get_icontrol_instance
                         &set_partition
@@ -147,6 +149,23 @@ sub get_icontrol {
 }
 
 #
+# Get special bigip instances, for example api gateway.
+#
+sub get_special_bigip {
+    my ( $envid, $type ) = @_;
+    my $icontrol = get_special_icontrol( $envid, $type );
+
+    my %bigip = ();
+
+    $bigip{ "iControl" } = $icontrol;
+    $bigip{ "server" } = get_bigip_server( $envid, $type );
+    $bigip{ "partition" } = get_bigip_partition( $envid, $type );
+    $bigip{ "version" } = get_bigip_version( $envid, $type );
+
+    return \%bigip;
+}
+
+#
 # Get special iControl instances, for example api gateway.
 #
 sub get_special_icontrol {
@@ -183,7 +202,7 @@ sub set_partition {
 sub get_object_prefix {
     my ( $bigip_ref ) = @_;
     my $prefix = "";
-    if ( $bigip_ref->{ "version" } eq "11" ) {
+    if ( defined $bigip_ref->{ "version" } and $bigip_ref->{ "version" } eq "11" ) {
         $prefix = "/$bigip_ref->{ 'partition' }/";
     }
     return $prefix;

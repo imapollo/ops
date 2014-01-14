@@ -30,8 +30,8 @@ use Carp;
 use Getopt::Long;
 
 # use lib '/nas/utl/devops/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
 
 use JSON;
 use Stubhub::Log::Util qw (
@@ -40,8 +40,8 @@ use Stubhub::Log::Util qw (
                             add_syslog_appender
                         );
 use Stubhub::BigIP::System::Util qw (
-                            get_icontrol
-                            get_special_icontrol
+                            get_bigip
+                            get_special_bigip
                         );
 use Stubhub::BigIP::Virtual::Handler qw (
                             get_env_virtual_servers
@@ -138,24 +138,24 @@ if ( ! defined $request_url ) {
 # Find the vritual server based on the request.
 #
 sub find_virtual_server {
-    my ( $icontrols_ref, $envid, $protocol, $virtual_server ) = @_;
+    my ( $bigip_refs, $envid, $protocol, $virtual_server ) = @_;
 
     my $virtual_server_ip = get_ip_by_hostname( $virtual_server );
     $protocol = "80" if $protocol eq "http";
     $protocol = "443" if $protocol eq "https";
 
     my $virtual_server_name = qw{};
-    my $selected_icontrol;
+    my $selected_bigip;
 
-    foreach my $icontrol ( @{ $icontrols_ref } ) {
-        my @virtual_servers = get_env_virtual_servers( $icontrol, $envid);
-        my @destinations = get_vss_destinations( $icontrol, @virtual_servers );
+    foreach my $bigip_ref ( @{ $bigip_refs } ) {
+        my @virtual_servers = get_env_virtual_servers( $bigip_ref, $envid);
+        my @destinations = get_vss_destinations( $bigip_ref, @virtual_servers );
         my $vs_index = 0;
         foreach my $destination ( @destinations ) {
             if ( $destination->{ 'address' } eq $virtual_server_ip
                 && $destination->{ 'port' } eq $protocol ) {
                 $virtual_server_name = $virtual_servers[ $vs_index ];
-                $selected_icontrol = $icontrol;
+                $selected_bigip = $bigip_ref;
                 last;
             }
             $vs_index = $vs_index + 1;
@@ -165,16 +165,16 @@ sub find_virtual_server {
     if ( not defined $virtual_server_name or $virtual_server_name eq "" ) {
         $logger->logdie( "Cannot fine virtual server for $virtual_server" );
     }
-    return ( $selected_icontrol, $virtual_server_name );
+    return ( $selected_bigip, $virtual_server_name );
 }
 
 #
 # Parse the irule and get which pool is redirected to.
 #
 sub parse_irule {
-    my ( $icontrol, $irules_on_f5_ref, $url_path ) = @_;
+    my ( $bigip_ref, $irules_on_f5_ref, $url_path ) = @_;
     foreach my $rule ( @{ $irules_on_f5_ref } ) {
-        my $rule_definition = get_rule_definition( $icontrol, $rule ) . "\n";
+        my $rule_definition = get_rule_definition( $bigip_ref, $rule ) . "\n";
         $logger->debug( "[iRule] definition for $rule" );
         $logger->debug( "\n$rule_definition" );
         my @rule_lines = split "\n", $rule_definition;
@@ -248,19 +248,19 @@ sub parse_gateway_forward {
 # Get the back end server based on virtual server.
 #
 sub get_backend_server {
-    my ( $icontrols_ref, $envid, $protocol, $virtual_server, $url_path) = @_;
-    my ( $icontrol, $virtual_server_on_f5 ) = find_virtual_server( $icontrols_ref, $envid, $protocol, $virtual_server);
-    my @irules_on_f5 = get_vs_irules( $icontrol, $virtual_server_on_f5 );
-    my $default_pool_on_f5 = get_vs_default_pool( $icontrol, $virtual_server_on_f5 );
+    my ( $bigip_refs, $envid, $protocol, $virtual_server, $url_path) = @_;
+    my ( $bigip_ref, $virtual_server_on_f5 ) = find_virtual_server( $bigip_refs, $envid, $protocol, $virtual_server);
+    my @irules_on_f5 = get_vs_irules( $bigip_ref, $virtual_server_on_f5 );
+    my $default_pool_on_f5 = get_vs_default_pool( $bigip_ref, $virtual_server_on_f5 );
 
     my $go_pool = $default_pool_on_f5;
     $logger->debug( "Default pool for virtual server: $go_pool" );
 
     if ( scalar @irules_on_f5 > 0 && $url_path ne "" ) {
-        my $temp_pool = parse_irule( $icontrol, \@irules_on_f5, $url_path );
+        my $temp_pool = parse_irule( $bigip_ref, \@irules_on_f5, $url_path );
         $go_pool = $temp_pool if $temp_pool ne "";
     }
-    return ( $go_pool, $icontrol );
+    return ( $go_pool, $bigip_ref );
 }
 
 #
@@ -320,13 +320,13 @@ if ( not defined $envid ) {
 # List of internal and external bigip server.
 
 my $go_pool = qw{};
-my $icontrol = qw{};
+my $bigip_ref = qw{};
 
 if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
-    my $icontrol_gateway = get_special_icontrol( $url_envid, "apigateway" );
-    my @icontrols = ( $icontrol_gateway );
-    ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $url_envid, $protocol, $virtual_server, $url_path);
-    my @members = get_env_pool_members( $icontrol, $go_pool );
+    my $gateway_bigip = get_special_bigip( $url_envid, "apigateway" );
+    my @bigip_list = ( $gateway_bigip );
+    ( $go_pool, $bigip_ref ) = get_backend_server( \@bigip_list, $url_envid, $protocol, $virtual_server, $url_path);
+    my @members = get_env_pool_members( $bigip_ref, $go_pool );
     my $gateway_server = $members[0];
     $gateway_server =~ s/(.*):.*/$1/;
     $gateway_server = get_hostname_by_ip( $gateway_server );
@@ -336,14 +336,16 @@ if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
         $logger->logdie( "Cannot get forwarding URL from API Gateway $gateway_server." );
     }
     ( $protocol, $virtual_server, $url_path, $url_envid ) = get_params_from_url( $go_url );
-    @icontrols = get_icontrol( $envid );
-    ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $envid, $protocol, $virtual_server, $url_path);
+    my $bigip_refs = get_bigip( $envid );
+    @bigip_list = ( $bigip_refs->{ "int" }, $bigip_refs->{ "ext" } );
+    ( $go_pool, $bigip_ref ) = get_backend_server( \@bigip_list, $envid, $protocol, $virtual_server, $url_path);
 } else {
-    my @icontrols = get_icontrol( $envid );
-    ( $go_pool, $icontrol ) = get_backend_server( \@icontrols, $envid, $protocol, $virtual_server, $url_path);
+    my $bigip_refs = get_bigip( $envid );
+    my @bigip_list = ( $bigip_refs->{ "int" }, $bigip_refs->{ "ext" } );
+    ( $go_pool, $bigip_ref ) = get_backend_server( \@bigip_list, $envid, $protocol, $virtual_server, $url_path);
 }
 
-my @pool_members = get_env_pool_members( $icontrol, $go_pool );
+my @pool_members = get_env_pool_members( $bigip_ref, $go_pool );
 foreach my $pool_member ( @pool_members ) {
     my $pool_hostname = get_hostname_by_ip( $pool_member );
     if ( not $show_verbose ) {

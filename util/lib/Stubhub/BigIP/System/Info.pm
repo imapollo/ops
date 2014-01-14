@@ -179,5 +179,5 @@ sub _get_special_bigip_server_partition {
         $version = "10";
     }
 
-    return ( $bigip_server, $partition );
+    return ( $bigip_server, $partition, $version );
 }
