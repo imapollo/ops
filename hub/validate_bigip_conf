@@ -28,9 +28,21 @@
 use strict;
 use warnings;
 
-use lib '/nas/reg/lib/perl';
-# use lib '/nas/utl/devops/lib/perl';
+# TODO fix this
+
 use lib '/nas/home/minjzhang/ops/util/lib';
+use BigIP::Pool::Parser qw (
+    parse_pool
+    );
+
+use lib '/nas/home/minjzhang/ops/util/lib';
+use BigIP::Virtual::Parser qw (
+    parse_virtual
+    );
+
+use lib '/nas/reg/lib/perl';
+
+# use lib '/nas/utl/devops/lib/perl';
 
 use Readonly;
 use Getopt::Long;
@@ -38,7 +50,7 @@ use Data::Dumper;
 use File::Temp;
 
 use Stubhub::BigIP::System::Util qw (
-                                    get_icontrol
+                                    get_bigip
                                 );
 use Stubhub::BigIP::Pool::Handler qw (
                                     get_env_pool_list
@@ -72,11 +84,14 @@ use Stubhub::P4::Client qw (
 use Stubhub::P4::Constants;
 use Stubhub::BigIP::System::Info qw (
                             get_exclude_list
-                           );
+                                );
 use Stubhub::Log::Util qw (
                                     init
                                     get_logger
                                     get_logger_with_loglevel
+                                );
+use Stubhub::BigIP::System::Util qw (
+                                    get_object_prefix
                                 );
 
 # Get options
@@ -258,7 +273,7 @@ sub validate_pool_list {
 # - Check if virtual server DNS/IP is correct.
 #
 sub validate_vs_conf {
-    my ( $match_vs_list_ref, $env_vs_list_ref, $icontrol, $vs_configuration_dir ) = @_;
+    my ( $match_vs_list_ref, $env_vs_list_ref, $bigip_ref, $vs_configuration_dir ) = @_;
     my $expected_vs_ref = parse_virtual_servers( $vs_configuration_dir );
 
     my @mismatch_pools;
@@ -271,6 +286,12 @@ sub validate_vs_conf {
         my $expected_destination = $expected_vs_ref->{ $match_vs }{ 'destination' };
         $expected_destination = replace_known_service_name_with_port( $expected_destination );
 
+        # Remove the partition in pool members parsed from
+        # configuration file.
+        my $object_prefix = get_object_prefix( $bigip_ref );
+        $expected_destination =~ s\$object_prefix\\;
+        # Remove partition done.
+
         my $match_vs_real_name;
         my $real_default_pool;
         my $real_irule;
@@ -279,10 +300,10 @@ sub validate_vs_conf {
         foreach my $env_vs ( @{ $env_vs_list_ref } ) {
             if ( $match_vs =~ /^$env_vs$/i ) {
                 $match_vs_real_name = $env_vs;
-                $real_default_pool = get_vs_default_pool( $icontrol, $env_vs);
+                $real_default_pool = get_vs_default_pool( $bigip_ref, $env_vs);
                 $real_default_pool = qw{} if $real_default_pool eq "";
-                $real_irule = join ",", sort( get_vs_irules( $icontrol , $env_vs ) ) if ( scalar get_vs_irules( $icontrol, $env_vs ) > 0 );
-                $real_destination = get_vs_destination( $icontrol, $env_vs);
+                $real_irule = join ",", sort( get_vs_irules( $bigip_ref, $env_vs ) ) if ( scalar get_vs_irules( $bigip_ref, $env_vs ) > 0 );
+                $real_destination = get_vs_destination( $bigip_ref, $env_vs);
                 last;
             }
         }
@@ -345,7 +366,7 @@ sub validate_vs_conf {
     }
 
     if ( scalar @mismatch_destinations > 0 ) {
-        $logger->warn( "Following irule mismatch:");
+        $logger->warn( "Following destinations mismatch:");
         foreach my $mismatch_destination_ref ( @mismatch_destinations ) {
             $logger->warn( "Virtual server [$mismatch_destination_ref->{ 'vs' }] destination is [$mismatch_destination_ref->{ 'real' }], but expects [$mismatch_destination_ref->{ 'expected' }]" );
         }
@@ -359,7 +380,9 @@ sub validate_vs_conf {
 # - Check if pool DNS/IP is correct.
 #
 sub validate_pool_conf {
-    my ( $match_pool_list_ref, $env_pool_list_ref, $icontrol, $pool_configuration_dir ) = @_;
+    my ( $match_pool_list_ref, $env_pool_list_ref, $bigip_ref, $pool_configuration_dir ) = @_;
+
+    my $object_prefix = get_object_prefix( $bigip_ref );
     my $expected_pool_ref = parse_pools( $pool_configuration_dir );
 
     my @mismatch_members;
@@ -368,13 +391,25 @@ sub validate_pool_conf {
         my $expected_members = $expected_pool_ref->{ $match_pool }{ 'members' };
         $expected_members = replace_known_service_name_with_port( $expected_members );
 
+        # Remove the partition in pool members parsed from
+        # configuration file.
+        my @expected_members_list = split( /,/, $expected_members );
+        my $expected_members_index = 0;
+        foreach my $expected_member ( @expected_members_list ) {
+            $expected_member =~ s\$object_prefix\\;
+            $expected_members_list[ $expected_members_index ] = $expected_member;
+            $expected_members_index += 1;
+        }
+        $expected_members = join ",", @expected_members_list;
+        # Remove partition done.
+
         my $match_pool_real_name;
         my $real_members;
 
         foreach my $env_pool ( @{ $env_pool_list_ref } ) {
             if ( $match_pool =~ /^$env_pool$/i ) {
                 $match_pool_real_name = $env_pool;
-                $real_members = join ",", sort( get_env_pool_members( $icontrol, $env_pool ) );
+                $real_members = join ",", sort( get_env_pool_members( $bigip_ref, $env_pool ) );
                 last;
             }
         }
@@ -430,11 +465,7 @@ sub get_bigip_templates {
 #
 # Main
 #
-my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
-my %icontrols = (
-    'int' => $internal_ic,
-    'ext' => $external_ic
-);
+my $bigip_refs = get_bigip( $envid );
 
 my @internal_excluded_vs = get_exclude_list( $envid, "internal", "virtual" );
 my @external_excluded_vs = get_exclude_list( $envid, "external", "virtual" );
@@ -453,13 +484,13 @@ my @empty_list = qw{};
 
 my ( $dynamic_p4_client, $dynamic_p4_dir, $p4_branch_path ) = get_bigip_templates( $branch );
 
-foreach my $ic_key ( keys %icontrols ) {
+foreach my $bigip_key ( keys %{ $bigip_refs } ) {
 
-    if ( $ic_key eq "int" ) {
+    if ( $bigip_key eq "int" ) {
         $logger->info( "Internal BigIP Configuraitons:" );
         $logger->info( "======================================" );
         $logger->info( "" );
-    } elsif ( $ic_key eq "ext" ) {
+    } elsif ( $bigip_key eq "ext" ) {
         $logger->info( "External BigIP Configuraitons:" );
         $logger->info( "======================================" );
         $logger->info( "" );
@@ -468,25 +499,41 @@ foreach my $ic_key ( keys %icontrols ) {
     # Generate the configuration files based on templates on P4.
     my $vs_output_dir = File::Temp->newdir();
     my $pool_output_dir = File::Temp->newdir();
-    generate_not_excluded_vs_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_VS_SUBDIR/$ic_key", $envid, $vs_output_dir, $excluded_vs{ $ic_key }, \@empty_list );
-    generate_not_excluded_pool_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_POOL_SUBDIR/$ic_key", $envid, $pool_output_dir, $excluded_pools{ $ic_key}, \@empty_list );
+    generate_not_excluded_vs_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_VS_SUBDIR/$bigip_key", $envid, $vs_output_dir, $excluded_vs{ $bigip_key }, \@empty_list, $bigip_refs->{ $bigip_key } );
+    generate_not_excluded_pool_separate_configs( "${dynamic_p4_dir}${p4_branch_path}/$Stubhub::P4::Constants::BIGIP_TEMPLATE_SUBDIR/$Stubhub::P4::Constants::BIGIP_POOL_SUBDIR/$bigip_key", $envid, $pool_output_dir, $excluded_pools{ $bigip_key }, \@empty_list, $bigip_refs->{ $bigip_key } );
 
-    my @env_vs_list = get_env_virtual_servers( $icontrols{ $ic_key }, $envid );
+    my @env_vs_list = get_env_virtual_servers( $bigip_refs->{ $bigip_key }, $envid );
     # lowercase all the virtual server name for consistency
-    $_ = lc for @env_vs_list;
+    my $object_prefix = get_object_prefix( $bigip_refs->{ $bigip_key } );
+    # $_ = lc for @env_vs_list;
+    my $index_vs = 0;
+    foreach my $vs_name ( @env_vs_list ) {
+        $vs_name =~ s\$object_prefix\\;
+        $vs_name = lc $vs_name;
+        $env_vs_list[ $index_vs ] = $object_prefix . $vs_name;
+        $index_vs += 1;
+    }
     my @env_expected_vs_list = get_expected_vs_list( $vs_output_dir );
-    my @env_pool_list = get_env_pool_list( $icontrols{ $ic_key }, $envid );
+    my @env_pool_list = get_env_pool_list( $bigip_refs->{ $bigip_key }, $envid );
     # uppercase all the virtual server name for consistency
-    $_ = uc for @env_pool_list;
+    # $_ = uc for @env_pool_list;
+    my $index_pool = 0;
+    foreach my $pool_name ( @env_pool_list ) {
+        $pool_name =~ s\$object_prefix\\;
+        $pool_name = uc $pool_name;
+        $env_pool_list[ $index_pool ] = $object_prefix . $pool_name;
+        $index_pool += 1;
+    }
+
     my @env_expected_pool_list = get_expected_pool_list( $pool_output_dir );
 
     my @match_vs_list = validate_vs_list( \@env_vs_list, \@env_expected_vs_list );
     my @match_pool_list = validate_pool_list( \@env_pool_list, \@env_expected_pool_list );
 
-    @env_vs_list = get_env_virtual_servers( $icontrols{ $ic_key }, $envid );
-    @env_pool_list = get_env_pool_list( $icontrols{ $ic_key }, $envid );
-    validate_vs_conf( \@match_vs_list, \@env_vs_list, $icontrols{ $ic_key }, $vs_output_dir);
-    validate_pool_conf( \@match_pool_list, \@env_pool_list, $icontrols{ $ic_key }, $pool_output_dir);
+    @env_vs_list = get_env_virtual_servers( $bigip_refs->{ $bigip_key }, $envid );
+    @env_pool_list = get_env_pool_list( $bigip_refs->{ $bigip_key }, $envid );
+    validate_vs_conf( \@match_vs_list, \@env_vs_list, $bigip_refs->{ $bigip_key }, $vs_output_dir);
+    validate_pool_conf( \@match_pool_list, \@env_pool_list, $bigip_refs->{ $bigip_key }, $pool_output_dir);
 }
 
 clean_perforce_client( $dynamic_p4_client, $dynamic_p4_dir );
