@@ -28,7 +28,7 @@ use Stubhub::BigIP::System::Util qw (
                                     deploy_configuration
                                     download_configuration
                                     save_configuration
-                                    get_icontrol
+                                    get_bigip
                                 );
 use Stubhub::BigIP::Pool::Handler qw (
                                     get_env_pool_list
@@ -108,21 +108,18 @@ sub exclude_pools {
 # Main
 #
 
-my ( $internal_ic, $external_ic ) = get_icontrol( $envid );
+my $bigip_refs = get_bigip( $envid );
 my $tmpdir = File::Temp->newdir();
 
 foreach my $intext ( "int", "ext" ) {
     my $bigip_conf_file_path = "$tmpdir/$envid-$intext-bigip.conf";
     my $bigip_conf_file_dest = "$tmpdir/$envid-$intext-bigip.conf.dest";
 
-    my $iControl = $internal_ic;
-    $iControl = $external_ic if $intext eq "ext";
-
-    my @env_pools = get_env_pool_list( $iControl, $envid );
+    my @env_pools = get_env_pool_list( $bigip_refs->{ $intext }, $envid );
     my @filtered_env_pools = exclude_pools( @env_pools );
 
     logecho "Downloading configuration ...";
-    download_configuration( $iControl, "/config/bigip.conf", "$bigip_conf_file_path");
+    download_configuration( $bigip_refs->{ $intext }, "/config/bigip.conf", "$bigip_conf_file_path");
 
     system("/bin/cp $bigip_conf_file_path /nas/home/minjzhang/temp");
 
@@ -160,9 +157,9 @@ foreach my $intext ( "int", "ext" ) {
     close BIGIP_CONF_DEST_FH;
 
     logecho "Deploying $bigip_conf_file_dest to $envid ...";
-    deploy_configuration( $envid, $intext, $iControl, $bigip_conf_file_dest, $show_verbose);
+    deploy_configuration( $envid, $intext, $bigip_refs->{ $intext }, $bigip_conf_file_dest, $show_verbose);
     logecho "Saving configuration ...";
-    save_configuration( $iControl );
+    save_configuration( $bigip_refs->{ $intext } );
 }
 
 exit 0;

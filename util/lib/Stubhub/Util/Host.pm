@@ -45,7 +45,7 @@ sub get_ip_by_hostname {
     chomp $ip_address;
 
     if ( $ip_address !~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/ ) {
-        $logger->error( "Cannot get IP address for $hostname.\n" );
+        $logger->warn ( "Cannot get IP address for [$hostname].\n" );
         return "";
     }
 
@@ -57,7 +57,7 @@ sub get_ip_by_hostname {
 
     my $reverse_dns = `$DNS_COMMAND $ip_address`;
     if ( $reverse_dns !~ /$hostname/ and ! $is_alias ) {
-        $logger->warn( "Reverse DNS for host $hostname is wrong.\n" );
+        $logger->warn( "Reverse DNS for host [$hostname] is wrong.\n" );
     }
 
     return $ip_address;
@@ -76,27 +76,34 @@ sub get_public_ip_by_hostname {
     return "" if $name_server !~ /8.8.8.8/;
 
     my $ip_address = `$DNS_COMMAND $hostname 8.8.8.8 | $GREP_COMMAND "has address"`;
+    my $dns_hostname = $ip_address;
+    $dns_hostname =~ s/(.*) has address .*/$1/;
     $ip_address =~ s/.* has address (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/$1/;
     chomp $ip_address;
 
     if ( $ip_address !~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/ ) {
-        $logger->error( "Cannot get IP address for $hostname.\n" );
+        $logger->error( "Cannot get IP address for [$hostname].\n" );
+        return "";
+    }
+
+    if ( $dns_hostname =~ /${hostname}.stubprod.com/ ) {
+        $logger->debug( "No external IP for [$hostname].\n" );
         return "";
     }
 
     my $is_alias = 0;
-    my $dns_result = `$DNS_COMMAND $hostname`;
-    if ( $dns_result =~ /alias/ ) {
+    my $dns_result = `$DNS_COMMAND $hostname 8.8.8.8`;
+    if ( $dns_result =~ /aliases:\s*\S+/i ) {
         $is_alias = 1;
     }
 
-    my $reverse_dns = `$DNS_COMMAND $ip_address`;
+    my $reverse_dns = `$DNS_COMMAND $ip_address 8.8.8.8`;
     if ( $reverse_dns =~ /not found/ ) {
-        $logger->error( "Reverse DNS for public host $hostname is wrong.\n" );
+        $logger->error( "Reverse DNS for public host [$hostname] is wrong.\n" );
         return "";
     }
     if ( $reverse_dns !~ /smf\.ragingwire\.net/ and ! $is_alias ) {
-        $logger->warn( "Reverse DNS for public host $hostname is wrong.\n" );
+        $logger->warn( "Reverse DNS for public host [$hostname] is wrong.\n" );
     }
 
     return $ip_address;
