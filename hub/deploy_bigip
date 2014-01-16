@@ -167,6 +167,7 @@ Options:
                           Multiple pools need to be separated by comma.
     | --includevs         Specify which of the virtual servers need to be included for deployment.
                           Multiple virtuals need to be separated by comma.
+    | --noclean           Not clean up the virtual servers, irules, pools for the environment at first step.
  -i | --ignoresave        Skip save and sync configurations after loading.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
