@@ -289,7 +289,12 @@ sub sync_configuration {
     my ( $bigip_ref, $envid, $int_ext ) = @_;
     my $ssh = _init_ssh( get_bigip_server( $envid, $int_ext ) );
     if ( check_failover_state( $bigip_ref ) eq 'FAILOVER_STATE_ACTIVE') {
-        my @output = mute_execute_ssh( $ssh, "config sync all" );
+        my @output;
+        if ( $bigip_ref->{ "version" } eq "10" ) {
+            @output = mute_execute_ssh( $ssh, "config sync all" );
+        } elsif ( $bigip_ref->{ "version"} eq "11" ) {
+            @output = mute_execute_ssh( $ssh, "run /cm config-sync to-group device-group" );
+        }
         if ( grep /error/i, @output ) {
             foreach my $line ( @output ) {
                 $logger->error( $line );
