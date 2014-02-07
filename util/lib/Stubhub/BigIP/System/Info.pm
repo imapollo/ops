@@ -140,14 +140,13 @@ sub _get_bigip_server_partition {
         $internal_bigip_server = '10.80.158.5'; # srwd00lba014/015
         $internal_bigip_server = '10.80.157.5' if $env_prefix =~ /srwq/i ; # srwd00lba017/018
         $external_bigip_server = '10.80.159.3'; # srwd00lba042
-        $internal_bigip_version = "10";
-        $internal_bigip_version = "11" if $env_prefix =~ /srwq/i ; # Only srwd00lba017/018 is 11.x 2014-01-13
+        $internal_bigip_version = "11";
         $external_bigip_version = "10";
     } else {
         $internal_bigip_server = '10.80.159.40'; # srwd00lba012/013
         $external_bigip_server = '10.80.159.37'; # srwd00lba040/041
-        $internal_bigip_version = "10";
-        $external_bigip_version = "10";
+        $internal_bigip_version = "11";
+        $external_bigip_version = "11";
     }
     # $internal_bigip_server = 'srwd00lba013.stubcorp.dev';
     # $external_bigip_server = 'srwd00lba041.stubcorp.dev';
