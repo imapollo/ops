@@ -7,7 +7,7 @@ package Stubhub::BigIP::System::Info;
 use strict;
 use warnings;
 
-use lib '/nas/home/minjzhang/ops/util/lib';
+use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/reg/lib/perl';
 
 use Readonly;
@@ -138,9 +138,11 @@ sub _get_bigip_server_partition {
     chomp $env_number;
     if ( $env_number >= 76 or $env_prefix =~ /srwq/i ) {
         $internal_bigip_server = '10.80.158.5'; # srwd00lba014/015
-        $internal_bigip_server = '10.80.157.5' if $env_prefix =~ /srwq/i ; # srwd00lba017/018
-        $external_bigip_server = '10.80.159.3'; # srwd00lba042
-        $internal_bigip_version = "11";
+        #$internal_bigip_server = '10.80.157.5' if $env_prefix =~ /srwq/i ; # srwd00lba017/018
+        $internal_bigip_server = '10.80.139.230' if $env_prefix =~ /srwq/i ; # srwd00lba017/018
+        #$external_bigip_server = '10.80.159.3'; # srwd00lba042
+        $external_bigip_server = '10.80.9.11'; # srwd00lba042
+        $internal_bigip_version = "11"; # srwd00lba014/015/017/018 is version 11.
         $external_bigip_version = "10";
     } else {
         $internal_bigip_server = '10.80.159.40'; # srwd00lba012/013
@@ -175,7 +177,7 @@ sub _get_special_bigip_server_partition {
 
     if ( $type eq "apigateway" ) {
         $bigip_server = '10.80.159.37'; # srwd00lba040/041
-        $version = "10";
+        $version = "11";
     }
 
     return ( $bigip_server, $partition, $version );
