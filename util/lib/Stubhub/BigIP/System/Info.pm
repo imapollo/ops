@@ -7,7 +7,7 @@ package Stubhub::BigIP::System::Info;
 use strict;
 use warnings;
 
-use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
 
 use Readonly;
@@ -138,8 +138,8 @@ sub _get_bigip_server_partition {
     chomp $env_number;
     if ( $env_number >= 76 or $env_prefix =~ /srwq/i ) {
         $internal_bigip_server = '10.80.158.5'; # srwd00lba014/015
-        #$internal_bigip_server = '10.80.157.5' if $env_prefix =~ /srwq/i ; # srwd00lba017/018
-        $internal_bigip_server = '10.80.139.230' if $env_prefix =~ /srwq/i ; # srwd00lba017/018
+        $internal_bigip_server = '10.80.157.5' if $env_prefix =~ /srwq/i ; # srwd00lba017/018
+        #$internal_bigip_server = '10.80.139.230' if $env_prefix =~ /srwq/i ; # srwd00lba017/018
         #$external_bigip_server = '10.80.159.3'; # srwd00lba042
         $external_bigip_server = '10.80.9.11'; # srwd00lba042
         $internal_bigip_version = "11"; # srwd00lba014/015/017/018 is version 11.

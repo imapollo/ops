@@ -244,6 +244,8 @@ sub generate_vs_config {
 
     my $profile_begin = 0;
     my $profile_end   = 0;
+    my $rules_begin   = 0;
+    my $rules_end     = 0;
     foreach my $line ( @lines ) {
         if ( $public_ip ) {
             if ( $line =~ /^virtual %{/ ) {
@@ -285,6 +287,26 @@ sub generate_vs_config {
             if ( $line =~ /^\s*destination\s+/ ) {
                 $line =~ s/^(\s*destination\s+)/$1$object_prefix/;
             }
+
+            # iRule multi lines
+            if ( $line =~ /^\s*rules\s*{\s*$/ ) {
+                $rules_begin = 1;
+                print TARGET_FH $line;
+                next;
+            }
+            if ( $rules_begin and not $rules_end ) {
+                if ( $line !~ /^\s*}\s*$/ ) {
+                    $line =~ s/(\S+)/$object_prefix$1/;
+                    print TARGET_FH $line;
+                    next;
+                } else {
+                    $rules_end = 1;
+                    print TARGET_FH $line;
+                    next;
+                }
+            }
+            # iRule multi line
+
             if ( $line =~ /^\s*rules\s+/ ) {
                 $line =~ s/^(\s*rules\s+)(\S+)/$1 \{ $object_prefix$2 \}/;
             }
@@ -292,6 +314,15 @@ sub generate_vs_config {
                 $profile_begin = 1;
                 print TARGET_FH $line;
                 next;
+            }
+            if ( $line =~ /^\s*persist cookie\s*$/ ) {
+                $line =~ s/persist cookie/persist { \/Common\/cookie { default yes } }/;
+            }
+            if ( $line =~ /^\s*persist source_addr_ftp\s*$/ ) {
+                $line =~ s/persist source_addr_ftp/persist { \/Common\/source_addr_ftp { default yes } }/;
+            }
+            if ( $line =~ /^\s*mirror enable\s*$/ ) {
+                $line =~ s/mirror enable/mirror enabled/;
             }
             if ( $profile_begin ) {
                 if ( $line =~ /^\s*\S+\s+{/ ) {

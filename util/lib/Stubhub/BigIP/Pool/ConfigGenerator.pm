@@ -221,7 +221,10 @@ sub generate_pool_config {
                             $replacing_line =~ s\$IPADDR_TOKEN\$object_prefix$pool_member\;
                             my $pool_member_without_port = $pool_member;
                             $pool_member_without_port =~ s/(.*):.*/$1/;
-                            $replacing_line =~ s/{}/{ address $pool_member_without_port }/;
+                            $replacing_line =~ s/{/{ address $pool_member_without_port /;
+                            if ( $replacing_line =~ /\slimit\s/ ) {
+                                $replacing_line =~ s/limit/connection-limit/;
+                            }
                         }
                     }
                     print TARGET_FH $replacing_line;
@@ -255,6 +258,9 @@ sub generate_pool_config {
             }
             if ( $line =~ /\bmember least conn\b/ ) {
                 $line =~ s/member least conn/least-connections-member/;
+            }
+            if ( $line =~ /\spredictive\s/ ) {
+                $line =~ s/predictive/predictive-node/;
             }
             if ( $line =~ /^\s*monitor/ ) {
                 $line =~ s/^\s*monitor\s*//;
