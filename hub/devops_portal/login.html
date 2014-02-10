@@ -1,0 +1,95 @@
+<html>
+<head>
+<style type="text/css">
+#customers
+  {
+  font-family:"Trebuchet MS", Arial, Helvetica, sans-serif;
+  width:400px;
+  border-collapse:collapse;
+  margin:0px auto;
+  background-color:#9FC1E5;
+  }
+
+#customers td, #customers th
+  {
+  font-size:1em;
+  border:1px solid #ffffff;
+  padding:3px 7px 2px 7px;
+  text-align:center;
+  }
+
+#customers th
+  {
+  padding-top:5px;
+  padding-bottom:4px;
+  background-color:#004A91;
+  color:#ffffff;
+  }
+
+#customers tr.alt td
+  {
+  color:#000000;
+  background-color:#ffffff;
+}
+</style>
+<script type="text/javascript">
+function validate()
+{
+
+        var username=document.getElementById("username");
+
+        var pass=document.getElementById("passwd");
+        if(username.value=="")
+        {
+                alert("......");
+                username.focus();
+        }
+        if(pass.value=="")
+        {
+                alert(".....");
+        }
+        if(username.value!="" && pass.value!="")
+        {
+        form.submit();
+        }
+}
+
+</script>
+</head>
+
+<body>
+    <h4 align="center"><img src='static/devops_logo.png'/></h4>
+    <form id="form" name="form" method="post" action="login.cgi">
+<table id="customers">
+
+
+<tr>
+<th width="30%">Username</th>
+<td>
+<input type="text" name="username" id="username"/><br/>
+</td>
+</tr>
+
+<tr>
+<th>Password</th>
+<td>
+<input type="password" name="passwd" id="passwd"/> <br/>
+</td>
+</tr>
+
+<tr class="alt">
+<td> </td>
+<td>                <div style="position: relative; "><!--FIXME-->
+                    <input style="float: right" type="button"  value="Submit" onclick="validate();"/>
+                    <input style="float: right" type="reset" id="demo-reset" name="demo-reset" value="Reset"/>
+                </div>
+</td>
+</tr>
+
+</table>
+
+
+
+</body>
+</html>
+
