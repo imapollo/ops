@@ -5,8 +5,15 @@ use strict;
 
 use Readonly;
 
-my $q = new CGI;
-my $envid = $q->param("envid");
+my $cgi = new CGI;
+my $envid = $cgi->param("envid");
+
+# Check if already login
+my $login_user = $cgi->cookie('PORTALUSER');
+if ( not $login_user ) {
+    # system('$SLEEP_COMMAND 3');
+    print $cgi->redirect('http://srwd00dvo002.stubcorp.dev/~relmgt/devops/login.html');
+}
 
 print header;
 
@@ -34,7 +41,10 @@ print "<body>";
 
 print "<div id='header'>
 <div id='logo'><a href='environments.cgi'><img src='static/devops_logo.png'/></a></div>
-<div id='jira_link'><a href='jira_createIssue.html'>Create ENV Support Ticket</a></div>
+<div id='jira_link'>
+    <a href='jira_createIssue.html'>Create ENV Support Ticket</a>
+    <a href='logout.cgi'>Log Off</a>
+</div>
 </div>";
 
 print "<div id='wrapper'>";

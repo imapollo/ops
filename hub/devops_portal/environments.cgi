@@ -97,7 +97,7 @@ sub print_env_list {
         if ( $index == 0 ) {
             print "<tr>\n";
         }
-        print "<td><a href='http://www.$env.com'><div style='background:url(static/env_icon.png);height: 60px;width: 60px'><b>$uc_env</b></div></a></td>\n";
+        print "<td><a href='http://www.$env.com'><div style='background:url(static/env_icon.png) no-repeat bottom; height: 85px; width: 60px; padding-top: 10px; font-size: 14px;'><b>$uc_env</b></div></a></td>\n";
         if ( $env_pool_status{ "$env" } == 0 ) {
             print "<td><img src='static/green-light.png' alt='PASS' title='PASS'/></td>\n";
         } elsif ( $env_pool_status{ "$env" } == 1 ) {

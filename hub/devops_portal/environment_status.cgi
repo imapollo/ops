@@ -114,22 +114,25 @@ a:hover { color: #000; bottom }
 #header { margin: 0 auto 10px; height: 80px; width: 1000px; padding-bottom: 10px; border-bottom: 1px solid #444 }
 #logo { float: left }
 #jira_link { float: right; padding-top: 60px; }
-#wrapper { margin: 0 auto; width: 1000px; clear: both }
+#wrapper { margin: 0 auto; width: 1000px; clear: both; }
 </style>
 </head>
 <body>";
 
 print "<div id='header'>
 <div id='logo'><a href='environments.cgi'><img src='static/devops_logo.png'/></a></div>
-<div id='jira_link'><a href='jira_createIssue.html'>Create ENV Support Ticket</a></div>
+<div id='jira_link'>
+    <a href='jira_createIssue.html'>Create ENV Support Ticket</a>
+    <a href='logout.cgi'>Log Off</a>
+</div>
 </div>";
 print "<div id='wrapper'>";
-print "<table>";
+print "<table style='font-size: 13px'>";
 
 my $env_json_result = `$SSH_COMMAND -i $SUPER_KEY_FILE $REG_HOST '$VALIDATE_BIGIP_SCRIPT -e $envid -j'`;
 my $env_status_ref = from_json( $env_json_result );
 
-print "<tr><td>Pool</td><td>Pool Status</td><td>Pool Member</td><td>Enable Status</td><td>Status</td><td>Build Label</td><td>Actions</td></tr>";
+print "<tr style='font-weight: bold'><td>Pool</td><td>Pool Status</td><td>Pool Member</td><td>Enabled</td><td>Status</td><td>Build Label</td><td>Actions</td></tr>";
 
 print_pools_status( $env_status_ref->{ 'internal' } );
 print_pools_status( $env_status_ref->{ 'external' } );
