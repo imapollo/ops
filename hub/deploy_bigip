@@ -35,8 +35,8 @@
 use strict;
 use warnings;
 
-use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
+use lib '/nas/utl/devops/lib/perl';
 
 use Readonly;
 use Getopt::Long;
@@ -87,6 +87,8 @@ use Stubhub::Log::Util qw (
                             get_logger_with_loglevel
                             add_syslog_appender
                            );
+
+my @args = @ARGV;
 
 # Get options
 my $show_usage = qw{};
@@ -289,8 +291,19 @@ sub clean_and_exit {
 }
 
 #
+# Print the command summary.
+#
+sub print_command_begin {
+    my ( $logger, $command, $envid, $args_ref ) = @_;
+    $logger->info( "$command starts on $envid ..." );
+    my $arguments = join " ", @{ $args_ref };
+    $logger->info( "Command: $command $arguments");
+}
+
+#
 # Main
 #
+print_command_begin( $logger, "deploy_bigip", $envid, \@args );
 my $bigip_refs = get_bigip( $envid );
 my $bigip_lock_file = check_deployment_lock( $envid );
 my $internal_bigip_ref = $bigip_refs->{ "int" };
