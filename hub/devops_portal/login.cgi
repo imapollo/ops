@@ -1,32 +1,31 @@
 #!/usr/bin/perl -w
-use CGI qw(:standard);
 use strict;
 
+use MIME::Base64;
+use CGI qw(:standard);
+use CGI::Session;
 use Net::SSH::Expect;
 
-
-my $q = new CGI;
-my $username=$q->param("username");
-my $passwd=$q->param("passwd");
-
-system("echo $username > /tmp/username");
+my $cgi = new CGI;
+my $username=$cgi->param("username");
+my $password=$cgi->param("passwd");
 
 my $ssh = Net::SSH::Expect->new(
                 host => "srwd00reg010.stubcorp.dev",
                 user => "$username",
-                password  => "$passwd",
+                password  => "$password",
                 raw_pty => 1
                 );
 
 my $prompt = "[Pp]assword";
 my $login_output = $ssh->login();
 if ($login_output !~ /Welcome/ and $login_output !~ /Last login/ ) {
-           print $q->redirect('http://srwd00dvo002.stubcorp.dev/~relmgt/devops/login.html');
-        }
-else { print $q->redirect('http://srwd00dvo002.stubcorp.dev/~relmgt/devops/environments.cgi');
+    print $cgi->redirect('http://srwd00dvo002.stubcorp.dev/~relmgt/devops/login.html');
+} else {
+    my $session = new CGI::Session( undef, $cgi, { Directory => '/tmp' } );
+    my $cookie_sessionid = $cgi->cookie( CGISESSID => $session->id );
+    my $cookie_username = $cgi->cookie( PORTALUSER => $username );
+    my $cookie_password = $cgi->cookie( PORTALPASSWD => encode_base64( $password) );
+    print $cgi->redirect( -url=>'http://srwd00dvo002.stubcorp.dev/~relmgt/devops/environments.cgi',
+            -cookie=>[ $cookie_sessionid, $cookie_username, $cookie_password ] );
 }
-
-
-#system("$cmd >/dev/null");
-#print "<input type='button' name='Submit' value='Back' onclick ='javascript:history.back();'/>";
-
