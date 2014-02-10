@@ -8,11 +8,15 @@ use strict;
 use warnings;
 
 use lib '/nas/reg/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
+use lib '/nas/utl/devops/lib/perl';
 
 use Readonly;
 use Log::Log4perl;
 use Log::Log4perl::Level;
+
+use Stubhub::Util::Time qw (
+                            get_timestamp
+                        );
 
 BEGIN {
   use Exporter();
@@ -54,12 +58,10 @@ sub init {
 sub add_syslog_appender {
     my ( $logger, $ident, $envid ) = @_;
 
-    my $layout;
-    if ( $envid eq "" ) {
-        $layout = Log::Log4perl::Layout::PatternLayout->new( "%C [%p] %m%n" );
-    } else {
-        $layout = Log::Log4perl::Layout::PatternLayout->new( "[$envid] %C [%p] %m%n" );
-    }
+    my $layout = Log::Log4perl::Layout::PatternLayout->new( "%C [%p] %m%n" );
+
+    my $timestamp = get_timestamp();
+    $ident = "$ident-$envid-$timestamp";
 
     my $syslog_appender = Log::Log4perl::Appender->new(
         "Log::Dispatch::Syslog",
