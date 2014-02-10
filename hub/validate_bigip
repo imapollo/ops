@@ -138,6 +138,7 @@ sub validate_env_pool_status {
 
         my %pool_status;
 
+        $pool = del_object_prefix( $bigip_ref, $pool );
         $pool_status{ 'pool' } = $pool;
         $pool_status{ 'status' } = $bigip_ref->{ "iControl" }->get_ltm_pool_availability_status( $pool );
         $pool_status{ 'status_description' } = $bigip_ref->{ "iControl" }->get_ltm_pool_status_as_string( $pool );
@@ -165,7 +166,6 @@ sub print_pool_status {
         my $pass = 0;
 
         my $pool_name = $pool_status{ 'pool' };
-        $pool_name = del_object_prefix( $bigip_ref, $pool_name );
         
         if ( $pool_status{ 'status_description' } =~ /either don't have service checking enabled/ ) {
             printf "%-50s %-20s\n", $pool_name, "WARN";
