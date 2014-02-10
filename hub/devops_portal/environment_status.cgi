@@ -12,8 +12,15 @@ use Stubhub::ENV::Info qw (
                             get_instance_list
                         );
 
-my $q = new CGI;
-my $envid = $q->param("envid");
+my $cgi = new CGI;
+my $envid = $cgi->param("envid");
+
+# Check if already login
+my $login_user = $cgi->cookie('PORTALUSER');
+if ( not $login_user ) {
+    # system('$SLEEP_COMMAND 3');
+    print $cgi->redirect('http://srwd00dvo002.stubcorp.dev/~relmgt/devops/login.html');
+}
 
 print header;
 

@@ -23,9 +23,9 @@ if ($login_output !~ /Welcome/ and $login_output !~ /Last login/ ) {
     print $cgi->redirect('http://srwd00dvo002.stubcorp.dev/~relmgt/devops/login.html');
 } else {
     my $session = new CGI::Session( undef, $cgi, { Directory => '/tmp' } );
-    my $cookie_sessionid = $cgi->cookie( CGISESSID => $session->id );
-    my $cookie_username = $cgi->cookie( PORTALUSER => $username );
-    my $cookie_password = $cgi->cookie( PORTALPASSWD => encode_base64( $password) );
+    my $cookie_sessionid = $cgi->cookie( -name=>'CGISESSID', -value=>$session->id, -expires=>'+12h' );
+    my $cookie_username  = $cgi->cookie( -name=>'PORTALUSER', -value=>$username, -expires=>'+12h' );
+    my $cookie_password  = $cgi->cookie( -name=>'PORTALPASSWD', -value=>encode_base64( $password ), -expires=>'+12h' );
     print $cgi->redirect( -url=>'http://srwd00dvo002.stubcorp.dev/~relmgt/devops/environments.cgi',
             -cookie=>[ $cookie_sessionid, $cookie_username, $cookie_password ] );
 }

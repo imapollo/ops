@@ -6,13 +6,12 @@ use strict;
 use Readonly;
 use Data::Dumper;
 
-my $q = new CGI;
-
-print header;
+my $cgi = new CGI;
 
 Readonly my $GREP_COMMAND => '/bin/grep';
 Readonly my $CAT_COMMAND => '/bin/cat';
 Readonly my $SED_COMMAND => '/bin/sed';
+Readonly my $SLEEP_COMMAND => '/bin/sleep';
 Readonly my $UNIQ_COMMAND => '/usr/bin/uniq';
 Readonly my $SSH_COMMAND => '/usr/bin/ssh';
 
@@ -21,6 +20,15 @@ Readonly my $SUPER_KEY_FILE => '/nas/reg/relmgt/.ssh/id_dsa';
 Readonly my $REG_HOST => 'srwd00reg015';
 
 Readonly my $BIGIP_POOL_STATUS => '/nas/home/minjzhang/bigip.rpt';
+
+# Check if already login
+my $login_user = $cgi->cookie('PORTALUSER');
+if ( not $login_user ) {
+    # system('$SLEEP_COMMAND 3');
+    print $cgi->redirect('http://srwd00dvo002.stubcorp.dev/~relmgt/devops/login.html');
+}
+
+print header;
 
 my $srwd_envs = `$GREP_COMMAND 'srwd' /nas/reg/etc/dev-qa-hosts | $SED_COMMAND 's/\\(srwd[0-9]\\+\\).*/\\1/' | $UNIQ_COMMAND`;
 my $srwe_envs = `$GREP_COMMAND 'srwe' /nas/reg/etc/dev-qa-hosts | $SED_COMMAND 's/\\(srwe[0-9]\\+\\).*/\\1/' | $UNIQ_COMMAND`;
@@ -61,7 +69,10 @@ print "<body>";
 
 print "<div id='header'>
 <div id='logo'><a href='environments.cgi'><img src='static/devops_logo.png'/></a></div>
-<div id='jira_link'><a href='jira_createIssue.html'>Create ENV Support Ticket</a></div>
+<div id='jira_link'>
+    <a href='jira_createIssue.html'>Create ENV Support Ticket</a>
+    <a href='logout.cgi'>Log Off</a>
+</div>
 </div>";
 print "<div id='wrapper'>";
 
