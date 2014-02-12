@@ -321,6 +321,9 @@ sub generate_vs_config {
             if ( $line =~ /^\s*persist source_addr_ftp\s*$/ ) {
                 $line =~ s/persist source_addr_ftp/persist { \/Common\/source_addr_ftp { default yes } }/;
             }
+            if ( $line =~ /^\s*persist source_addr\s*$/ ) {
+                $line =~ s/persist source_addr/persist { \/Common\/source_addr { default yes } }/;
+            }
             if ( $line =~ /^\s*mirror enable\s*$/ ) {
                 $line =~ s/mirror enable/mirror enabled/;
             }
