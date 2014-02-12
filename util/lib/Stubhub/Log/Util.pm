@@ -58,10 +58,8 @@ sub init {
 sub add_syslog_appender {
     my ( $logger, $ident, $envid ) = @_;
 
-    my $layout = Log::Log4perl::Layout::PatternLayout->new( "%C [%p] %m%n" );
-
     my $timestamp = get_timestamp();
-    $ident = "$ident-$envid-$timestamp";
+    my $layout = Log::Log4perl::Layout::PatternLayout->new( "$envid:$timestamp:%C [%p] %m%n" );
 
     my $syslog_appender = Log::Log4perl::Appender->new(
         "Log::Dispatch::Syslog",
