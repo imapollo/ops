@@ -1,0 +1,146 @@
+#!/usr/bin/perl
+#
+# Enable/Disable the status of pool members.
+#
+# Usage: toggle_pool_member_status [options]
+#
+# Options:
+#  -e | --envid             Specify the environment to operate. eg, srwd83.
+#  -t | --int-ext           Specify if the pool is in internal / external BigIP server.
+#                           Pass 'int' or 'ext'.
+#  -p | --pool-name         Specify the name of the pool to operate.
+#  -m | --pool-member       Specify the pool member to enable / disable.
+#     | --enable            To enable the pool member.
+#     | --disable           To disable the pool member.
+#     | --show              To show the status of the pool.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --enable
+#  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --disable
+#  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX --show
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+
+use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+
+use BigIP::iControl;
+use Stubhub::BigIP::Pool::Handler qw (
+                            enable_pool_member
+                            disable_pool_member
+                        );
+use Stubhub::BigIP::System::Util qw (
+                            get_bigip
+                        );
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $envid = qw{};
+my $intext = qw{};
+my $pool_name = qw{};
+my $pool_member = qw{};
+my $enable = qw{};
+my $disable = qw{};
+my $show = qw{};
+my $options_okay = GetOptions (
+    'e|envid=s'       => \$envid,
+    't|int-ext=s'     => \$intext,
+    'p|pool-name=s'   => \$pool_name,
+    'm|pool-member=s' => \$pool_member,
+    'enable'          => \$enable,
+    'disable'         => \$disable,
+    'show'            => \$show,
+    'v|verbose'       => \$show_verbose,
+    'h|help'          => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+Enable/Disable the status of pool members.
+
+Usage: toggle_pool_member_status [options]
+
+Options:
+ -e | --envid             Specify the environment to operate. eg, srwd83.
+ -t | --int-ext           Specify if the pool is in internal / external BigIP server.
+                          Pass 'int' or 'ext'.
+ -p | --pool-name         Specify the name of the pool to operate.
+ -m | --pool-member       Specify the pool member to enable / disable.
+    | --enable            To enable the pool member.
+    | --disable           To disable the pool member.
+    | --show              To show the status of the pool.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --enable
+ toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --disable
+ toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX --show
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $envid ) {
+    $logger->error( "The pamameter '-e' must be set.\n" );
+    usage();
+    exit 1;
+}
+
+if ( $enable and $disable ) {
+    $logger->error( "Can only specify --enable or --disable at once.\n");
+}
+
+#
+# Main
+#
+my $bigip_refs = get_bigip( $envid );
+if ( $enable ) {
+    enable_pool_member( $bigip_refs->{ $intext }, $pool_name, $pool_member );
+} elsif ( $disable ) {
+    disable_pool_member( $bigip_refs->{ $intext }, $pool_name, $pool_member );
+} elsif ( $show ) {
+}
+
+exit 0;

@@ -7,8 +7,8 @@ package Stubhub::BigIP::Pool::Handler;
 use strict;
 use warnings;
 
-use lib '/nas/home/minjzhang/ops/util/lib';
 use lib '/nas/reg/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 use Data::Dumper;
@@ -26,6 +26,8 @@ BEGIN {
   @ISA          = qw( Exporter );
   @EXPORT       = qw();
   @EXPORT_OK    = qw(
+                        &enable_pool_member
+                        &disable_pool_member
                         &delete_env_pools
                         &get_pool_list
                         &get_env_pool_list
@@ -105,3 +107,17 @@ sub get_env_pool_members {
     return $bigip_ref->{ "iControl" }->get_pool_members( $pool );
 }
 
+#
+# Enable a pool member.
+#
+sub enable_pool_member {
+    my ( $bigip_ref, $pool, $pool_member ) =@_;
+    $bigip_ref->{ "iControl" }->enable_pool_member( $pool, $pool_member );
+}
+#
+# Disable a pool member.
+#
+sub disable_pool_member {
+    my ( $bigip_ref, $pool, $pool_member ) =@_;
+    $bigip_ref->{ "iControl" }->disable_pool_member( $pool, $pool_member );
+}
