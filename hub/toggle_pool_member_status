@@ -36,9 +36,14 @@ use BigIP::iControl;
 use Stubhub::BigIP::Pool::Handler qw (
                             enable_pool_member
                             disable_pool_member
+                            get_pool_members_status
                         );
 use Stubhub::BigIP::System::Util qw (
                             get_bigip
+                        );
+use Stubhub::Util::Host qw (
+                            get_ip_by_hostname
+                            get_hostname_by_ip
                         );
 use Stubhub::Log::Util qw (
                             init
@@ -137,10 +142,37 @@ if ( $enable and $disable ) {
 #
 my $bigip_refs = get_bigip( $envid );
 if ( $enable ) {
+    $pool_member = get_ip_by_hostname( $pool_member );
     enable_pool_member( $bigip_refs->{ $intext }, $pool_name, $pool_member );
 } elsif ( $disable ) {
+    $pool_member = get_ip_by_hostname( $pool_member );
     disable_pool_member( $bigip_refs->{ $intext }, $pool_name, $pool_member );
 } elsif ( $show ) {
+    my $pool_members_ref = get_pool_members_status( $bigip_refs->{ $intext }, $pool_name );
+    my $pool_members_status_ref = ${ $pool_members_ref }[0];
+
+    # Convert to no bless data structure due to JSON module limitation.
+    foreach my $pool_member_status_ref ( @{ $pool_members_status_ref } ) {
+        my $pool_address = get_hostname_by_ip( $pool_member_status_ref->{'member'}->{'address'} );
+        my $pool_port = $pool_member_status_ref->{'member'}->{'port'};
+        my $pool_availability = $pool_member_status_ref->{'object_status'}->{'availability_status'};
+        my $pool_enabled = $pool_member_status_ref->{'object_status'}->{'enabled_status'};
+        if ( $pool_availability eq "AVAILABILITY_STATUS_GREEN" ) {
+            $pool_availability = "PASS";
+        } else {
+            $pool_availability = "FAIL";
+        }
+
+        if ( $pool_enabled eq "ENABLED_STATUS_ENABLED" ) {
+            $pool_enabled = "Enabled";
+        } else {
+            $pool_enabled = "Disabled";
+        }
+
+        my $pool_ipport = "$pool_address:$pool_port";
+        printf "%-34s %-8s %-5s\n", $pool_ipport, $pool_enabled, $pool_availability;
+    }
+
 }
 
 exit 0;
