@@ -26,9 +26,14 @@
 use strict;
 use warnings;
 
-use lib '/nas/reg/lib/perl';
 # use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/home/minjzhang/ops/util/lib';
+use Stubhub::BigIP::Pool::Handler qw (
+                                    get_env_pool_list
+                                    get_pool_members_status
+                                    get_monitor_state
+                                );
+use lib '/nas/reg/lib/perl';
 
 use Readonly;
 use Getopt::Long;
@@ -40,10 +45,6 @@ use Stubhub::BigIP::System::Util qw (
                                     get_icontrol
                                     get_bigip
                                     del_object_prefix
-                                );
-use Stubhub::BigIP::Pool::Handler qw (
-                                    get_env_pool_list
-                                    get_pool_members_status
                                 );
 use Stubhub::Log::Util qw (
                             init
@@ -123,6 +124,7 @@ sub validate_env_pool_status {
     my @pools_status;
     foreach my $pool ( @filtered_pool_list ) {
         my $pool_members_ref = get_pool_members_status( $bigip_ref, $pool );
+        get_monitor_state( $bigip_ref, $pool );
         my $pool_members_status_ref = ${ $pool_members_ref }[0];
         my @pool_no_bless_members_status;
 

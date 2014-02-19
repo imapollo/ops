@@ -28,6 +28,7 @@ BEGIN {
   @EXPORT_OK    = qw(
                         &enable_pool_member
                         &disable_pool_member
+                        &get_monitor_state
                         &delete_env_pools
                         &get_pool_list
                         &get_env_pool_list
@@ -111,13 +112,26 @@ sub get_env_pool_members {
 # Enable a pool member.
 #
 sub enable_pool_member {
-    my ( $bigip_ref, $pool, $pool_member ) =@_;
+    my ( $bigip_ref, $pool, $pool_member ) = @_;
     $bigip_ref->{ "iControl" }->enable_pool_member( $pool, $pool_member );
 }
 #
 # Disable a pool member.
 #
 sub disable_pool_member {
-    my ( $bigip_ref, $pool, $pool_member ) =@_;
+    my ( $bigip_ref, $pool, $pool_member ) = @_;
     $bigip_ref->{ "iControl" }->disable_pool_member( $pool, $pool_member );
+}
+
+sub get_monitor_state {
+    my ( $bigip_ref, $pool ) = @_;
+    my @states = $bigip_ref->{ "iControl" }->get_monitor_states( $pool );
+    my $pool_state_ref = $states[0];
+    foreach my $monitor_state_ref ( @{ $pool_state_ref->[0] } ) {
+        print $monitor_state_ref->{ "enabled_state" } . "\n";
+        print $monitor_state_ref->{ "instance_state" } . "\n";
+        print $monitor_state_ref->{ "instance" }->{ "template_name"} . "\n";
+        print $monitor_state_ref->{ "instance" }->{ "instance_definition" }->{ "ipport"}->{ "address" } . "\n";
+        print $monitor_state_ref->{ "instance" }->{ "instance_definition" }->{ "ipport"}->{ "port" } . "\n";
+    }
 }
