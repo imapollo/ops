@@ -15,6 +15,7 @@
 #  -j | --json              Return the JSON format status.
 #  -m | --member            Show the detail pool member status.
 #  -v | --verbose           Show verbose messages.
+#     | --very-verbose      Show very verbose message including monitors.
 #  -h | --help              Show help information.
 #
 # Examples:
@@ -58,14 +59,17 @@ my $show_usage = qw{};
 my $show_member_status = qw{};
 my $return_json = qw{};
 my $show_verbose = qw{};
+my $show_very_verbose = qw{};
 my $envid = qw{};
 my $options_okay = GetOptions (
    'e|env=s'     => \$envid,
    'm|member'    => \$show_member_status,
    'j|json'      => \$return_json,
    'v|verbose'   => \$show_verbose,
+   'very-verbose'=> \$show_very_verbose,
    'h|help'      => \$show_usage,
 );
+$show_verbose = 1 if $show_very_verbose;
 
 Stubhub::Log::Util->init();
 
@@ -124,27 +128,13 @@ sub validate_env_pool_status {
     my @pools_status;
     foreach my $pool ( @filtered_pool_list ) {
         my $pool_members_ref = get_pool_members_status( $bigip_ref, $pool );
-        get_monitor_state( $bigip_ref, $pool );
-        my $pool_members_status_ref = ${ $pool_members_ref }[0];
-        my @pool_no_bless_members_status;
-
-        # Convert to no bless data structure due to JSON module limitation.
-        foreach my $pool_member_status_ref ( @{ $pool_members_status_ref } ) {
-            my %no_bless_pool_status;
-            $no_bless_pool_status{ 'member' }{ 'address' } = get_hostname_by_ip( $pool_member_status_ref->{'member'}->{'address'} );
-            $no_bless_pool_status{ 'member' }{ 'port' } = $pool_member_status_ref->{'member'}->{'port'};
-            $no_bless_pool_status{ 'object_status' }{ 'availability_status' } = $pool_member_status_ref->{'object_status'}->{'availability_status'};
-            $no_bless_pool_status{ 'object_status' }{ 'enabled_status' } = $pool_member_status_ref->{'object_status'}->{'enabled_status'};
-            push @pool_no_bless_members_status, \%no_bless_pool_status;
-        }
 
         my %pool_status;
-
         $pool = del_object_prefix( $bigip_ref, $pool );
         $pool_status{ 'pool' } = $pool;
         $pool_status{ 'status' } = $bigip_ref->{ "iControl" }->get_ltm_pool_availability_status( $pool );
         $pool_status{ 'status_description' } = $bigip_ref->{ "iControl" }->get_ltm_pool_status_as_string( $pool );
-        $pool_status{ 'members' } = \@pool_no_bless_members_status;
+        $pool_status{ 'members' } = $pool_members_ref; 
 
         push @pools_status, \%pool_status;
     }
@@ -209,6 +199,15 @@ sub print_pool_status {
 
                 if ( $show_verbose or $pass == 1 ) {
                     printf "       %-34s %-8s %-5s\n", $member_host, $member_enabled, $member_status;
+                    if ( $show_very_verbose ) {
+                        foreach my $monitor_status ( @{ $pool_member_status_ref->{ 'monitor' } } ) {
+                            my $monitor_enabled = "Disabled";
+                            $monitor_enabled = "Enabled" if $monitor_status->{ 'enabled_state' } == 1;
+                            my $monitor_up = "FAIL";
+                            $monitor_up = "PASS" if $monitor_status->{ 'instance_state' } eq "INSTANCE_STATE_UP";
+                            printf "       - %-32s %-8s %-5s\n", del_object_prefix( $bigip_ref, $monitor_status->{ 'template_name' } ), $monitor_enabled, $monitor_up;
+                        }
+                    }
                 }
             }
         }
