@@ -10,9 +10,16 @@
 #  -u | --url=..       Specify the URL to import cacerts from.
 #                      For example: payments.api.srwd24.com
 #  -f | --file=..      Specify the key file path to import.
-#  -j | --jdkhome=..   Specify the path of the JDK. Default: /opt/jdk1.5.0_22.
+#  -j | --jdkhome=..   Specify the path of the JDK.
+#                      Default: BPM /opt/jdk1.5.0_22.
+#                      Others: /opt/java
 #                      cacerts file is located in $JDK_HOME/jre/lib/security/cacerts
 #  -v | --verbose      Print verbose messages.
+#
+# Example:
+#  import_cacerts -e srwd83 -r bpm -u payments.api.srwd83.com
+#  import_cacerts -e srwe04 -r act -f /tmp/stubhub.cer
+#  import_cacerts -e srwe04 -r bpm -u siebel.srwe04.com -j /opt/jdk1.6.0_15
 #
 # Author: minjzhang
 #
@@ -22,7 +29,7 @@ options=$@
 envid=""
 role=""
 url=""
-jdk_home="/opt/jdk1.5.0_22"
+jdk_home="/opt/java"
 verbose=0
 
 #
@@ -43,9 +50,16 @@ Options:
  -u | --url=..       Specify the URL to import certs from.
                      For example: payments.api.srwd24.com
  -f | --file=..      Specify the key file path to import.
- -j | --jdkhome=..   Specify the path of the JDK. Default: /opt/jdk1.5.0_22.
+ -j | --jdkhome=..   Specify the path of the JDK.
+                     Default: BPM /opt/jdk1.5.0_22.
+                     Others: /opt/java
                      cacerts file is located in \$JDK_HOME/jre/lib/security/cacerts
  -v | --verbose      Print verbose messages.
+
+Example:
+ import_cacerts -e srwd83 -r bpm -u payments.api.srwd83.com
+ import_cacerts -e srwe04 -r act -f /tmp/stubhub.cer
+ import_cacerts -e srwe04 -r bpm -u siebel.srwe04.com -j /opt/jdk1.6.0_15
 
 EOF
 }
@@ -68,11 +82,17 @@ while true ; do
         -r | --role) role="${2// }"; shift 2;;
         -u | --url) url="${2// }"; shift 2;;
         -f | --file) key_file="${2// }"; shift 2;;
-        -j | --jdkhome) jdk_home="${2// }"; shift 2;;
+        -j | --jdkhome) jdk_home="${2// }"; jdk_set=1; shift 2;;
         -v | --verbose) verbose=1; shift;;
         --) shift; break;;
     esac
 done
+
+if [[ "$jdk_set" != 1 && "$role" == "bpm" ]]; then
+    jdk_home="/opt/jdk1.5.0_22"
+fi
+
+echo $jdk_home
 
 #
 # Print verbose message
