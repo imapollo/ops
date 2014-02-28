@@ -168,6 +168,9 @@ sub disable_pool_member {
     $bigip_ref->{ "iControl" }->disable_pool_member( $pool, $pool_member );
 }
 
+#
+# Get the status of monitors.
+#
 sub get_monitor_state {
     my ( $bigip_ref, $pool ) = @_;
     my @states = $bigip_ref->{ "iControl" }->get_monitor_states( $pool );
@@ -181,6 +184,14 @@ sub get_monitor_state {
         my $the_enabled_state = $monitor_state_ref->{ "enabled_state" };
         my $the_instance_state = $monitor_state_ref->{ "instance_state" };
         my $the_template_name = $monitor_state_ref->{ "instance" }->{ "template_name"};
+
+        # TODO store the template string into a static hash
+        my $send_string = $bigip_ref->{ "iControl" }->get_monitor_template_send( $the_template_name ) if defined $the_template_name and $the_template_name !~ /\/none$/;
+        if ( $send_string ) {
+            $send_string =~ s/^GET //;
+            $send_string =~ s/\\r\\n$//;
+            $send_string = get_hostname_by_ip( $the_address ) . $send_string;
+        }
 
         # Check if the member address:ip already in
         # @pool_members_monitor_status
@@ -196,6 +207,7 @@ sub get_monitor_state {
                 $pool_monitor_status{ "enabled_state" } = $the_enabled_state;
                 $pool_monitor_status{ "instance_state" } = $the_instance_state;
                 $pool_monitor_status{ "template_name" } = $the_template_name;
+                $pool_monitor_status{ "send_string" } = $send_string;
                 push @pool_monitors_status, \%pool_monitor_status;
                 $added_pool_members_monitor_status->{ "monitor" } = \@pool_monitors_status;
                 $found_pool_member = 1;
@@ -210,6 +222,7 @@ sub get_monitor_state {
         $pool_monitor_status{ "enabled_state" } = $the_enabled_state;
         $pool_monitor_status{ "instance_state" } = $the_instance_state;
         $pool_monitor_status{ "template_name" } = $the_template_name;
+        $pool_monitor_status{ "send_string" } = $send_string;
         push @pool_monitors_status, \%pool_monitor_status;
         $pool_member_monitor_status{ "monitor" } = \@pool_monitors_status;
 

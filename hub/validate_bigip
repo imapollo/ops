@@ -214,6 +214,7 @@ sub print_pool_status {
                             my $monitor_up = "FAIL";
                             $monitor_up = "PASS" if $monitor_status->{ 'instance_state' } eq "INSTANCE_STATE_UP";
                             printf "       - %-32s %-8s %-5s\n", del_object_prefix( $bigip_ref, $monitor_status->{ 'template_name' } ), $monitor_enabled, $monitor_up;
+                            print  "       -- " . $monitor_status->{ 'send_string' } . "\n" if defined $monitor_status->{ 'send_string' } and $monitor_status->{ 'send_string' } ne "";
                         }
                     }
                 }
