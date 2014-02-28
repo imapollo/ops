@@ -27,6 +27,7 @@
 use strict;
 use warnings;
 use Carp;
+use Data::Dumper;
 use Getopt::Long;
 
 use lib '/nas/reg/lib/perl';
@@ -149,11 +150,10 @@ if ( $enable ) {
     disable_pool_member( $bigip_refs->{ $intext }, $pool_name, $pool_member );
 } elsif ( $show ) {
     my $pool_members_ref = get_pool_members_status( $bigip_refs->{ $intext }, $pool_name );
-    my $pool_members_status_ref = ${ $pool_members_ref }[0];
 
     # Convert to no bless data structure due to JSON module limitation.
-    foreach my $pool_member_status_ref ( @{ $pool_members_status_ref } ) {
-        my $pool_address = get_hostname_by_ip( $pool_member_status_ref->{'member'}->{'address'} );
+    foreach my $pool_member_status_ref ( @{ $pool_members_ref } ) {
+        my $pool_address = $pool_member_status_ref->{'member'}->{'address'};
         my $pool_port = $pool_member_status_ref->{'member'}->{'port'};
         my $pool_availability = $pool_member_status_ref->{'object_status'}->{'availability_status'};
         my $pool_enabled = $pool_member_status_ref->{'object_status'}->{'enabled_status'};

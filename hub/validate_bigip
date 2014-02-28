@@ -165,7 +165,7 @@ sub validate_env_pool_status {
 # Print the pool status.
 #
 sub print_pool_status {
-    my ( $bigip_ref, $pattern ) = @_;
+    my ( $bigip_ref, $int_ext, $pattern ) = @_;
 
     my $pools_status_ref = validate_env_pool_status( $bigip_ref, $pattern );
     my $pass_count = 0;
@@ -180,15 +180,15 @@ sub print_pool_status {
         my $pool_name = $pool_status{ 'pool' };
         
         if ( $pool_status{ 'status_description' } =~ /either don't have service checking enabled/ ) {
-            printf "%-50s %-20s\n", $pool_name, "WARN";
+            printf "%-41s %-8s %-10s\n", $pool_name, uc( $int_ext ), "WARN";
             $pass = 0;
             $pass_count += 1;
         } elsif ( $pool_status{ 'status_description' } !~ /The pool is available/ ) {
-            printf "%-50s %-20s\n", $pool_name, "FAIL";
+            printf "%-41s %-8s %-10s\n", $pool_name, uc( $int_ext ), "FAIL";
             $pass = 1;
             $fail_count += 1;
         } else {
-            printf "%-50s %-20s\n", $pool_name, "PASS" if $show_pass;
+            printf "%-41s %-8s %-10s\n", $pool_name, uc( $int_ext ), "PASS" if $show_pass;
             $pass = 0;
             $pass_count += 1;
         }
@@ -288,8 +288,8 @@ my $internal_bigip_ref = $bigip_ref->{ "int" };
 my $external_bigip_ref = $bigip_ref->{ "ext" };
 
 if ( not $return_json ) {
-    my ( $int_pass_count, $int_fail_count ) = print_pool_status( $internal_bigip_ref, $envid );
-    my ( $ext_pass_count, $ext_fail_count ) = print_pool_status( $external_bigip_ref, $envid );
+    my ( $int_pass_count, $int_fail_count ) = print_pool_status( $internal_bigip_ref, "int", $envid );
+    my ( $ext_pass_count, $ext_fail_count ) = print_pool_status( $external_bigip_ref, "ext", $envid );
 
     my $overall_pass_rate = ( $ext_pass_count + $ext_fail_count + $int_pass_count + $int_fail_count ) / ( $ext_pass_count + $int_pass_count );
 
