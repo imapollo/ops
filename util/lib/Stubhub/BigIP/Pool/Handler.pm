@@ -16,6 +16,9 @@ use BigIP::iControl;
 use Stubhub::Util::Host qw (
                                     get_hostname_by_ip
                                 );
+use Stubhub::BigIP::Monitor::Handler qw (
+                                    get_monitor_send_url
+                                );
 use Stubhub::BigIP::System::Util qw (
                                     add_object_prefix
                                 );
@@ -186,7 +189,7 @@ sub get_monitor_state {
         my $the_template_name = $monitor_state_ref->{ "instance" }->{ "template_name"};
 
         # TODO store the template string into a static hash
-        my $send_string = $bigip_ref->{ "iControl" }->get_monitor_template_send( $the_template_name ) if defined $the_template_name and $the_template_name !~ /\/none$/;
+        my $send_string = get_monitor_send_url( $bigip_ref, $the_template_name );
         if ( $send_string ) {
             $send_string =~ s/^GET //;
             $send_string =~ s/\\r\\n$//;

@@ -13,9 +13,9 @@
 # Options:
 #  -e | --env               Specify the environment ID. For example: srwd76.
 #  -j | --json              Return the JSON format status.
-#  -m | --member            Show the detail pool member status.
-#  -v | --verbose           Show verbose messages.
-#     | --show-monitor      Show very verbose message including monitors.
+#  -m | --show-member       Show the detail pool member status.
+#     | --show-monitor      Show monitor details.
+#     | --show-pass         Show the pass pools.
 #  -h | --help              Show help information.
 #
 # Examples:
@@ -57,20 +57,21 @@ use Stubhub::Util::Host qw (
 
 # Get options
 my $show_usage = qw{};
-my $show_member_status = qw{};
 my $return_json = qw{};
-my $show_verbose = qw{};
+my $show_member_status = qw{};
+my $show_pass = qw{};
 my $show_monitor = qw{};
 my $envid = qw{};
 my $options_okay = GetOptions (
-   'e|env=s'     => \$envid,
-   'm|member'    => \$show_member_status,
-   'j|json'      => \$return_json,
-   'v|verbose'   => \$show_verbose,
-   'show-monitor'=> \$show_monitor,
-   'h|help'      => \$show_usage,
+   'e|env=s'       => \$envid,
+   'm|show-member' => \$show_member_status,
+   'show-monitor'  => \$show_monitor,
+   'show-pass'     => \$show_pass,
+   'j|json'        => \$return_json,
+   'h|help'        => \$show_usage,
 );
-$show_verbose = 1 if $show_monitor;
+
+$show_member_status = 1 if $show_monitor;
 
 Stubhub::Log::Util->init();
 
@@ -108,10 +109,10 @@ Usage: validate_bigip [options]
 
 Options:
  -e | --env               Specify the environment ID. For example: srwd76.
- -m | --member            Show the detail pool member status.
  -j | --json              Return the JSON format status.
- -v | --verbose           Show verbose messages.
-    | --show-monitor      Show very verbose message including monitors.
+ -m | --show-member       Show the detail pool member status.
+    | --show-monitor      Show monitor details.
+    | --show-pass         Show the pass pools.
  -h | --help              Show help information.
 
 Examples:
@@ -129,20 +130,31 @@ sub validate_env_pool_status {
     my @filtered_pool_list = filter_pool_list( @pool_list );
     my @pools_status;
     foreach my $pool ( @filtered_pool_list ) {
-        my $pool_members_ref;
-        if ( $show_verbose or $show_member_status or $return_json ) {
-            if ( $show_monitor or $return_json ) {
-                $pool_members_ref = get_pool_members_status( $bigip_ref, $pool );
-            } else {
-                $pool_members_ref = get_pool_members_status_without_monitor( $bigip_ref, $pool );
-            }
-        }
 
         my %pool_status;
         $pool = del_object_prefix( $bigip_ref, $pool );
         $pool_status{ 'pool' } = $pool;
         $pool_status{ 'status_description' } = $bigip_ref->{ "iControl" }->get_ltm_pool_status_as_string( $pool );
-        $pool_status{ 'members' } = $pool_members_ref; 
+
+        my $pool_pass = 1;
+        $pool_pass = 0 if ( $pool_status{ 'status_description' } =~ /either don't have service checking enabled/
+                or $pool_status{ 'status_description' } !~ /The pool is available/ );
+
+        # Get pool status on demand.
+        my $pool_members_ref;
+        if ( $return_json ) {
+            $pool_members_ref = get_pool_members_status( $bigip_ref, $pool );
+            $pool_status{ 'members' } = $pool_members_ref; 
+        } elsif ( $show_member_status ) {
+            if ( $show_pass or not $pool_pass ) {
+                if ( $show_monitor ) {
+                    $pool_members_ref = get_pool_members_status( $bigip_ref, $pool );
+                } else {
+                    $pool_members_ref = get_pool_members_status_without_monitor( $bigip_ref, $pool );
+                }
+                $pool_status{ 'members' } = $pool_members_ref; 
+            }
+        }
 
         push @pools_status, \%pool_status;
     }
@@ -176,7 +188,7 @@ sub print_pool_status {
             $pass = 1;
             $fail_count += 1;
         } else {
-            printf "%-50s %-20s\n", $pool_name, "PASS" if $show_verbose;
+            printf "%-50s %-20s\n", $pool_name, "PASS" if $show_pass;
             $pass = 0;
             $pass_count += 1;
         }
@@ -205,7 +217,7 @@ sub print_pool_status {
                     $member_enabled = "Disabled";
                 }
 
-                if ( $show_verbose or $pass == 1 ) {
+                if ( $show_pass or $pass == 1 ) {
                     printf "       %-34s %-8s %-5s\n", $member_host, $member_enabled, $member_status;
                     if ( $show_monitor ) {
                         foreach my $monitor_status ( @{ $pool_member_status_ref->{ 'monitor' } } ) {
@@ -282,7 +294,7 @@ if ( not $return_json ) {
     my $overall_pass_rate = ( $ext_pass_count + $ext_fail_count + $int_pass_count + $int_fail_count ) / ( $ext_pass_count + $int_pass_count );
 
     if ( $overall_pass_rate == 1 ) {
-        print "====================================\n" if $show_verbose;
+        print "====================================\n" if $show_pass;
         print "Overall: PASS\n";
         exit 0;
     } elsif ( $overall_pass_rate > 1 and $overall_pass_rate < 2 ) {
