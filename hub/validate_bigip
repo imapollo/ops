@@ -15,7 +15,7 @@
 #  -j | --json              Return the JSON format status.
 #  -m | --member            Show the detail pool member status.
 #  -v | --verbose           Show verbose messages.
-#     | --very-verbose      Show very verbose message including monitors.
+#     | --show-monitor      Show very verbose message including monitors.
 #  -h | --help              Show help information.
 #
 # Examples:
@@ -32,6 +32,7 @@ use lib '/nas/home/minjzhang/ops/util/lib';
 use Stubhub::BigIP::Pool::Handler qw (
                                     get_env_pool_list
                                     get_pool_members_status
+                                    get_pool_members_status_without_monitor
                                     get_monitor_state
                                 );
 use lib '/nas/reg/lib/perl';
@@ -59,17 +60,17 @@ my $show_usage = qw{};
 my $show_member_status = qw{};
 my $return_json = qw{};
 my $show_verbose = qw{};
-my $show_very_verbose = qw{};
+my $show_monitor = qw{};
 my $envid = qw{};
 my $options_okay = GetOptions (
    'e|env=s'     => \$envid,
    'm|member'    => \$show_member_status,
    'j|json'      => \$return_json,
    'v|verbose'   => \$show_verbose,
-   'very-verbose'=> \$show_very_verbose,
+   'show-monitor'=> \$show_monitor,
    'h|help'      => \$show_usage,
 );
-$show_verbose = 1 if $show_very_verbose;
+$show_verbose = 1 if $show_monitor;
 
 Stubhub::Log::Util->init();
 
@@ -110,6 +111,7 @@ Options:
  -m | --member            Show the detail pool member status.
  -j | --json              Return the JSON format status.
  -v | --verbose           Show verbose messages.
+    | --show-monitor      Show very verbose message including monitors.
  -h | --help              Show help information.
 
 Examples:
@@ -127,12 +129,18 @@ sub validate_env_pool_status {
     my @filtered_pool_list = filter_pool_list( @pool_list );
     my @pools_status;
     foreach my $pool ( @filtered_pool_list ) {
-        my $pool_members_ref = get_pool_members_status( $bigip_ref, $pool );
+        my $pool_members_ref;
+        if ( $show_verbose or $show_member_status or $return_json ) {
+            if ( $show_monitor or $return_json ) {
+                $pool_members_ref = get_pool_members_status( $bigip_ref, $pool );
+            } else {
+                $pool_members_ref = get_pool_members_status_without_monitor( $bigip_ref, $pool );
+            }
+        }
 
         my %pool_status;
         $pool = del_object_prefix( $bigip_ref, $pool );
         $pool_status{ 'pool' } = $pool;
-        $pool_status{ 'status' } = $bigip_ref->{ "iControl" }->get_ltm_pool_availability_status( $pool );
         $pool_status{ 'status_description' } = $bigip_ref->{ "iControl" }->get_ltm_pool_status_as_string( $pool );
         $pool_status{ 'members' } = $pool_members_ref; 
 
@@ -199,7 +207,7 @@ sub print_pool_status {
 
                 if ( $show_verbose or $pass == 1 ) {
                     printf "       %-34s %-8s %-5s\n", $member_host, $member_enabled, $member_status;
-                    if ( $show_very_verbose ) {
+                    if ( $show_monitor ) {
                         foreach my $monitor_status ( @{ $pool_member_status_ref->{ 'monitor' } } ) {
                             my $monitor_enabled = "Disabled";
                             $monitor_enabled = "Enabled" if $monitor_status->{ 'enabled_state' } == 1;

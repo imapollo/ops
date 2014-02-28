@@ -37,6 +37,7 @@ BEGIN {
                         &get_env_pool_list
                         &delete_not_excluded_env_pools
                         &get_pool_members_status
+                        &get_pool_members_status_without_monitor
                         &get_env_pool_members
                     );
   %EXPORT_TAGS  = ();
@@ -95,13 +96,15 @@ sub delete_not_excluded_env_pools {
 }
 
 #
-# Get pool_members status.
-#
-sub get_pool_members_status {
-    my ( $bigip_ref, $pool ) = @_;
+# Get pool member status details
+sub get_pool_members_status_details {
+    my ( $bigip_ref, $pool, $get_monitor ) = @_;
     my $pool_members_status = ${ $bigip_ref->{ "iControl" }->get_pool_member_status( $pool )}[0];
 
-    my $pool_members_monitor_status = get_monitor_state( $bigip_ref, $pool );
+    my $pool_members_monitor_status;
+    if ( $get_monitor ) {
+        $pool_members_monitor_status = get_monitor_state( $bigip_ref, $pool );
+    }
 
     my @no_bless_pool_members_status;
 
@@ -113,16 +116,33 @@ sub get_pool_members_status {
         $no_bless_pool_status{ 'object_status' }{ 'availability_status' } = $pool_member_status_ref->{ 'object_status' }->{ 'availability_status' };
         $no_bless_pool_status{ 'object_status' }{ 'enabled_status' } = $pool_member_status_ref->{ 'object_status' }->{ 'enabled_status' };
 
-        foreach my $pool_member_monitor_status ( @{ $pool_members_monitor_status } ) {
-            if ( get_hostname_by_ip( $pool_member_monitor_status->{ 'member' }{ 'address' } ) eq $no_bless_pool_status{ 'member' }{ 'address' } ) {
-                # and $pool_member_monitor_status->{ 'member' }{ 'port' } eq $no_bless_pool_status{ 'member' }{ 'port' } ) {
-                $no_bless_pool_status{ 'monitor' } = $pool_member_monitor_status->{ 'monitor' };
+        if ( $get_monitor ) {
+            foreach my $pool_member_monitor_status ( @{ $pool_members_monitor_status } ) {
+                if ( get_hostname_by_ip( $pool_member_monitor_status->{ 'member' }{ 'address' } ) eq $no_bless_pool_status{ 'member' }{ 'address' } ) {
+                    # and $pool_member_monitor_status->{ 'member' }{ 'port' } eq $no_bless_pool_status{ 'member' }{ 'port' } ) {
+                    $no_bless_pool_status{ 'monitor' } = $pool_member_monitor_status->{ 'monitor' };
+                }
             }
         }
-
         push @no_bless_pool_members_status, \%no_bless_pool_status;
     }
     return \@no_bless_pool_members_status;
+}
+
+#
+# Get pool members status.
+#
+sub get_pool_members_status {
+    my ( $bigip_ref, $pool ) = @_;
+    return get_pool_members_status_details( $bigip_ref, $pool, 1 );
+}
+
+#
+# Get pool members status without monitor details.
+#
+sub get_pool_members_status_without_monitor {
+    my ( $bigip_ref, $pool ) = @_;
+    return get_pool_members_status_details( $bigip_ref, $pool, 0 );
 }
 
 #
