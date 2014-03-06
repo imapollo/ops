@@ -96,8 +96,15 @@ do
     if [[ $return_code == 0 ]]; then
         echo "${from_host} -> ${to_host}:${port} : PASS"
     else
-        echo "${from_host} -> ${to_host}:${port} : FAIL"
-        overall_pass="FAIL"
+        # test again if fail
+        ssh -oPasswordAuthentication=no -ostricthostkeychecking=no $from_host ". /nas/home/minjzhang/bin/base; $BIN/check_port $to_host $port" &> /dev/null < /dev/null
+        return_code=$?
+        if [[ $return_code == 0 ]];then
+            echo "${from_host} -> ${to_host}:${port} : PASS"
+        else
+            echo "${from_host} -> ${to_host}:${port} : FAIL"
+            overall_pass="FAIL"
+        fi
     fi
 done
 
