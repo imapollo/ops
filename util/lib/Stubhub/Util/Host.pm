@@ -73,7 +73,7 @@ sub get_public_ip_by_hostname {
     Readonly my $GREP_COMMAND => '/bin/grep';
     Readonly my $HEAD_COMMAND => '/usr/bin/head';
 
-    my $name_server = `$DNS_COMMAND $hostname 8.8.8.8 | $GREP_COMMAND "8.8.8.8 | $HEAD_COMMAND -n 1"`;
+    my $name_server = `$DNS_COMMAND $hostname 8.8.8.8 | $GREP_COMMAND 8.8.8.8 | $HEAD_COMMAND -n 1`;
     return "" if $name_server !~ /8.8.8.8/;
 
     my $ip_address = `$DNS_COMMAND $hostname 8.8.8.8 | $GREP_COMMAND "has address"`;

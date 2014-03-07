@@ -41,20 +41,16 @@ BEGIN {
 our @EXPORT_OK;
 
 #
-# Generate public virtual server configuration file bsed on
-# templates, not including the exlucded virtual servers.
+# Generate public virtual server configuration file based on
+# templates, not including the excluded virtual servers.
 # Return empty string if no public ip for the environment.
 #
 sub generate_pub_not_excluded_vs_configs {
     my ( $templates_dir, $public_ip_list, $envid, $output_dir, $excluded_virtual_servers_ref, $only_include_vs_ref, $bigip_ref ) = @_;
     my @excluded_virtual_servers = @{ $excluded_virtual_servers_ref };
     my @only_include_vs = @{ $only_include_vs_ref };
-    my $public_vs = _get_env_public_vs( $public_ip_list, $envid );
-    my $public_vs_number = scalar keys %$public_vs;
     my $output_file = "$output_dir/virtual_server_$envid.conf";
-    if ( $public_vs_number == 0 ) {
-        return $output_file;
-    }
+
     opendir DH, $templates_dir or die "Cannot open $templates_dir: $!";
     my @template_files = grep { ! -d } readdir DH;
     closedir DH;
@@ -83,9 +79,7 @@ sub generate_pub_not_excluded_vs_configs {
             next if $excluded;
         }
 
-        if ( exists $public_vs->{ "pub-$envid-$vs_template_filename" } ) {
-            generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid, 1, $bigip_ref );
-        }
+        generate_vs_config( $output_file, "$templates_dir/$virtual_server_template", $envid, 1, $bigip_ref );
     }
     return $output_file;
 }
@@ -359,24 +353,4 @@ sub _replace_token_hostname_by_ip {
 
     return get_public_ip_by_hostname( $line ) if $public_ip;
     return get_ip_by_hostname( $line );
-}
-
-#
-# Get public virtual server list for the specific environment.
-# Return \%env_public_vs
-#
-sub _get_env_public_vs {
-    my ( $pub_ip_list, $env_id ) = @_;
-    open PUB_IP_LIST, "<$pub_ip_list" or die "Cannot open file $pub_ip_list: $!";
-    my @public_vs = <PUB_IP_LIST>;
-
-    my %env_public_vs;
-    foreach my $virtual_server ( @public_vs ) {
-        my $virtual_server_name = "pub-${env_id}-${virtual_server}";
-        my $virtual_server_ip   = $virtual_server;
-        chomp $virtual_server_name;
-        chomp $virtual_server_ip;
-        $env_public_vs{ $virtual_server_name } = $virtual_server_ip;
-    }
-    return \%env_public_vs;
 }
