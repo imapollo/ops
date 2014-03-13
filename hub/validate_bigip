@@ -254,7 +254,6 @@ sub filter_pool_list {
                 and $pool_name !~ /SRW[QDE][0-9]+-GEN3APPS$/
                 and $pool_name !~ /SRW[QDE][0-9]+-REST$/
                 and $pool_name !~ /SRW[QDE][0-9]+-SRH$/
-                and $pool_name !~ /SRW[QDE][0-9]+-USR$/
                 and $pool_name !~ /SRW[QDE][0-9]+-DSC$/
                 and $pool_name !~ /SRW[QDE][0-9]+-DISRUPTIVE$/
                 and $pool_name !~ /SRW[QDE][0-9]+-EHCACHE$/ ) {
