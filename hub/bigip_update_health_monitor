@@ -143,8 +143,9 @@ foreach my $intext ( "int", "ext" ) {
             $line =~ s/\bJK-Status-GET_SSL_443\b/JBoss-Secured-SSL/;
             print BIGIP_CONF_DEST_FH "$line\n";
         }
-        if ( $line =~ /^pool\s+.*\s+{\s*/ ) {
+        if ( $line =~ /^ltm pool\s+.*\s+{\s*/ || $line =~ /^pool\s+.*\s+{\s*/ ) {
             my $pool = $line;
+            $pool =~ s/^ltm pool\s+(.*)\s+{\s*/$1/;
             $pool =~ s/^pool\s+(.*)\s+{\s*/$1/;
             if ( grep $_ eq $pool, @filtered_env_pools) {
                 $inpool = 1;
