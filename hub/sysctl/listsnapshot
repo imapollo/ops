@@ -1,0 +1,6 @@
+#!/bin/bash
+
+script_dir=`dirname $0`
+snapshot_prefix='sysctl.conf.'
+
+/bin/ls -1 ${snapshot_prefix}* | sed "s/^.*${snapshot_prefix}//"

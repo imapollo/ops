@@ -1,0 +1,28 @@
+#!/bin/bash
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+
+Usage:
+ createsnapshot [snapshot_name]
+
+Example
+ createsnapshot orig
+
+EOF
+}
+
+snapshot_name=$1
+script_dir=`dirname $0`
+snapshot_prefix='sysctl.conf.'
+
+if [[ "$snapshot_name" == "" ]]; then
+    echo "Need to specify the snapshot name."
+    _usage
+    exit 1
+fi
+
+/usr/bin/sudo /sbin/sysctl -a | grep -v net.ipv4.neigh.eth0.retrans_time_ms | grep -v net.ipv4.neigh.eth0.locktime | grep -v net.ipv4.neigh.eth0.proxy_delay | grep -v net.ipv4.neigh.eth0.anycast_delay | grep -v net.ipv4.neigh.eth0.retrans_time | grep -v net.ipv4.neigh.lo.retrans_time_ms | grep -v net.ipv4.neigh.lo.locktime | grep -v net.ipv4.neigh.lo.proxy_delay | grep -v net.ipv4.neigh.lo.anycast_delay | grep -v net.ipv4.neigh.lo.retrans_time | grep -v net.ipv4.neigh.default.retrans_time_ms | grep -v net.ipv4.neigh.default.locktime | grep -v net.ipv4.neigh.default.proxy_delay | grep -v net.ipv4.neigh.default.anycast_delay | grep -v net.ipv4.neigh.default.retrans_time | grep -v kernel.random.uuid | grep -v kernel.random.entropy_avail | grep -v fs.dentry-state | grep -v fs.dentry-state | grep -v fs.inode-state | grep -v fs.inode-nr | grep -v net.ipv4.route.gc_min_interval_ms | grep -v net.ipv4.route.gc_min_interval > ${snapshot_prefix}${snapshot_name}

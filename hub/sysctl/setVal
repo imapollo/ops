@@ -1,0 +1,29 @@
+#!/bin/bash
+
+values=$@
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+
+Usage:
+ setVal [property=value] ...
+
+Example
+ setVal net.ipv4.tcp_keepalive_time=7200
+ setVal net.ipv4.tcp_keepalive_time=7200 net.ipv4.tcp_timestamps=1
+
+EOF
+}
+
+if [[ "$values" == "" ]]; then
+    echo "Error: please specify the values. For example: net.ipv4.tcp_tw_reuse=0."
+    _usage
+    exit 1
+fi
+
+for value in $values; do
+    /usr/bin/sudo /sbin/sysctl -w $value
+done
