@@ -183,6 +183,7 @@ sub parse_irule {
         my $go_pool = qw{};
         foreach my $rule_line ( @rule_lines ) {
             if ( $rule_line =~ /^\s*"\/.+"/ ) {
+                $match_rule = 0;
                 $rule_line =~ s/^\s*"*(\/.+)".*/$1/;
                 $rule_line =~ s/\*+$//;
                 if ( $url_path =~ "$rule_line" ) {
@@ -191,6 +192,18 @@ sub parse_irule {
                     $logger->debug( "[iRule] Rule line: $rule_line" );
                     $match_rule = 1;
                 }
+                next;
+            }
+            if ( $rule_line =~ /^\s*(?:else)?if\s+.*".+".*/ ) {
+                $match_rule = 0;
+                $rule_line =~ s/^.*"(.+)".*/$1/;
+                if ( $url_path =~ "$rule_line" ) {
+                    $logger->debug( "[iRule] iRule matching:" );
+                    $logger->debug( "[iRule] URL Path: $url_path" );
+                    $logger->debug( "[iRule] Rule line: $rule_line" );
+                    $match_rule = 1;
+                }
+                next;
             }
             if ( $match_rule && $rule_line =~ /^\s*pool\s+\S+/i ) {
                 $go_pool = $rule_line;
@@ -202,10 +215,14 @@ sub parse_irule {
                 next;
             }
             if ( $go_default ) {
-                $rule_line =~ s/^\s*//;
-                $logger->error( "No url path matching found for irule: $rule.");
-                $logger->error( "Return $rule_line" );
-                exit 1;
+                if ( $rule_line =~ /404/ ) {
+                    $rule_line =~ s/^\s*//;
+                    $logger->error( "No url path matching found for irule: $rule.");
+                    $logger->error( "Return $rule_line" );
+                    exit 1;
+                } else {
+                    $go_default = 0;
+                }
             }
         }
         $logger->debug( "[iRule] Redirect to $go_pool" ) if defined $go_pool;
