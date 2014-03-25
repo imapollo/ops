@@ -26,5 +26,26 @@
         </li>
       </ul>
     </form>
+    <h2>Comments</h2>
+    <ul>
+    {% for comment in post.comments %}
+      <li>{{comment.content}}</li>
+    {% endfor %}
+    </ul>
+    <form method="post" action="http://10.9.245.150:8000/comments/update/">
+      {% csrf_token %}
+      <ul>
+        <input type="hidden" name="id" value="{{post.id}}">
+        <li>
+          <textarea name="content_comment" placeholder="Enter Comment"
+            rows=5 cols=50 required>
+            {{comment.content}}
+          </textarea>
+        </li>
+        <li>
+        <input type="submit" value="Post">
+        </li>
+      </ul>
+    </form>
   </body>
 </html>

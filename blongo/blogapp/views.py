@@ -1,6 +1,7 @@
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from models import Post
+from models import Comment
 import datetime
 
 def index(request):
@@ -31,6 +32,26 @@ def update(request):
         post.content = request.POST['content']
         post.save()
         template = 'index.html'
+        params = {'Posts': Post.objects}
+
+    elif request.method == 'GET':
+        template = 'update.html'
+        params = {'post':post}
+
+    return render_to_response(template, params, context_instance=RequestContext(request))
+
+def comment_update(request):
+    id = eval("request." + request.method + "['id']")
+    post = Post.objects(id=id)[0]
+
+    if request.method == 'POST':
+        # update field values and save to mongo
+        comment = Comment(content=request.POST['content_comment'])
+        comments = post.comments
+        comments.append(comment)
+        post.comments = comments
+        post.save()
+        template = 'update.html'
         params = {'Posts': Post.objects}
 
     elif request.method == 'GET':
