@@ -20,14 +20,36 @@ class JenkinsClient:
                 username=self.jenkins_username, password=jenkins_password)
 
     # Trigger build for a job with optional parameters.
-    def build_job( self, job_name, build_params=None, timeout=3600 ):
+    def build_job( self, job_name, build_params=None, timeout=3600, inqueue_timeout=30 ):
         next_build_number = self.jclient[ job_name ].get_next_build_number()
         job_is_running = self.jclient[ job_name ].is_running()
 
         self.jclient.build_job( job_name, params=build_params )
         time.sleep( 10 )
 
-        return self._get_build_number( job_name, build_params, job_is_running, next_build_number, timeout )
+        build_number = self._get_build_number( job_name, build_params, job_is_running, next_build_number, inqueue_timeout )
+        sleep_time = 0
+        check_status_interval = 10
+        while ( timeout >= sleep_time ):
+            if ( self._get_build_status( job_name, build_number ) ):
+                print self._get_build_log_url( job_name, build_number )
+                print self._get_build_status( job_name, build_number )
+                break
+            else:
+                time.sleep( check_status_interval )
+                sleep_time += check_status_interval
+
+    def _get_build_status( self, job_name, build_number ):
+        build = self.jclient[ job_name ].get_build( build_number )
+        return build.get_status()
+
+    def _get_build_log_url( self, job_name, build_number ):
+        build = self.jclient[ job_name ].get_build( build_number )
+        return "%s/consoleText" % build.baseurl
+
+    def _get_build_log( self, job_name, build_number ):
+        build = self.jclient[ job_name ].get_build( build_number )
+        return build.get_console()
 
     # Get the build number for the triggered job.
     def _get_build_number( self, job_name, build_params, is_running_before_trigger, next_build_number, timeout ):
@@ -42,7 +64,7 @@ class JenkinsClient:
                     return self._get_the_build_number( job_name, build_params, next_build_number )
                 else:
                     if ( sleep_time >= timeout ):
-                        print "timeout"
+                        print "in queue timeout ..."
                         break
                     time.sleep( check_interval )
                     sleep_time += check_interval
@@ -81,8 +103,7 @@ class JenkinsClient:
 def main():
     jclient = JenkinsClient( 'http://int.testing.stubcorp.dev/jenkins' )
     build_params = { 'pool': 'srwd73', 'site': 'UK' }
-    build_number = jclient.build_job( "com.stubhub.devops.smoketest", build_params )
-    print build_number
+    jclient.build_job( "com.stubhub.devops.smoketest", build_params )
 
 if __name__ == "__main__":
     main()
