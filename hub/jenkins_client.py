@@ -1,11 +1,20 @@
 #!/usr/local/bin/python
 # -*- coding: utf-8 -*-
-#
-# Jenkins Client
-#
+
+'''
+jenkins_client - Jenkins client
+
+@author:    Minjie Zhang
+@contact:   minjzhang@ebay.com
+'''
 
 from jenkinsapi import jenkins
 import time
+
+__all__ = []
+__version__ = 0.1
+__date__ = '2014-04-17'
+__updated__ = '2014-04-17'
 
 #
 # Jenkins Client
@@ -15,7 +24,7 @@ class JenkinsClient:
     # Initiate the client.
     def __init__( self, jenkins_url='http://jenkins.stubcorp.dev/reg' ):
         self.jenkins_username = 'minjzhang'
-        jenkins_password = 'chinSk18w'
+        jenkins_password = ''
         self.jclient = jenkins.Jenkins( jenkins_url,
                 username=self.jenkins_username, password=jenkins_password)
 
