@@ -29,15 +29,28 @@ class JenkinsClient:
         for build_id in build_ids:
             if ( build_id >= next_build_number ):
                 build = self.jclient[ job_name ].get_build( build_id )
-                build_actions = build.get_actions()
-                build_parameters = build_actions[ 'parameters' ]
-                build_user = build_actions[ 'causes' ][0][ 'userId' ]
-                if ( build_user == self.jenkins_username ):
+                jenkins_build_actions = build.get_actions()
+                jenkins_build_parameters = jenkins_build_actions[ 'parameters' ]
+                jenkins_build_user = jenkins_build_actions[ 'causes' ][0][ 'userId' ]
+                if ( jenkins_build_user == self.jenkins_username
+                        and self.check_params( build_params, jenkins_build_parameters ) ):
                     return build_id
             else:
                 break
 
         return 0
+
+    # Check if the parameters are the same with the jenkins build.
+    def check_params( self, build_params, jenkins_params ):
+        params_same = 1
+        for param in jenkins_params:
+            for build_param_key, build_param_value in build_params.items():
+                if ( param[ 'name' ] == build_param_key ):
+                    if ( param[ 'value' ] != build_param_value ):
+                        params_same = 0
+                        break
+
+        return params_same
 
 # Main.
 def main():
