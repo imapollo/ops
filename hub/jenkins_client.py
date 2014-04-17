@@ -20,18 +20,37 @@ class JenkinsClient:
                 username=self.jenkins_username, password=jenkins_password)
 
     # Trigger build for a job with optional parameters.
-    def build_job( self, job_name, build_params=None ):
-        # if ( self.jclient[ job_name ].is_queued_or_running() ):
-        #     print "already running...."
-        #     return 0
-
+    def build_job( self, job_name, build_params=None, timeout=3600 ):
         next_build_number = self.jclient[ job_name ].get_next_build_number()
+        job_is_running = self.jclient[ job_name ].is_running()
+
         self.jclient.build_job( job_name, params=build_params )
         time.sleep( 10 )
-        build_ids = self.jclient[ job_name ].get_build_ids()
-        last_id = self.jclient[ job_name ].get_last_buildnumber()
 
-        # To get the right build number.
+        return self._get_build_number( job_name, build_params, job_is_running, next_build_number, timeout )
+
+    # Get the build number for the triggered job.
+    def _get_build_number( self, job_name, build_params, is_running_before_trigger, next_build_number, timeout ):
+
+        if not is_running_before_trigger:
+            return self._get_the_build_number( job_name, build_params, next_build_number )
+        else:
+            sleep_time = 0
+            check_interval = 10
+            while self.jclient[ job_name ].is_queued_or_running:
+                if ( self._get_the_build_number( job_name, build_params, next_build_number ) ):
+                    return self._get_the_build_number( job_name, build_params, next_build_number )
+                else:
+                    if ( sleep_time >= timeout ):
+                        print "timeout"
+                        break
+                    time.sleep( check_interval )
+                    sleep_time += check_interval
+
+        return 0
+
+    def _get_the_build_number( self, job_name, build_params, next_build_number ):
+        build_ids = self.jclient[ job_name ].get_build_ids()
         for build_id in build_ids:
             if ( build_id >= next_build_number ):
                 build = self.jclient[ job_name ].get_build( build_id )
@@ -43,8 +62,8 @@ class JenkinsClient:
                     return build_id
             else:
                 break
-
         return 0
+
 
     # Check if the parameters are the same with the jenkins build.
     def _check_params( self, build_params, jenkins_params ):
