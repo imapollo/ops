@@ -1,0 +1,12 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+# use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/reg/lib/perl';
+
+use HTML::Perlinfo::Modules;
+
+my $m = HTML::Perlinfo::Modules->new();
+$m->print_modules();
