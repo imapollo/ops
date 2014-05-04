@@ -196,19 +196,21 @@ sub uniq {
 #
 sub generate_configuration {
     my ( $env_id, $branch_name, $tmpdir, $intext, $excluded_vs_ref, $excluded_pool_ref, $only_include_vs_ref, $only_include_pool_ref, $bigip_ref ) = @_;
-    my $p4_f5_dir = qw{};
-    my $p4_f5_subdir = "templates/fsroot/etc/stubhub/f5";
+
+    Readonly my $F5_REPOSITORY => "Stubhub/f5";
+    Readonly my $CHECKOUT_PATH => "/nas/reg/f5";
+
     if ( $branch_name eq "main" ) {
-        $p4_f5_dir = "/depot/main/$p4_f5_subdir";
     } elsif ( $branch_name =~ m/^rb_/ ) {
-        $p4_f5_dir = "/depot/release/$branch_name/$p4_f5_subdir";
     } elsif ( $branch_name =~ m/^pb_/ ) {
-        $p4_f5_dir = "/depot/project/$branch_name/$p4_f5_subdir";
     } else {
         $logger->logdie( "Branch name $branch_name doesn't look good." );
     }
-    my ( $dynamic_perforce_client, $dynamic_perforce_dir )
-        = check_out_perforce_file( "/$p4_f5_dir/..." );
+
+    my $checkout_path = "$CHECKOUT_PATH/$branch_name-" . get_timestamp();
+    $logger->info( "Checking out from [$F5_REPOSITORY] to [$checkout_path]." );
+    system( "/nas/home/minjzhang/bin/git_checkout -r $F5_REPOSITORY -p $checkout_path" );
+    $logger->info( "Checkout finished from [$F5_REPOSITORY]." );
 
     Readonly my $PUBLIC_IP_LIST => '/internal/devops/network/bigip/public_virtual_server_ip.lst';
     my ( $public_ip_chkout_client, $public_ip_list_dir )
@@ -216,12 +218,15 @@ sub generate_configuration {
 
     my $vs_file;
     if ( $intext eq "ext" ) {
-        $vs_file = generate_pub_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext",
+        $vs_file = generate_pub_not_excluded_vs_configs( "$checkout_path/virtuals/$intext",
             "$public_ip_list_dir$PUBLIC_IP_LIST", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref, $bigip_ref );
     }
-    $vs_file = generate_not_excluded_vs_configs( "$dynamic_perforce_dir$p4_f5_dir/virtuals/$intext", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref, $bigip_ref );
-    my $pool_file = generate_not_excluded_pool_configs( "$dynamic_perforce_dir$p4_f5_dir/pools/$intext", $envid, "$tmpdir", $excluded_pool_ref, $only_include_pool_ref, $bigip_ref );
-    clean_perforce_client( $dynamic_perforce_client, $dynamic_perforce_dir );
+    $vs_file = generate_not_excluded_vs_configs( "$checkout_path/virtuals/$intext", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref, $bigip_ref );
+    my $pool_file = generate_not_excluded_pool_configs( "$checkout_path/pools/$intext", $envid, "$tmpdir", $excluded_pool_ref, $only_include_pool_ref, $bigip_ref );
+    # Sleep for 5 seconds to allow /nas/reg/f5 sync.
+    sleep 5;
+    system( "/bin/rm -rf $checkout_path" );
+    sleep 5;
     clean_perforce_client( $public_ip_chkout_client, $public_ip_list_dir);
     return ( $vs_file, $pool_file );
 }

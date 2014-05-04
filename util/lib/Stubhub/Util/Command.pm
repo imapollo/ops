@@ -40,7 +40,7 @@ sub run_cmd {
 #
 sub ssh_cmd {
   my ( $server, $command ) = @_;
-  Readonly my $SSH => "ssh -oPasswordAuthentication=no -ostricthostkeychecking=no";
+  Readonly my $SSH => "/usr/bin/ssh -oPasswordAuthentication=no -ostricthostkeychecking=no";
   Readonly my $SSH_TIMEOUT => 10;
-  return run_cmd("$SSH -o ConnectTimeout=$SSH_TIMEOUT $server \"$command\"");
+  return run_cmd("$SSH -o ConnectTimeout=$SSH_TIMEOUT $server \"$command\" < /dev/null");
 }

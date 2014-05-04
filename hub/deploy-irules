@@ -130,7 +130,8 @@ my $iruleDir = qw{};
 if ( -d "/nas/release/$env/$BRANCH/config-f5/conf/etc/stubhub/f5/irules" ) {
   $iruleDir = get_irule_from_build_label( $env, $BRANCH );
 } else {
-  $iruleDir = get_irule_from_p4( $env, $BRANCH );
+  # $iruleDir = get_irule_from_p4( $env, $BRANCH );
+  $iruleDir = get_irule_from_github( $env, $BRANCH );
 }
 
 # Get the internal / external rule
@@ -202,6 +203,58 @@ exit $globalResult;
 sub get_irule_from_build_label {
   my ( $env, $build_label ) = @_;
   return "/nas/release/$env/$build_label/config-f5/conf/etc/stubhub/f5/irules";
+}
+
+#------------------------------------------------------------------------
+# Get irule configuration files from github repository.
+sub get_irule_from_github {
+  my ( $env, $branch_name ) = @_;
+  my $env_id = lc($env);
+
+  Readonly my $F5_REPOSITORY => "Stubhub/f5";
+  Readonly my $CHECKOUT_PATH => "/nas/reg/f5";
+
+  if ( $branch_name eq "main" ) {
+  } elsif ( $branch_name =~ m/^rb_/ ) {
+  } elsif ( $branch_name =~ m/^pb_/ ) {
+  } else {
+    print "Error: Branch name $branch_name doesn't exist in depot.\n";
+    exit 1;
+  }
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
+  my $nice_timestamp = sprintf ( "%04d%02d%02d%02d%02d%02d",
+        $year+1900,$mon+1,$mday,$hour,$min,$sec);
+  my $checkout_path = "$CHECKOUT_PATH/$branch_name-" . $nice_timestamp;
+  $logger->info( "Checking out from [$F5_REPOSITORY] to [$checkout_path]." );
+  system( "/nas/home/minjzhang/bin/git_checkout -r $F5_REPOSITORY -p $checkout_path" );
+  $logger->info( "Checkout finished from [$F5_REPOSITORY]." );
+  system("/bin/chmod u+w $checkout_path -R");
+
+  foreach my $intExt ("int", "ext") {
+    my $iruleDir = "$checkout_path/irules/$intExt";
+    logwarn "Irules dir not found: $iruleDir" && exit 0 unless -d $iruleDir;
+
+    my $iruleFiles = `/bin/ls -1 $iruleDir/*`;
+    $VERBOSE && value_echo( 'iruleFiles', $iruleFiles );
+    logwarn "No Irules in $iruleDir" && exit 0 unless $iruleFiles;
+    
+    foreach my $iRuleFile (split /\n/, $iruleFiles) {
+      redeem_config_tokens( $iRuleFile, $env_id, $branch_name);
+    }
+  }
+
+  my $uc_env_id = uc( $env_id );
+  my $dest_file_dir = "/nas/release/$uc_env_id";
+  system("/usr/bin/sudo /bin/cp -rf $checkout_path/irules $dest_file_dir");
+
+  # Sleep for 5 seconds to allow /nas/reg/f5 sync.
+  sleep 5;
+  system( "/bin/rm -rf $checkout_path" );
+  sleep 5;
+
+  $dest_file_dir = "$dest_file_dir/irules";
+
+  return ( $dest_file_dir );
 }
 
 #------------------------------------------------------------------------
