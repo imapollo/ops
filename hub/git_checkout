@@ -1,0 +1,135 @@
+#!/usr/bin/perl
+#
+# Checkout from git repository.
+#
+# Usage: git_checkout [options]
+#
+# Options:
+#  -u | --url               URL for the git repository server. Optional.
+#  -r | --repository        Repository name. Required.
+#  -p | --path              Checkout path for the repository. Required.
+#  -v | --verbose           Print verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  git_checkout -r Stubhub/f5 -p /nas/reg/f5/main
+#  git_checkout -r Stubhub/f5 -p /nas/reg/f5/main -u github.scm.corp.ebay.com
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Getopt::Long;
+use Cwd 'abs_path';
+
+# use lib '/nas/utl/devops/lib/perl';
+use lib '/nas/home/minjzhang/ops/util/lib';
+use lib '/nas/reg/lib/perl';
+
+use Data::Dumper;
+use Readonly;
+use Stubhub::Util::Command qw (
+                            ssh_cmd
+                        );
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+use Stubhub::Git::Client qw (
+                            check_out_file
+                        );
+
+my @options = @ARGV;
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $url = "github.scm.corp.ebay.com";
+my $repository = qw{};
+my $path = qw{};
+my $options_okay = GetOptions (
+    'u|url=s'        => \$url,
+    'r|repository=s' => \$repository,
+    'p|path=s'       => \$path,
+    'v|verbose'      => \$show_verbose,
+    'h|help'         => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+Checkout from git repository.
+
+Usage: git_checkout [options]
+
+Options:
+ -u | --url               URL for the git repository server. Optional.
+ -r | --repository        Repository name. Required.
+ -p | --path              Checkout path for the repository. Required.
+ -h | --help              Show help information.
+
+Examples:
+ git_checkout -r Stubhub/f5 -p /nas/reg/f5/main
+ git_checkout -r Stubhub/f5 -p /nas/reg/f5/main -u github.scm.corp.ebay.com
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+if ( ! defined $repository or ! defined $path ) {
+    $logger->error( "Error: The pamameter '-r' and '-p' must be set.\n" );
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+
+Readonly my $GIT_CHECKOUT_HOST => "srwd00dev007";
+Readonly my $GIT_CHECKOUT_HOST_CANONICAL => $GIT_CHECKOUT_HOST . ".stubcorp.dev";
+
+my $hostname = `/bin/hostname`;
+my $script_path = abs_path( $0 );
+chomp( $hostname );
+$logger->debug( "Hostname: $hostname" );
+
+if ( $hostname !~ /^$GIT_CHECKOUT_HOST\./ ) {
+    my $the_options = join " ", @options;
+    $logger->debug( "Run commands on $GIT_CHECKOUT_HOST_CANONICAL: $script_path $the_options" );
+    ssh_cmd( $GIT_CHECKOUT_HOST_CANONICAL, "$script_path $the_options" );
+    exit 0;
+}
+
+check_out_file( "git@" . $url . ":" . $repository . ".git", $path );
+
+exit 0;
