@@ -214,19 +214,18 @@ sub get_irule_from_github {
   Readonly my $F5_REPOSITORY => "Stubhub/f5";
   Readonly my $CHECKOUT_PATH => "/nas/reg/f5";
 
-  if ( $branch_name eq "main" ) {
-  } elsif ( $branch_name =~ m/^rb_/ ) {
-  } elsif ( $branch_name =~ m/^pb_/ ) {
-  } else {
-    print "Error: Branch name $branch_name doesn't exist in depot.\n";
-    exit 1;
-  }
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
   my $nice_timestamp = sprintf ( "%04d%02d%02d%02d%02d%02d",
         $year+1900,$mon+1,$mday,$hour,$min,$sec);
   my $checkout_path = "$CHECKOUT_PATH/$branch_name-" . $nice_timestamp;
   $logger->info( "Checking out from [$F5_REPOSITORY] to [$checkout_path]." );
-  system( "/nas/home/minjzhang/bin/git_checkout -r $F5_REPOSITORY -p $checkout_path" );
+
+  if ( $branch_name eq "main" ) {
+    system( "/nas/utl/devops/bin/git_checkout -r $F5_REPOSITORY -p $checkout_path" );
+  } else {
+    system( "/nas/utl/devops/bin/git_checkout -r $F5_REPOSITORY -p $checkout_path -b $branch_name" );
+  }
+
   $logger->info( "Checkout finished from [$F5_REPOSITORY]." );
   system("/bin/chmod u+w $checkout_path -R");
 
@@ -247,10 +246,10 @@ sub get_irule_from_github {
   my $dest_file_dir = "/nas/release/$uc_env_id";
   system("/usr/bin/sudo /bin/cp -rf $checkout_path/irules $dest_file_dir");
 
-  # Sleep for 5 seconds to allow /nas/reg/f5 sync.
-  sleep 5;
+  # Sleep for 10 seconds to allow /nas/reg/f5 sync.
+  sleep 10;
   system( "/bin/rm -rf $checkout_path" );
-  sleep 5;
+  sleep 10;
 
   $dest_file_dir = "$dest_file_dir/irules";
 
