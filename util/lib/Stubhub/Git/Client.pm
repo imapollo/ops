@@ -22,15 +22,29 @@ BEGIN {
   @EXPORT       = qw();
   @EXPORT_OK    = qw(
                         check_out_file
+                        check_out_branch_file
                     );
   %EXPORT_TAGS  = ();
 }
 
 our @EXPORT_OK;
 
+sub check_out_branch_file {
+    my ( $url, $branch, $path ) = @_;
+    my $repository = check_out_file( $url, $path );
+    _checkout_branch( $repository, $branch );
+    return $repository;
+}
+
 sub check_out_file {
     my ( $url, $path ) = @_;
     my $repository = _clone_repository( $url, $path );
+    return $repository;
+}
+
+sub _checkout_branch {
+    my ( $repository, $branch_name ) = @_;
+    $repository->run( checkout => $branch_name );
 }
 
 sub _clone_repository {

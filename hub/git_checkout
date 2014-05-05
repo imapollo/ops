@@ -7,6 +7,8 @@
 # Options:
 #  -u | --url               URL for the git repository server. Optional.
 #  -r | --repository        Repository name. Required.
+#  -b | --branch            Branch name. Optional.
+#  -t | --tag               Tag name. Optional.
 #  -p | --path              Checkout path for the repository. Required.
 #  -v | --verbose           Print verbose messages.
 #  -h | --help              Show help information.
@@ -14,6 +16,8 @@
 # Examples:
 #  git_checkout -r Stubhub/f5 -p /nas/reg/f5/main
 #  git_checkout -r Stubhub/f5 -p /nas/reg/f5/main -u github.scm.corp.ebay.com
+#  git_checkout -r Stubhub/f5 -p /nas/reg/f5/main -b rb_ecomm_14_8
+#  git_checkout -r Stubhub/f5 -p /nas/reg/f5/main -t 14_8_tag
 #
 # Author: minjzhang
 #
@@ -26,8 +30,12 @@ use Cwd 'abs_path';
 
 # use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/home/minjzhang/ops/util/lib';
-use lib '/nas/reg/lib/perl';
+use Stubhub::Git::Client qw (
+                            check_out_file
+                            check_out_branch_file
+                        );
 
+use lib '/nas/reg/lib/perl';
 use Data::Dumper;
 use Readonly;
 use Stubhub::Util::Command qw (
@@ -37,9 +45,6 @@ use Stubhub::Log::Util qw (
                             init
                             get_logger_with_loglevel
                         );
-use Stubhub::Git::Client qw (
-                            check_out_file
-                        );
 
 my @options = @ARGV;
 
@@ -48,10 +53,14 @@ my $show_usage = qw{};
 my $show_verbose = qw{};
 my $url = "github.scm.corp.ebay.com";
 my $repository = qw{};
+my $branch = 'main';
+my $tag = qw{};
 my $path = qw{};
 my $options_okay = GetOptions (
     'u|url=s'        => \$url,
     'r|repository=s' => \$repository,
+    'b|branch=s'     => \$branch,
+    't|tag=s'        => \$tag,
     'p|path=s'       => \$path,
     'v|verbose'      => \$show_verbose,
     'h|help'         => \$show_usage,
@@ -92,12 +101,17 @@ Usage: git_checkout [options]
 Options:
  -u | --url               URL for the git repository server. Optional.
  -r | --repository        Repository name. Required.
+ -b | --branch            Branch name. Optional.
+ -t | --tag               Tag name. Optional.
  -p | --path              Checkout path for the repository. Required.
+ -v | --verbose           Print verbose messages.
  -h | --help              Show help information.
 
 Examples:
  git_checkout -r Stubhub/f5 -p /nas/reg/f5/main
  git_checkout -r Stubhub/f5 -p /nas/reg/f5/main -u github.scm.corp.ebay.com
+ git_checkout -r Stubhub/f5 -p /nas/reg/f5/main -b rb_ecomm_14_8
+ git_checkout -r Stubhub/f5 -p /nas/reg/f5/main -t 14_8_tag
 
 END_OF_HELP
 }
@@ -106,7 +120,13 @@ END_OF_HELP
 # Parameter validation
 #
 if ( ! defined $repository or ! defined $path ) {
-    $logger->error( "Error: The pamameter '-r' and '-p' must be set.\n" );
+    $logger->error( "The pamameter '-r' and '-p' must be set.\n" );
+    usage();
+    exit 1;
+}
+
+if ( defined $branch and $branch ne 'main' and defined $tag ) {
+    $logger->error( "Only one pamameter '-b' or '-t' can be set at once.\n" );
     usage();
     exit 1;
 }
@@ -130,6 +150,14 @@ if ( $hostname !~ /^$GIT_CHECKOUT_HOST\./ ) {
     exit 0;
 }
 
-check_out_file( "git@" . $url . ":" . $repository . ".git", $path );
+if ( $branch eq 'main' ) {
+    if ( not defined $tag ) {
+        check_out_file( "git@" . $url . ":" . $repository . ".git", $path );
+    } else {
+        check_out_branch_file( "git@" . $url . ":" . $repository . ".git", $tag, $path );
+    }
+} else {
+    check_out_branch_file( "git@" . $url . ":" . $repository . ".git", $branch, $path );
+}
 
 exit 0;
