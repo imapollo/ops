@@ -187,6 +187,7 @@ sub parse_irule {
                 $match_rule = 0;
                 $rule_line =~ s/^\s*"*(\/.+)".*/$1/;
                 $rule_line =~ s/\*+$//;
+                $rule_line =~ s/\/+$//;
                 if ( $url_path =~ "$rule_line" ) {
                     $logger->debug( "[iRule] iRule matching:" );
                     $logger->debug( "[iRule] URL Path: $url_path" );
@@ -286,7 +287,7 @@ sub get_backend_server {
                 $virtual_server = "api-dev.srwd10.com";
                 $url_envid = "srwd10";
             }
-            ( $go_pool, $bigip_ref ) = get_redirect_from_apigateway( $url_envid, $protocol, $virtual_server, $url_path );
+            ( $go_pool, $bigip_ref ) = get_redirect_from_apigateway( $url_envid, "https", $virtual_server, $url_path );
         }
     }
     return ( $go_pool, $bigip_ref );
