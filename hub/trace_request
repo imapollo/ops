@@ -33,6 +33,7 @@ use Getopt::Long;
 use lib '/nas/reg/lib/perl';
 use lib '/nas/home/minjzhang/ops/util/lib';
 
+use Data::Dumper;
 use JSON;
 use Stubhub::Log::Util qw (
                             init
@@ -265,7 +266,7 @@ sub parse_gateway_forward {
 # Get the back end server based on virtual server.
 #
 sub get_backend_server {
-    my ( $bigip_refs, $envid, $protocol, $virtual_server, $url_path) = @_;
+    my ( $bigip_refs, $envid, $protocol, $virtual_server, $url_path, $recursive ) = @_;
     my ( $bigip_ref, $virtual_server_on_f5 ) = find_virtual_server( $bigip_refs, $envid, $protocol, $virtual_server);
     my @irules_on_f5 = get_vs_irules( $bigip_ref, $virtual_server_on_f5 );
     my $default_pool_on_f5 = get_vs_default_pool( $bigip_ref, $virtual_server_on_f5 );
@@ -276,6 +277,17 @@ sub get_backend_server {
     if ( scalar @irules_on_f5 > 0 && $url_path ne "" ) {
         my $temp_pool = parse_irule( $bigip_ref, \@irules_on_f5, $url_path );
         $go_pool = $temp_pool if $temp_pool ne "";
+        my $url_envid = qw{};
+        if ( $go_pool =~ /.*agg-https/i and $recursive ) {
+            if ( $envid =~ /srwe.*/ ) {
+                $virtual_server = "api-dev.${envid}.com";
+                $url_envid = $envid;
+            } else {
+                $virtual_server = "api-dev.srwd10.com";
+                $url_envid = "srwd10";
+            }
+            ( $go_pool, $bigip_ref ) = get_redirect_from_apigateway( $url_envid, $protocol, $virtual_server, $url_path );
+        }
     }
     return ( $go_pool, $bigip_ref );
 }
@@ -317,6 +329,28 @@ sub get_params_from_url {
     return ( $protocol, $virtual_server, $url_path, $url_envid );
 }
 
+sub get_redirect_from_apigateway {
+    my ( $url_envid, $protocol, $virtual_server, $url_path ) = @_;
+    my $gateway_bigip = get_special_bigip( $url_envid, "apigateway" );
+    my @bigip_list = ( $gateway_bigip );
+    my ( $go_pool, $bigip_ref ) = get_backend_server( \@bigip_list, $url_envid, $protocol, $virtual_server, $url_path, 0 );
+    my @members = get_env_pool_members( $bigip_ref, $go_pool );
+    my $gateway_server = $members[0];
+    $gateway_server =~ s/(.*):.*/$1/;
+    $gateway_server = get_hostname_by_ip( $gateway_server );
+    $logger->debug( "[APIGW] Go to $gateway_server.");
+    my $go_url = parse_gateway_forward( $gateway_server, $url_path, $envid );
+    if ( not defined $go_url or $go_url eq "" or $go_url eq "null" ) {
+        $logger->logdie( "Cannot get forwarding URL from API Gateway $gateway_server." );
+    }
+    ( $protocol, $virtual_server, $url_path, $url_envid ) = get_params_from_url( $go_url );
+    my $bigip_refs = get_bigip( $envid );
+    @bigip_list = ( $bigip_refs->{ "int" }, $bigip_refs->{ "ext" } );
+    ( $go_pool, $bigip_ref ) = get_backend_server( \@bigip_list, $envid, $protocol, $virtual_server, $url_path, 1 );
+
+    return ( $go_pool, $bigip_ref );
+}
+
 #
 # Main
 #
@@ -340,26 +374,11 @@ my $go_pool = qw{};
 my $bigip_ref = qw{};
 
 if ( $virtual_server =~ /^api-dev\.srw[deq][0-9]+\.com/ ) {
-    my $gateway_bigip = get_special_bigip( $url_envid, "apigateway" );
-    my @bigip_list = ( $gateway_bigip );
-    ( $go_pool, $bigip_ref ) = get_backend_server( \@bigip_list, $url_envid, $protocol, $virtual_server, $url_path);
-    my @members = get_env_pool_members( $bigip_ref, $go_pool );
-    my $gateway_server = $members[0];
-    $gateway_server =~ s/(.*):.*/$1/;
-    $gateway_server = get_hostname_by_ip( $gateway_server );
-    $logger->debug( "[APIGW] Go to $gateway_server.");
-    my $go_url = parse_gateway_forward( $gateway_server, $url_path, $envid );
-    if ( not defined $go_url or $go_url eq "" or $go_url eq "null" ) {
-        $logger->logdie( "Cannot get forwarding URL from API Gateway $gateway_server." );
-    }
-    ( $protocol, $virtual_server, $url_path, $url_envid ) = get_params_from_url( $go_url );
-    my $bigip_refs = get_bigip( $envid );
-    @bigip_list = ( $bigip_refs->{ "int" }, $bigip_refs->{ "ext" } );
-    ( $go_pool, $bigip_ref ) = get_backend_server( \@bigip_list, $envid, $protocol, $virtual_server, $url_path);
+    ( $go_pool, $bigip_ref ) = get_redirect_from_apigateway( $url_envid, $protocol, $virtual_server, $url_path );
 } else {
     my $bigip_refs = get_bigip( $envid );
     my @bigip_list = ( $bigip_refs->{ "int" }, $bigip_refs->{ "ext" } );
-    ( $go_pool, $bigip_ref ) = get_backend_server( \@bigip_list, $envid, $protocol, $virtual_server, $url_path);
+    ( $go_pool, $bigip_ref ) = get_backend_server( \@bigip_list, $envid, $protocol, $virtual_server, $url_path, 1 );
 }
 
 my @pool_members = get_env_pool_members( $bigip_ref, $go_pool );
