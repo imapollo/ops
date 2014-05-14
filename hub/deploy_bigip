@@ -35,9 +35,13 @@
 use strict;
 use warnings;
 
+use lib '/nas/home/minjzhang/ops/util/lib';
+use Stubhub::Util::Host qw (
+                            get_ip_by_hostname
+                           );
+
 use lib '/nas/reg/lib/perl';
 # use lib '/nas/utl/devops/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
 
 use Readonly;
 use Getopt::Long;
@@ -222,9 +226,9 @@ sub generate_configuration {
     $vs_file = generate_not_excluded_vs_configs( "$checkout_path/virtuals/$intext", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref, $bigip_ref );
     my $pool_file = generate_not_excluded_pool_configs( "$checkout_path/pools/$intext", $envid, "$tmpdir", $excluded_pool_ref, $only_include_pool_ref, $bigip_ref );
     # Sleep for 10 seconds to allow /nas/reg/f5 sync.
-    sleep 10;
+    sleep 15;
     system( "/bin/rm -rf $checkout_path" );
-    sleep 10;
+    sleep 15;
     clean_perforce_client( $public_ip_chkout_client, $public_ip_list_dir);
     return ( $vs_file, $pool_file );
 }

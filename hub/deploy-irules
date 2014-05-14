@@ -247,9 +247,9 @@ sub get_irule_from_github {
   system("/usr/bin/sudo /bin/cp -rf $checkout_path/irules $dest_file_dir");
 
   # Sleep for 10 seconds to allow /nas/reg/f5 sync.
-  sleep 10;
+  sleep 15;
   system( "/bin/rm -rf $checkout_path" );
-  sleep 10;
+  sleep 15;
 
   $dest_file_dir = "$dest_file_dir/irules";
 

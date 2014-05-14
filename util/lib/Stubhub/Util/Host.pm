@@ -43,9 +43,10 @@ sub get_ip_by_hostname {
     my $ip_address = `$DNS_COMMAND $hostname | $GREP_COMMAND "has address" | $HEAD_COMMAND -n 1`;
     $ip_address =~ s/.* has address (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/$1/;
     chomp $ip_address;
+    $logger->debug( "IP address: [$ip_address]\n" );
 
     if ( $ip_address !~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/ ) {
-        $logger->warn ( "Cannot get IP address for [$hostname].\n" );
+        $logger->warn( "Cannot get IP address for [$hostname].\n" );
         return "";
     }
 
@@ -83,7 +84,7 @@ sub get_public_ip_by_hostname {
     chomp $ip_address;
 
     if ( $ip_address !~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/ ) {
-        $logger->error( "Cannot get IP address for [$hostname].\n" );
+        $logger->warn( "Cannot get external IP address for [$hostname].\n" );
         return "";
     }
 
