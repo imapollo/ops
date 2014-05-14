@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# Configure perl mount point for following directory at one.
+# /nas/reg/lib/perl
+#
+# Usage: perl_mount_point -f host.lst
+#
+# Options:
+#  -f | --file=..      File of host list to configure.
+#  -v | --verbose      Print verbose messages.
+#
+# Author: minjzhang
+#
+
+options=$@
+
+host_list=0
+verbose=0
+
+#
+# Usage
+#
+function _usage() {
+    cat <<EOF
+
+perl_mount_point $options
+$*
+Usage: perl_mount_point [options]
+
+Options:
+  -f | --file=..      File of host list to configure.
+  -v | --verbose      Print verbose messages.
+
+EOF
+}
+
+#
+# Get options
+#
+OPTS=`getopt -o f:v -l file:,verbose -- $options`
+if [ $? != 0 ]; then
+    echo "Error: Unrecognized parameters."
+    _usage
+    exit 1
+fi
+
+eval set -- "$OPTS"
+
+while true ; do
+    case "$1" in
+        -f | --file) host_list=${2// }; shift 2;;
+        -v | --verbose) verbose=1; shift;;
+        --) shift; break;;
+    esac
+done
+
+#
+# Print verbose message
+#
+function _print_verbose_msg {
+    verbose_message=$1
+    if [[ "$verbose" == 1 ]]; then
+        echo $verbose_message
+    fi
+}
+
+#
+# Main
+#
+
+if [ ! -f $host_list ]; then
+    echo "Error: [$host_list] doesn't exist of is not a file."
+    exit 1
+fi
+
+ssh_cmd='ssh -oPasswordAuthentication=no -ostricthostkeychecking=no'
+
+cat $host_list | while read line
+do
+    $ssh_cmd $line "sudo /nas/home/minjzhang/bin/do_perl_mount_point" < /dev/null
+done
+
+exit 0
