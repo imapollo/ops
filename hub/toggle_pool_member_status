@@ -12,6 +12,7 @@
 #  -m | --pool-member       Specify the pool member to enable / disable.
 #     | --enable            To enable the pool member.
 #     | --disable           To disable the pool member.
+#  -g | --grace             Gracefully disable pool member.
 #     | --show              To show the status of the pool.
 #  -v | --verbose           Show verbose messages.
 #  -h | --help              Show help information.
@@ -19,6 +20,7 @@
 # Examples:
 #  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --enable
 #  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --disable
+#  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --disable -g
 #  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX --show
 #
 # Author: minjzhang
@@ -30,15 +32,16 @@ use Carp;
 use Data::Dumper;
 use Getopt::Long;
 
-use lib '/nas/reg/lib/perl';
 use lib '/nas/home/minjzhang/ops/util/lib';
-
-use BigIP::iControl;
 use Stubhub::BigIP::Pool::Handler qw (
                             enable_pool_member
                             disable_pool_member
+                            grace_disable_pool_member
                             get_pool_members_status
                         );
+
+use lib '/nas/reg/lib/perl';
+use BigIP::iControl;
 use Stubhub::BigIP::System::Util qw (
                             get_bigip
                         );
@@ -60,6 +63,7 @@ my $pool_name = qw{};
 my $pool_member = qw{};
 my $enable = qw{};
 my $disable = qw{};
+my $grace = qw{};
 my $show = qw{};
 my $options_okay = GetOptions (
     'e|envid=s'       => \$envid,
@@ -68,6 +72,7 @@ my $options_okay = GetOptions (
     'm|pool-member=s' => \$pool_member,
     'enable'          => \$enable,
     'disable'         => \$disable,
+    'g|grace'         => \$grace,
     'show'            => \$show,
     'v|verbose'       => \$show_verbose,
     'h|help'          => \$show_usage,
@@ -113,6 +118,7 @@ Options:
  -m | --pool-member       Specify the pool member to enable / disable.
     | --enable            To enable the pool member.
     | --disable           To disable the pool member.
+ -g | --grace             Gracefully disable pool member.
     | --show              To show the status of the pool.
  -v | --verbose           Show verbose messages.
  -h | --help              Show help information.
@@ -120,6 +126,7 @@ Options:
 Examples:
  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --enable
  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --disable
+ toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX -m srwe04myx001.srwe04.com --disable -g
  toggle_pool_member_status -e srwe04 -t int -p SRWE04-MYX --show
 
 END_OF_HELP
@@ -147,7 +154,11 @@ if ( $enable ) {
     enable_pool_member( $bigip_refs->{ $intext }, $pool_name, $pool_member );
 } elsif ( $disable ) {
     $pool_member = get_ip_by_hostname( $pool_member );
-    disable_pool_member( $bigip_refs->{ $intext }, $pool_name, $pool_member );
+    if ( $grace ) {
+        grace_disable_pool_member( $bigip_refs->{ $intext }, $pool_name, $pool_member );
+    } else {
+        disable_pool_member( $bigip_refs->{ $intext }, $pool_name, $pool_member );
+    }
 } elsif ( $show ) {
     my $pool_members_ref = get_pool_members_status( $bigip_refs->{ $intext }, $pool_name );
 

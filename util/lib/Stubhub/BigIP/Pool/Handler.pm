@@ -34,6 +34,7 @@ BEGIN {
   @EXPORT_OK    = qw(
                         &enable_pool_member
                         &disable_pool_member
+                        &grace_disable_pool_member
                         &get_monitor_state
                         &delete_env_pools
                         &get_pool_list
@@ -169,6 +170,14 @@ sub enable_pool_member {
 sub disable_pool_member {
     my ( $bigip_ref, $pool, $pool_member ) = @_;
     $bigip_ref->{ "iControl" }->disable_pool_member( $pool, $pool_member );
+}
+
+#
+# Gracefully disable a pool member.
+#
+sub grace_disable_pool_member {
+    my ( $bigip_ref, $pool, $pool_member ) = @_;
+    $bigip_ref->{ "iControl" }->grace_disable_pool_member( $pool, $pool_member );
 }
 
 #
