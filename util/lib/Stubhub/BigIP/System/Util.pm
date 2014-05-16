@@ -42,6 +42,7 @@ BEGIN {
                         &download_configuration
                         &get_bigip
                         &get_icontrol
+                        &get_that_icontrol
                         &add_object_prefix
                         &del_object_prefix
                         &get_object_prefix
@@ -120,6 +121,15 @@ sub get_bigip {
     $bigip{ "ext" } = \%external_bigip;
 
     return \%bigip;
+}
+
+#
+# Get the specified iControl instance.
+#
+sub get_that_icontrol {
+    my ( $bigip_server, $bigip_user, $bigip_password ) = @_;
+    my $icontrol = get_icontrol_instance( $bigip_server, $bigip_user, $bigip_password );
+    return $icontrol;
 }
 
 #
