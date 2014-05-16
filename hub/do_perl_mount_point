@@ -1,13 +1,27 @@
-cp /etc/fstab /etc/fstab.bak.perl5
-sed '/\/nas\/reg\/lib\/perl/d' /etc/fstab > /etc/fstab.tmp
-echo 'napMGT.stubcorp.dev:/REG/lib/perl5.8 /nas/reg/lib/perltest nfs vers=3,rw,nosuid,nodev,_netdev,rsize=32768,wsize=32768,timeo=35,retrans=5,soft,tcp 0 0' >> /etc/fstab.tmp
-mv -f /etc/fstab.tmp /etc/fstab
-umount -l /nas/reg/lib/perltest 2&> /dev/null
-mount /nas/reg/lib/perltest
-if df /nas/reg/lib/perltest | grep -q perl5.8; then
-    echo -n "success: "
-    hostname
-else
-    echo -n "failure: "
-    hostname
+#!/bin/sh
+
+dry_run=0
+
+if [[ "$1" == "-d" ]]; then
+    dry_run=1
 fi
+
+umount_cmd='umount -l /nas/reg/lib/perltest'
+mount_cmd='mount -o rw,nosuid,nodev,_netdev,rsize=32768,wsize=32768,timeo=35,retrans=5,soft,tcp napMGT.stubcorp.dev:/REG/lib/perl5.8 /nas/reg/lib/perltest'
+host=`hostname`
+
+if [[ "$dry_run" == "1" ]]; then
+    echo "Host: $host"
+    echo "Command: $umount_cmd"
+    echo "Command: $mount_cmd"
+else
+    $umount_cmd 2&> /dev/null
+    $mount_cmd
+    if df /nas/reg/lib/perltest | grep -q perl5.8; then
+        echo "$host: success"
+    else
+        echo "$host: failure"
+    fi
+fi
+
+
