@@ -1,0 +1,178 @@
+#!/usr/bin/perl
+#
+# Enable/Disable the status of siebel pool members.
+#
+# Usage: toggle_siebel_pool [options]
+#
+# Options:
+#  -p | --pool-name         Specify the name of the pool to operate.
+#  -m | --pool-member       Specify the pool member to enable / disable.
+#     | --enable            To enable the pool member.
+#     | --disable           To disable the pool member.
+#     | --show              To show the status of the pool.
+#  -v | --verbose           Show verbose messages.
+#  -h | --help              Show help information.
+#
+# Examples:
+#  toggle_siebel_pool -p SRWE04-MYX -m srwe04myx001.srwe04.com --enable
+#  toggle_siebel_pool -p SRWE04-MYX -m srwe04myx001.srwe04.com --disable
+#  toggle_siebel_pool -p SRWE04-MYX --show
+#
+# Author: minjzhang
+#
+
+use strict;
+use warnings;
+use Carp;
+use Data::Dumper;
+use Getopt::Long;
+
+use lib '/nas/home/minjzhang/ops/util/lib';
+use Stubhub::BigIP::Pool::Handler qw (
+                            enable_pool_member
+                            disable_pool_member
+                            grace_disable_pool_member
+                            get_pool_members_status
+                        );
+use Stubhub::BigIP::System::Util qw (
+                            get_that_icontrol
+                        );
+use Stubhub::Util::Host qw (
+                            get_ip_by_hostname
+                            get_hostname_by_ip
+                        );
+use Stubhub::Log::Util qw (
+                            init
+                            get_logger_with_loglevel
+                        );
+
+use lib '/nas/reg/lib/perl';
+use BigIP::iControl;
+
+# Get options
+my $show_usage = qw{};
+my $show_verbose = qw{};
+my $pool_name = qw{};
+my $pool_member = qw{};
+my $enable = qw{};
+my $disable = qw{};
+my $show = qw{};
+my $options_okay = GetOptions (
+    'p|pool-name=s'   => \$pool_name,
+    'm|pool-member=s' => \$pool_member,
+    'enable'          => \$enable,
+    'disable'         => \$disable,
+    'show'            => \$show,
+    'v|verbose'       => \$show_verbose,
+    'h|help'          => \$show_usage,
+);
+
+#
+# Initiate log instance
+#
+Stubhub::Log::Util->init();
+our $logger = get_logger_with_loglevel( $show_verbose );
+
+#
+# Signal Handler
+#
+$SIG{'INT'} = \&sigIntHandler;
+
+#
+# Clean up and exit when catch SIGINT(2)
+#
+sub sigIntHandler {
+    exit;
+}
+
+if ( $show_usage ) {
+    usage();
+    exit 0;
+}
+
+#
+# Usage
+#
+sub usage {
+    print <<END_OF_HELP
+Enable/Disable the status of siebel pool members.
+
+Usage: toggle_siebel_pool [options]
+
+Options:
+ -p | --pool-name         Specify the name of the pool to operate.
+ -m | --pool-member       Specify the pool member to enable / disable.
+    | --enable            To enable the pool member.
+    | --disable           To disable the pool member.
+    | --show              To show the status of the pool.
+ -v | --verbose           Show verbose messages.
+ -h | --help              Show help information.
+
+Examples:
+ toggle_siebel_pool -p SRWE04-MYX -m srwe04myx001.srwe04.com --enable
+ toggle_siebel_pool -p SRWE04-MYX -m srwe04myx001.srwe04.com --disable
+ toggle_siebel_pool -p SRWE04-MYX --show
+
+
+END_OF_HELP
+}
+
+#
+# Parameter validation
+#
+
+if ( $enable and $disable ) {
+    $logger->error( "Can only specify --enable or --disable at once.\n");
+    usage();
+    exit 1;
+}
+
+#
+# Main
+#
+print "Username: ";
+my $bigip_username = <>;
+chomp $bigip_username;
+print "Password: ";
+system("stty -echo");
+my $bigip_password = <>;
+system("stty echo");
+print "\n";
+
+Readonly my $BIGIP_SERVER => '';
+
+my $icontrol = get_that_icontrol( $BIGIP_SERVER, $bigip_username, $bigip_password );
+if ( $enable ) {
+    $pool_member = get_ip_by_hostname( $pool_member );
+    enable_pool_member( $icontrol, $pool_name, $pool_member );
+} elsif ( $disable ) {
+    $pool_member = get_ip_by_hostname( $pool_member );
+    grace_disable_pool_member( $icontrol, $pool_name, $pool_member );
+} elsif ( $show ) {
+    my $pool_members_ref = get_pool_members_status( $icontrol, $pool_name );
+
+    # Convert to no bless data structure due to JSON module limitation.
+    foreach my $pool_member_status_ref ( @{ $pool_members_ref } ) {
+        my $pool_address = $pool_member_status_ref->{'member'}->{'address'};
+        my $pool_port = $pool_member_status_ref->{'member'}->{'port'};
+        my $pool_availability = $pool_member_status_ref->{'object_status'}->{'availability_status'};
+        my $pool_enabled = $pool_member_status_ref->{'object_status'}->{'enabled_status'};
+        if ( $pool_availability eq "AVAILABILITY_STATUS_GREEN" ) {
+            $pool_availability = "PASS";
+        } else {
+            $pool_availability = "FAIL";
+        }
+
+        if ( $pool_enabled eq "ENABLED_STATUS_ENABLED" ) {
+            $pool_enabled = "Enabled";
+        } else {
+            $pool_enabled = "Disabled";
+        }
+
+        my $pool_ipport = "$pool_address:$pool_port";
+        printf "%-34s %-8s %-5s\n", $pool_ipport, $pool_enabled, $pool_availability;
+    }
+
+}
+
+exit 0;
