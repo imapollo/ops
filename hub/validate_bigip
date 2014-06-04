@@ -27,14 +27,7 @@
 use strict;
 use warnings;
 
-# use lib '/nas/utl/devops/lib/perl';
-use lib '/nas/home/minjzhang/ops/util/lib';
-use Stubhub::BigIP::Pool::Handler qw (
-                                    get_env_pool_list
-                                    get_pool_members_status
-                                    get_pool_members_status_without_monitor
-                                    get_monitor_state
-                                );
+use lib '/nas/utl/devops/lib/perl';
 use lib '/nas/reg/lib/perl';
 
 use Readonly;
@@ -43,6 +36,12 @@ use Data::Dumper;
 use JSON;
 use BigIP::iControl;
 use MIME::Base64;
+use Stubhub::BigIP::Pool::Handler qw (
+                                    get_env_pool_list
+                                    get_pool_members_status
+                                    get_pool_members_status_without_monitor
+                                    get_monitor_state
+                                );
 use Stubhub::BigIP::System::Util qw (
                                     get_icontrol
                                     get_bigip
@@ -247,19 +246,24 @@ sub print_pool_status {
 #
 sub filter_pool_list {
     my ( @pool_list ) = @_;
+    Readonly my $IGNORE_LIST => '/nas/utl/devops/etc/bigip_ignore_pool.lst';
     my @filtered_pool_list;
+    open( FILE, $IGNORE_LIST );
+    my @ignore_lists = <FILE>;
+    my $ignore = 0;
     foreach my $pool_name ( @pool_list ) {
-        if ( $pool_name !~ /SRW[QDE][0-9]+-ABX-FTP$/ 
-                and $pool_name !~ /SRW[QDE][0-9]+-ABX$/
-                and $pool_name !~ /SRW[QDE][0-9]+-GEN3APPS$/
-                and $pool_name !~ /SRW[QDE][0-9]+-REST$/
-                and $pool_name !~ /SRW[QDE][0-9]+-SRH$/
-                and $pool_name !~ /SRW[QDE][0-9]+-DSC$/
-                and $pool_name !~ /SRW[QDE][0-9]+-DISRUPTIVE$/
-                and $pool_name !~ /SRW[QDE][0-9]+-EHCACHE$/ ) {
+        $ignore = 0;
+        foreach my $ignore_list ( @ignore_lists ) {
+            chomp $ignore_list;
+            if ( $pool_name =~ /$ignore_list/) {
+                $ignore = 1;
+            }
+        }
+        if ( not $ignore ) {
             push @filtered_pool_list, $pool_name;
         }
     }
+    close ( FILE );
     return @filtered_pool_list;
 }
 

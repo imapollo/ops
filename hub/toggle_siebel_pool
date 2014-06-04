@@ -28,14 +28,14 @@ use Data::Dumper;
 use Getopt::Long;
 
 use lib '/nas/home/minjzhang/ops/util/lib';
+use Stubhub::BigIP::System::Util qw (
+                            get_that_icontrol
+                        );
 use Stubhub::BigIP::Pool::Handler qw (
                             enable_pool_member
                             disable_pool_member
                             grace_disable_pool_member
                             get_pool_members_status
-                        );
-use Stubhub::BigIP::System::Util qw (
-                            get_that_icontrol
                         );
 use Stubhub::Util::Host qw (
                             get_ip_by_hostname

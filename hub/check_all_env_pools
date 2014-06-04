@@ -66,7 +66,7 @@ function _print_verbose_msg {
 export PATH='/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin';
 
 dev_hosts_file='/nas/reg/etc/dev-qa-hosts'
-report_file='/nas/home/minjzhang/bigip.rpt'
+report_file='/var/devops/env/bigip/bigip_summary.rpt'
 temp_file="$report_file.tmp"
 
 rm -f $temp_file
