@@ -9,7 +9,7 @@
 
 hi clear
 
-set background=dark
+" set background=dark
 if version > 580
     " no guarantees for version 5.8 and below, but this makes it stop
     " complaining
@@ -213,3 +213,5 @@ if &t_Co > 255
    hi NonText         ctermfg=59
    hi SpecialKey      ctermfg=59
 end
+
+hi Normal ctermbg=NONE
