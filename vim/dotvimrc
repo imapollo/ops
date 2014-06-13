@@ -49,12 +49,9 @@ noremap \4 :set tabstop=4<CR>:set sw=4<CR>:set sts=4<CR>:set wm=4<CR>
 
 " minibuffer explorer
 let g:miniBufExplModSelTarget = 1
-let g:miniBufExplorerMoreThanOne = 0
-let g:miniBufExplModSelTarget = 0
-let g:miniBufExplUseSingleClick = 1
 let g:miniBufExplMapWindowNavVim = 1
-let g:miniBufExplVSplit = 25
-let g:miniBufExplSplitBelow=1
+let g:miniBufExplMapWindowNavArrows = 1
+let g:miniBufExplMapCTabSwitchBufs = 1
 
 noremap <c-w><c-t> :WMToggle<cr>
 
@@ -63,6 +60,13 @@ noremap <c-w><c-t> :WMToggle<cr>
 noremap <leader>tn :tabnew %<cr>
 noremap <leader>tc :tabclose<cr>
 noremap <leader>tm :tabmove
+
+" tab completion
+au FileType python set omnifunc=pythoncomplete#Complete
+let g:SuperTabDefaultCompletionType = "context"
+
+" nerd tree
+map <leader>n :NERDTreeToggle<cr>
 
 " set 256 color mode on character client on putty
 if &term =~ "xterm"
