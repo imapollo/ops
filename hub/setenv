@@ -85,8 +85,8 @@ DEV_HOSTS=/nas/reg/etc/dev-qa-hosts
 roles=`grep ${ENVPREFIX}${ENVID} ${DEV_HOSTS} | sort | uniq`
 for ROLE in $roles
 do
-    shortcut=`echo $ROLE | sed "s/${ENVPREFIX}${ENVID}\([a-z]*\)001.*/\1/"`
-    shortcut_long=`echo $ROLE | sed "s/${ENVPREFIX}${ENVID}\([a-z]*00[0-9]\).*/\1/"`
+    shortcut=`echo $ROLE | sed "s/${ENVPREFIX}${ENVID}\([a-z]*\)[0-9]\{3\}.*/\1/"`
+    shortcut_long=`echo $ROLE | sed "s/${ENVPREFIX}${ENVID}\([a-z]*[0-9]\{3\}\).*/\1/"`
     if echo $shortcut | grep -q "^[a-z]\+$"; then
         export $shortcut=$ROLE
         export ${shortcut}jmx="http://${ROLE}/jmx-console/"
