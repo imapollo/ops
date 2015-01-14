@@ -1,0 +1,3 @@
+#!/bin/bash
+
+ssh -oPasswordAuthentication=no -ostricthostkeychecking=no -oConnectTimeout=5 $1 -t ". ~minjzhang/bin/setenv ${ENVPREFIX}${ENVID}; /bin/bash -l"
