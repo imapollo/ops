@@ -273,12 +273,12 @@ sub get_lba_server {
     print "1. srwp01lba040/041 (10.80.81.17)
 2. srwp01lba043/044 (10.80.81.9)
 3. srwp01lba045/046 (10.80.81.10)
-x. Push to all F5 gears (coming soon)
+4. srwp01lba043/044/045/046 sync (10.80.81.9, 10.80.81.10)
 ";
     print color 'bold';
     print "\nFirewall section:\n";
     print color 'reset';
-    print "4. srwp01jfw040/041 (coming soon)
+    print "5. srwp01jfw040/041 (coming soon)
 
 q. quit
 > ";
@@ -294,6 +294,9 @@ q. quit
             $lba_version = 11;
             return "10.80.81.10";
         } elsif ( $lba_server_choose eq "4" ) {
+            $lba_version = 11;
+            return "10.80.81.9,10.80.81.10";
+        } elsif ( $lba_server_choose eq "5" ) {
             print "Firewall section is coming soon...\n";
         } elsif ( $lba_server_choose =~ /^\s*q\s*$/i ) {
             exit 1;
@@ -304,16 +307,50 @@ q. quit
     }
 }
 
+# Get add list command.
+sub get_add_list_command {
+    my ( $listname, $ip_address, $lba_version ) = @_;
+    my $command = "modify ltm data-group $listname records add {$ip_address}";
+    $command = "modify ltm data-group internal $listname records add {$ip_address}" if $lba_version eq "11";
+    return $command;
+}
+
+# Add IPs to list.
+sub do_add_list_command {
+    my ( $ssh, $command, $listname, $hostname_canonical, $lba_username, $ip_address ) = @_;
+    mute_execute_ssh($ssh, $command);
+    print_list( $ssh, $listname );
+    write_log( get_current_time() . " [$hostname_canonical] $lba_username add [$ip_address] to [$listname].\n");
+}
+
+# Get delete list command.
+sub get_del_list_command {
+    my ( $listname, $ip_address, $lba_version ) = @_;
+    my $command = "modify ltm data-group $listname records delete {$ip_address}";
+    $command = "modify ltm data-group internal $listname records delete {$ip_address}" if $lba_version eq "11";
+    return $command;
+}
+
+# Delete IPs from list.
+sub do_del_list_command {
+    my ( $ssh, $command, $listname, $hostname_canonical, $lba_username, $ip_address ) = @_;
+    mute_execute_ssh($ssh, $command);
+    print_list( $ssh, $listname );
+    write_log( get_current_time() . " [$hostname_canonical] $lba_username delete [$ip_address] from [$listname].\n");
+}
+
 #
 # Main
 #
 
-# Readonly my $HOSTNAME => 'srwd00lba041';
-#Readonly my $HOSTNAME => 'srwp01lba040';
-# Readonly my $HOSTNAME_CANONICAL => "$HOSTNAME";
-#Readonly my $HOSTNAME_CANONICAL => "10.80.81.17";
 Readonly my $TMSH_EXEC => 'tmsh';
-my $HOSTNAME_CANONICAL = get_lba_server();
+my $hostname_canonical = get_lba_server();
+my @lba_slave_hosts;
+if ( $hostname_canonical =~ /,/ ) {
+    @lba_slave_hosts = split( /,/, $hostname_canonical );
+    $hostname_canonical = $lba_slave_hosts[0];
+    splice @lba_slave_hosts, 0, 1;
+}
 
 if ( not defined $list_listname and not defined $add_listname and not defined $del_listname ) {
 print "-------------------------------------------------------------------
@@ -323,7 +360,7 @@ print "-------------------------------------------------------------------
 
 ( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
 
-my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
+my $ssh = login_ssh( $hostname_canonical, $lba_username, $lba_password );
 
 while (1) {
 
@@ -402,16 +439,13 @@ if ( $action eq "list" ) {
         print "> ";
         $ip_address = <>;
         chomp $ip_address;
-        $ip_address =~ s/\s*(\S*)\s*/$1/;
-        $command = "modify ltm data-group $listname records add {$ip_address}";
-        $command = "modify ltm data-group internal $listname records add {$ip_address}" if $lba_version eq "11";
+        $ip_address =~ s/^\s*(.*)\s*$/$1/;
+        $command = get_add_list_command( $listname, $ip_address, $lba_version );
         print "$command\n";
         print "Please confirm to execute the command above (y/n): ";
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
-            mute_execute_ssh($ssh, $command);
-            print_list( $ssh, $listname );
-            write_log( get_current_time() . " [$HOSTNAME_CANONICAL] $lba_username add [$ip_address] to [$listname].\n");
+            do_add_list_command( $ssh, $command, $listname, $hostname_canonical, $lba_username, $ip_address );
         }
     } elsif ( $action eq "delete" ) {
         print "Enter the IP address you want to $action from $listname. For example:\n";
@@ -420,16 +454,13 @@ if ( $action eq "list" ) {
         print "> ";
         $ip_address = <>;
         chomp $ip_address;
-        $ip_address =~ s/\s*(\S*)\s*/$1/;
-        $command = "modify ltm data-group $listname records delete {$ip_address}";
-        $command = "modify ltm data-group internal $listname records delete {$ip_address}" if $lba_version eq "11";
+        $ip_address =~ s/^\s*(.*)\s*$/$1/;
+        $command = get_del_list_command( $listname, $ip_address, $lba_version );
         print "$command\n";
         print "Please confirm to execute the command above (y/n): ";
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
-            mute_execute_ssh($ssh, $command);
-            print_list( $ssh, $listname );
-            write_log( get_current_time() . " [$HOSTNAME_CANONICAL] $lba_username delete [$ip_address] from [$listname].\n");
+            do_del_list_command( $ssh, $command, $listname, $hostname_canonical, $lba_username, $ip_address );
         }
     }
 }
@@ -442,7 +473,7 @@ close_ssh( $ssh );
 
     if ( defined $list_listname && not defined $add_listname && not defined $del_listname ) {
         ( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
-        my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
+        my $ssh = login_ssh($hostname_canonical, $lba_username, $lba_password);
         print_list( $ssh, $list_listname );
         close_ssh($ssh);
     } elsif ( defined $add_listname && not defined $del_listname && not defined $list_listname ) {
@@ -451,12 +482,9 @@ close_ssh( $ssh );
             exit 1;
         }
         ( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
-        my $command = "modify ltm data-group $add_listname records add {$ip_address}";
-        $command = "modify ltm data-group internal $add_listname records add {$ip_address}" if $lba_version eq "11";
-        my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
-        mute_execute_ssh($ssh, $command);
-        print_list( $ssh, $add_listname );
-        write_log( get_current_time() . " [$HOSTNAME_CANONICAL] $lba_username add [$ip_address] to [$add_listname].\n");
+        my $command = get_add_list_command( $add_listname, $ip_address, $lba_version );
+        my $ssh = login_ssh($hostname_canonical, $lba_username, $lba_password);
+        do_add_list_command( $ssh, $command, $add_listname, $hostname_canonical, $lba_username, $ip_address );
         close_ssh($ssh);
     } elsif ( defined $del_listname && not defined $add_listname && not defined $list_listname ) {
         if ( not defined $ip_address ) {
@@ -464,12 +492,9 @@ close_ssh( $ssh );
             exit 1;
         }
         ( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
-        my $command = "modify ltm data-group $del_listname records delete {$ip_address}";
-        $command = "modify ltm data-group internal $del_listname records delete {$ip_address}" if $lba_version eq "11";
-        my $ssh = login_ssh($HOSTNAME_CANONICAL, $lba_username, $lba_password);
-        mute_execute_ssh($ssh, $command);
-        print_list( $ssh, $del_listname );
-        write_log( get_current_time() . " [$HOSTNAME_CANONICAL] $lba_username delete [$ip_address] from [$del_listname].\n");
+        my $command = get_del_list_command( $del_listname, $ip_address, $lba_version );
+        my $ssh = login_ssh($hostname_canonical, $lba_username, $lba_password);
+        do_del_list_command( $ssh, $command, $add_listname, $hostname_canonical, $lba_username, $ip_address );
         close_ssh($ssh);
     } else {
         print "ERROR: Only one option can be defined '-l', '-a' and '-d'.\n";
