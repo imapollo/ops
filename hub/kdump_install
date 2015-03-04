@@ -1,0 +1,14 @@
+#!/bin/bash
+
+export PATH=/nas/home/minjzhang/bin:$PATH
+envid=$1
+
+getroles $envid | grep -v jfw | grep -v lba | grep -v mqs | grep -v sew | grep -v ses | grep -v gns | grep -v scg | while read host
+do
+if ssh -oPasswordAuthentication=no -ostricthostkeychecking=no -oConnectTimeout=5 $host "nohup sudo /nas/home/danwilson/bin/scripts/linuxsystem/setkdumpcentos5x.sh > /tmp/foo.out 2> /tmp/foo.err < /dev/null &" < /dev/null 2>&1 | grep "timed out"; then
+    echo "$host - timed out"
+else
+    echo "$host - installing kdump..."
+fi
+done
+
