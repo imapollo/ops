@@ -1,0 +1,13 @@
+#!/bin/bash
+
+export PATH=/nas/home/minjzhang/bin:$PATH
+envid=$1
+
+getroles $envid | grep -v jfw | grep -v lba | grep -v mqs | grep -v sew | grep -v ses | grep -v gns | grep -v scg | while read host
+do
+if ssh -oPasswordAuthentication=no -ostricthostkeychecking=no -oConnectTimeout=5 $host "sudo /sbin/service kdump status" < /dev/null 2>/dev/null | grep -q "Kdump is operational"; then
+echo "$host - kdump operational"
+else
+echo "$host - kdump not operational"
+fi
+done
