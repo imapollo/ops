@@ -1,0 +1,14 @@
+#!/bin/bash
+
+export PATH=/nas/home/minjzhang/bin:$PATH
+
+printf "%20s %20s %20s %20s %20s\n" "ROLE" "CONFIG" "PROPERTIES" "ECOMM" "SHAPE"
+getroles $1 | while read line
+do
+    output=`ssh -oPasswordAuthentication=no -ostricthostkeychecking=no -oConnectTimeout=5 $line "rpm -qa | grep -e '^dev-config-rpm' -e '^env-stubhub-properties-rpm' -e 'ecomm-rpm' -e 'shape-rpm'" 2> /dev/null < /dev/null`
+    config_version=`echo "$output" | grep '^dev-config-rpm' | awk -F- '{ print $4 }'`
+    properties_version=`echo "$output" | grep '^env-stubhub-properties-rpm' | awk -F- '{ print $5 }'`
+    ecomm_version=`echo "$output" | grep 'ecomm-rpm' | awk -F- '{ print $4 }'`
+    shape_version=`echo "$output" | grep 'shape-rpm' | awk -F- '{ print $4 }'`
+    printf "%20s %20s %20s %20s %20s\n" $line $config_version $properties_version $ecomm_version $shape_version
+done
