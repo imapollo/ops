@@ -18,7 +18,7 @@
 options=$@
 
 debug_level=0
-ENVPREFIX=srwd
+export ENVPREFIX=srwd
 
 #
 # Usage
@@ -79,7 +79,7 @@ if [[ "$1" != "" ]]; then
 fi
 
 if echo $ENVID | grep -q "[a-z]\{4\}[0-9]\{2,3\}"; then
-    ENVPREFIX=`echo $ENVID | sed 's/\([a-z]\{4\}\)[0-9]\{2,3\}/\1/'`
+    export ENVPREFIX=`echo $ENVID | sed 's/\([a-z]\{4\}\)[0-9]\{2,3\}/\1/'`
     ENVID=`echo $ENVID | sed 's/[a-z]\{4\}\([0-9]\{2,3\}\)/\1/'`
 fi
 
@@ -93,9 +93,11 @@ do
     shortcut=`echo $ROLE | sed "s/${ENVPREFIX}${ENVID}\([a-z]*\)[0-9]\{3\}.*/\1/"`
     shortcut_long=`echo $ROLE | sed "s/${ENVPREFIX}${ENVID}\([a-z]*[0-9]\{3\}\).*/\1/"`
     if echo $shortcut | grep -q "^[a-z]\+$"; then
-        export $shortcut=$ROLE
-        export ${shortcut}jmx="http://${ROLE}/jmx-console/"
-        export ${shortcut}chk="http://${ROLE}/jmx-console/HtmlAdaptor?action=invokeOpByName&name=jboss.system%3Aservice%3DMainDeployer&methodName=checkIncompleteDeployments"
+        if echo $ROLE | grep -q "001\.s"; then
+            export $shortcut=$ROLE
+            export ${shortcut}jmx="http://${ROLE}/jmx-console/"
+            export ${shortcut}chk="http://${ROLE}/jmx-console/HtmlAdaptor?action=invokeOpByName&name=jboss.system%3Aservice%3DMainDeployer&methodName=checkIncompleteDeployments"
+        fi
     fi
     export $shortcut_long=$ROLE
     export ${shortcut_long}jmx="http://${ROLE}/jmx-console/"
@@ -114,6 +116,12 @@ export JBDF="/opt/jboss/server/default"
 export JBDP="${JBDF}/deploy"
 export JBLG="${JBDF}/log/jboss.log"
 export JBLGDIR="${JBDF}/log"
+
+#
+# Set API GW variables
+#
+export APIGWDF="/opt/wso2am/repository/deployment/server/synapse-configs/default/api"
+export APIGWLG="/opt/wso2am/repository/logs"
 
 #
 # Set Apache variables

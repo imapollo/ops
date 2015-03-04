@@ -101,8 +101,7 @@ sub get_public_ip_by_hostname {
 
     my $reverse_dns = `$DNS_COMMAND $ip_address 8.8.8.8`;
     if ( $reverse_dns =~ /not found/ ) {
-        $logger->error( "Reverse DNS for public host [$hostname] is wrong.\n" );
-        return "";
+        $logger->warn( "Reverse DNS for public host [$hostname] is wrong.\n" );
     }
     if ( $reverse_dns !~ /smf\.ragingwire\.net/ and ! $is_alias ) {
         $logger->warn( "Reverse DNS for public host [$hostname] is wrong.\n" );

@@ -336,16 +336,18 @@ sub get_lcx_number {
 #
 
 my $success = 1;
+my $domain_name = "$envid.com";
+$domain_name = "stubhubsandbox.com" if $envid =~ /slcq000/i;
 
-my $mqm_activemq_url = "http://${envid}mqm001.${envid}.com:8161/admin/queues.jsp";
+my $mqm_activemq_url = "http://${envid}mqm001.$domain_name:8161/admin/queues.jsp";
 my $mqm_queues_ref = get_activemq_queue( $mqm_activemq_url );
 $success = 0 if not validate_queue( $mqm_queues_ref, "MQM", 50 );
 
-my $lcm_activemq_url = "http://${envid}lcm001.${envid}.com:8161/admin/queues.jsp";
+my $lcm_activemq_url = "http://${envid}lcm001.$domain_name:8161/admin/queues.jsp";
 my $lcm_queues_ref = get_activemq_queue( $lcm_activemq_url );
 $success = 0 if not validate_queue( $lcm_queues_ref, "LCM", 7 );
 
-my $lcm_activemq_subscribers_url = "http://${envid}lcm001.${envid}.com:8161/admin/subscribers.jsp";
+my $lcm_activemq_subscribers_url = "http://${envid}lcm001.$domain_name:8161/admin/subscribers.jsp";
 my $lcm_subscribers_ref = get_activemq_subscribers( $lcm_activemq_subscribers_url );
 my $lcx_number = get_lcx_number( $envid );
 my $subscribers_expected_number = 8 * $lcx_number;

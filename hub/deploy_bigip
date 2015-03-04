@@ -219,7 +219,7 @@ sub generate_configuration {
         = check_out_perforce_file( "/$PUBLIC_IP_LIST" );
 
     my $vs_file;
-    if ( $intext eq "ext" ) {
+    if ( $intext eq "exta" ) {
         $vs_file = generate_pub_not_excluded_vs_configs( "$checkout_path/virtuals/$intext",
             "$public_ip_list_dir$PUBLIC_IP_LIST", $envid, "$tmpdir", $excluded_vs_ref, $only_include_vs_ref, $bigip_ref );
     }
