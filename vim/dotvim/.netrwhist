@@ -1,7 +1,11 @@
 let g:netrw_dirhistmax  =10
-let g:netrw_dirhist_cnt =5
-let g:netrw_dirhist_1='/etc/puppet/environments/production/modules/ldapauth/files'
-let g:netrw_dirhist_2='/etc/puppet/environments/production/modules/ldapauth'
-let g:netrw_dirhist_3='/etc/puppet/environments/production/modules/ldapauth/manifests'
-let g:netrw_dirhist_4='/etc/puppet/environments/production/modules/devkeystore'
-let g:netrw_dirhist_5='/etc/puppet/environments/production/modules/devkeystore/manifests'
+let g:netrw_dirhist_cnt =9
+let g:netrw_dirhist_1='/nas/home/minjzhang/github/ops-dash/dashboard'
+let g:netrw_dirhist_2='/nas/home/minjzhang/github/ops-dash/opsdash'
+let g:netrw_dirhist_3='/nas/home/minjzhang/github/ops-dash/opsdash/..'
+let g:netrw_dirhist_4='/nas/home/minjzhang/github/ops-dash/opsdash'
+let g:netrw_dirhist_5='/etc/openldap/cacerts'
+let g:netrw_dirhist_6='/etc/httpd/conf.d/vhosts.d'
+let g:netrw_dirhist_7='/nas/reg/devops-vigilante/vigilante/vigillib'
+let g:netrw_dirhist_8='/nas/home/minjzhang/gitebay/devops/vigilante/vigillib'
+let g:netrw_dirhist_9='/nas/pup/etc/puppet/environments/production/modules/puppet/manifests'

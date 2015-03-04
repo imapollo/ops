@@ -1,7 +1,5 @@
 " color scheme
-" colorscheme molokai
-" colorscheme delek
-colorscheme torte
+colorscheme molokai
 syntax on
 
 " default settings
