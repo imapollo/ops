@@ -89,17 +89,23 @@ select NAME, MAJOR_VERSION, MINOR_VERSION from RULESETS;" > $ILOG_QUERY
 
 if [[ "$branch" == "" ]]; then
     branch=`$SSH_COMMAND ${envid}ilg001.${envid}.com "ls -l /opt/jboss/server/default/deploy/stubhub" | awk '{ print $11 }' | awk -F/ '{ print $4 }' | sed 's/\(.*\)-[0-9\.]\+-[0-9]\+/\1/'`
+    if [[ "$branch" == "" ]]; then
+        branch=`$SSH_COMMAND ${envid}ilg001.${envid}.com "rpm -qa ilg-config-rpm" | awk -F- '{ print $4 }' | awk -F. '{ print $1 "." $2 ".0-SNAPSHOT" }'`
+    fi
 fi
 
 #
 # Update the ilog rule versions in stub_property
 #
 sqlplus $ILOG_USER/$ILOG_PASSWD@$ILOG_SID < $ILOG_QUERY | grep -e "^[A-Za-z]\+\s*[0-9]\+\s*[0-9]\+\s*" | awk '{ print $1 ":" $2 ":" $3}' > $ILOG_QUERY_RESULT
+cat $ILOG_QUERY_RESULT
 cat $ILOG_QUERY_RESULT | while read line
 do
     echo $line | sed "s/\(.*\):\(.*\):\(.*\)/update stub_property set property_value=\'\/\1\/1.0\/\1\/\2.\3\' where property_value like \'\/\1\/1.0\/\1\/%\' and description=\'$branch\';/" >> $ILOG_STUB_PROPERTY_UPDATE
 done
 echo "commit;" >> $ILOG_STUB_PROPERTY_UPDATE
+
+cat $ILOG_STUB_PROPERTY_UPDATE
 
 sqlplus stub/dstub@$ILOG_SID < $ILOG_STUB_PROPERTY_UPDATE
 

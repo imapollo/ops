@@ -321,6 +321,7 @@ sub _get_domain_name {
     my ( $domain_name ) = @_;
     chomp $domain_name;
     $domain_name =~ s/.*\.(srw[deq][0-9]+)\..*/$1/;
+    $domain_name =~ s/.*\.(slc[deq][0-9]+)\..*/$1/;
     return $domain_name;
 }
 
