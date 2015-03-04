@@ -492,7 +492,7 @@ close_ssh( $ssh );
         my $command = get_add_list_command( $add_listname, $ip_address, $lba_version );
         my $ssh = login_ssh($hostname_canonical, $lba_username, $lba_password);
         do_list_command( $ssh, $command, $add_listname, $hostname_canonical, $lba_username, $ip_address );
-        write_log( get_current_time() . " [$hostname_canonical] $lba_username add [$ip_address] to [$listname].\n");
+        write_log( get_current_time() . " [$hostname_canonical] $lba_username add [$ip_address] to [$add_listname].\n");
         close_ssh($ssh);
     } elsif ( defined $del_listname && not defined $add_listname && not defined $list_listname ) {
         if ( not defined $ip_address ) {
@@ -503,7 +503,7 @@ close_ssh( $ssh );
         my $command = get_del_list_command( $del_listname, $ip_address, $lba_version );
         my $ssh = login_ssh($hostname_canonical, $lba_username, $lba_password);
         do_list_command( $ssh, $command, $add_listname, $hostname_canonical, $lba_username, $ip_address );
-        write_log( get_current_time() . " [$hostname_canonical] $lba_username delete [$ip_address] from [$listname].\n");
+        write_log( get_current_time() . " [$hostname_canonical] $lba_username delete [$ip_address] from [$del_listname].\n");
         close_ssh($ssh);
     } else {
         print "ERROR: Only one option can be defined '-l', '-a' and '-d'.\n";
