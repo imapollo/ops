@@ -54,6 +54,12 @@ my $options_okay = GetOptions (
 
 our $lba_version = "10";
 
+our %lba_ip_name = (
+    '10.80.81.17' => "srwp01lba040/041",
+    '10.80.81.9' => "srwp01lba043/044",
+    '10.80.81.10' => "srwp01lba045/046",
+);
+
 foreach my $rest_arg ( @ARGV ) {
     $rest_arg = "\"$rest_arg\"";
     $ip_address .= $rest_arg . " ";
@@ -187,10 +193,8 @@ sub print_list {
             push( @ip_addresses, $line );
         }
     }
-    print "[$hostname]:\n";
     if ( defined $ip_addresses[0] ) {
-        print "\n";
-        print "Current $listname:\n";
+        print "\nCurrent $listname on [$lba_ip_name{ $hostname }]:\n";
         print join "\n", @ip_addresses;
         print "\n";
     } else {
@@ -318,9 +322,14 @@ sub get_add_list_command {
 
 # Add IPs to list.
 sub do_list_command {
-    my ( $ssh, $command, $listname ) = @_;
-    mute_execute_ssh($ssh, $command);
-    print_list( $ssh, $listname );
+    my ( $ssh, $command, $listname, $hostname ) = @_;
+    my @outputs = mute_execute_ssh($ssh, $command);
+    foreach my $output_line ( @outputs ) {
+        if ( $output_line =~ /already exists/ or $output_line =~ /was not found/ ) {
+            print "\nERROR: $output_line\n";
+        }
+    }
+    print_list( $ssh, $listname, $hostname );
     # need to take care of output.
 }
 
@@ -334,11 +343,11 @@ sub get_del_list_command {
 
 # Sync the same command to slave hosts if necessary.
 sub sync_command_to_slave_servers {
-    my ( $lba_username, $lba_password, $command, $listname, $ip_address, @lba_slave_hosts ) = @_;
+    my ( $lba_username, $lba_password, $command, $listname, $ip_address, $add_del, $to_from, @lba_slave_hosts ) = @_;
     foreach my $lba_slave_host ( @lba_slave_hosts ) {
         my $ssh = login_ssh( $lba_slave_host, $lba_username, $lba_password );
-        do_list_command( $ssh, $command, $listname );
-        write_log( get_current_time() . " [$lba_slave_host] $lba_username add [$ip_address] to [$listname] (sync).\n");
+        do_list_command( $ssh, $command, $listname, $lba_slave_host );
+        write_log( get_current_time() . " [$lba_slave_host] $lba_username $add_del [$ip_address] $to_from [$listname] (sync).\n");
     }
 }
 
@@ -431,7 +440,12 @@ Readonly my $IP_EXAMPLES =>
 -------------------------------------------------------------------';
 
 if ( $action eq "list" ) {
-    print_list( $ssh, $listname );
+    print_list( $ssh, $listname, $hostname_canonical );
+    foreach my $lba_slave_host ( @lba_slave_hosts ) {
+        my $slave_ssh = login_ssh( $lba_slave_host, $lba_username, $lba_password );
+        print_list( $slave_ssh, $listname, $lba_slave_host );
+    }
+
 } else {
     $ip_address = qw{};
     my $command = qw{};
@@ -448,14 +462,18 @@ if ( $action eq "list" ) {
         print "Please confirm to execute the command above (y/n): ";
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
-            do_list_command( $ssh, $command, $listname );
+            do_list_command( $ssh, $command, $listname, $hostname_canonical );
             write_log( get_current_time() . " [$hostname_canonical] $lba_username add [$ip_address] to [$listname].\n");
-            sync_command_to_slave_servers( $lba_username, $lba_password, $command, $listname, $ip_address, @lba_slave_hosts );
+            sync_command_to_slave_servers( $lba_username, $lba_password, $command, $listname, $ip_address, "add", "to", @lba_slave_hosts );
         }
     } elsif ( $action eq "delete" ) {
         print "Enter the IP address you want to $action from $listname. For example:\n";
         print "$IP_EXAMPLES\n";
-        print_list( $ssh, $listname );
+        print_list( $ssh, $listname, $hostname_canonical );
+        foreach my $lba_slave_host ( @lba_slave_hosts ) {
+            my $slave_ssh = login_ssh( $lba_slave_host, $lba_username, $lba_password );
+            print_list( $slave_ssh, $listname, $lba_slave_host );
+        }
         print "> ";
         $ip_address = <>;
         chomp $ip_address;
@@ -465,9 +483,9 @@ if ( $action eq "list" ) {
         print "Please confirm to execute the command above (y/n): ";
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
-            do_list_command( $ssh, $command, $listname, $hostname_canonical, $lba_username, $ip_address );
+            do_list_command( $ssh, $command, $listname, $hostname_canonical );
             write_log( get_current_time() . " [$hostname_canonical] $lba_username delete [$ip_address] from [$listname].\n");
-            sync_command_to_slave_servers( $lba_username, $lba_password, $command, $listname, $ip_address, @lba_slave_hosts );
+            sync_command_to_slave_servers( $lba_username, $lba_password, $command, $listname, $ip_address, "delete", "from", @lba_slave_hosts );
         }
     }
 }
@@ -491,7 +509,7 @@ close_ssh( $ssh );
         ( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
         my $command = get_add_list_command( $add_listname, $ip_address, $lba_version );
         my $ssh = login_ssh($hostname_canonical, $lba_username, $lba_password);
-        do_list_command( $ssh, $command, $add_listname, $hostname_canonical, $lba_username, $ip_address );
+        do_list_command( $ssh, $command, $add_listname, $hostname_canonical );
         write_log( get_current_time() . " [$hostname_canonical] $lba_username add [$ip_address] to [$add_listname].\n");
         close_ssh($ssh);
     } elsif ( defined $del_listname && not defined $add_listname && not defined $list_listname ) {
@@ -502,7 +520,7 @@ close_ssh( $ssh );
         ( $lba_username, $lba_password ) = get_username_password( $lba_username, $lba_password );
         my $command = get_del_list_command( $del_listname, $ip_address, $lba_version );
         my $ssh = login_ssh($hostname_canonical, $lba_username, $lba_password);
-        do_list_command( $ssh, $command, $add_listname, $hostname_canonical, $lba_username, $ip_address );
+        do_list_command( $ssh, $command, $del_listname, $hostname_canonical );
         write_log( get_current_time() . " [$hostname_canonical] $lba_username delete [$ip_address] from [$del_listname].\n");
         close_ssh($ssh);
     } else {
