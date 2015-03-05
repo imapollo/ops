@@ -60,6 +60,8 @@ our %lba_ip_name = (
     '10.80.81.10' => "srwp01lba045/046",
 );
 
+our @error_logs = ();
+
 foreach my $rest_arg ( @ARGV ) {
     $rest_arg = "\"$rest_arg\"";
     $ip_address .= $rest_arg . " ";
@@ -324,13 +326,14 @@ sub get_add_list_command {
 sub do_list_command {
     my ( $ssh, $command, $listname, $hostname ) = @_;
     my @outputs = mute_execute_ssh($ssh, $command);
+    my $error_log = "";
     foreach my $output_line ( @outputs ) {
         if ( $output_line =~ /already exists/ or $output_line =~ /was not found/ ) {
-            print "\nERROR: $output_line\n";
+            $error_log = "ERROR: $output_line on [$hostname].\n";
         }
     }
     print_list( $ssh, $listname, $hostname );
-    # need to take care of output.
+    return $error_log;
 }
 
 # Get delete list command.
@@ -346,7 +349,8 @@ sub sync_command_to_slave_servers {
     my ( $lba_username, $lba_password, $command, $listname, $ip_address, $add_del, $to_from, @lba_slave_hosts ) = @_;
     foreach my $lba_slave_host ( @lba_slave_hosts ) {
         my $ssh = login_ssh( $lba_slave_host, $lba_username, $lba_password );
-        do_list_command( $ssh, $command, $listname, $lba_slave_host );
+        my $error = do_list_command( $ssh, $command, $listname, $lba_slave_host );
+        push( @error_logs, $error ) if ( $error ne "" );
         write_log( get_current_time() . " [$lba_slave_host] $lba_username $add_del [$ip_address] $to_from [$listname] (sync).\n");
     }
 }
@@ -462,9 +466,16 @@ if ( $action eq "list" ) {
         print "Please confirm to execute the command above (y/n): ";
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
-            do_list_command( $ssh, $command, $listname, $hostname_canonical );
+            my $error = do_list_command( $ssh, $command, $listname, $hostname_canonical );
+            push( @error_logs, $error ) if ( $error ne "" );
             write_log( get_current_time() . " [$hostname_canonical] $lba_username add [$ip_address] to [$listname].\n");
             sync_command_to_slave_servers( $lba_username, $lba_password, $command, $listname, $ip_address, "add", "to", @lba_slave_hosts );
+            print "\n";
+            foreach my $error_line ( @error_logs ) {
+                print $error_line;
+            }
+            print "\n";
+            @error_logs = ();
         }
     } elsif ( $action eq "delete" ) {
         print "Enter the IP address you want to $action from $listname. For example:\n";
@@ -483,9 +494,17 @@ if ( $action eq "list" ) {
         print "Please confirm to execute the command above (y/n): ";
         $confirm = <>;
         if ( $confirm =~ /y/i ) {
-            do_list_command( $ssh, $command, $listname, $hostname_canonical );
+            my $error = do_list_command( $ssh, $command, $listname, $hostname_canonical );
+            push( @error_logs, $error ) if ( $error ne "" );
             write_log( get_current_time() . " [$hostname_canonical] $lba_username delete [$ip_address] from [$listname].\n");
             sync_command_to_slave_servers( $lba_username, $lba_password, $command, $listname, $ip_address, "delete", "from", @lba_slave_hosts );
+            print "\n";
+            foreach my $error_line ( @error_logs ) {
+                print $error_line;
+            }
+            print "\n";
+            @error_logs = ();
+
         }
     }
 }
