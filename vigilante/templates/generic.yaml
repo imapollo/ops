@@ -1,0 +1,45 @@
+#YAML
+# Template for generic roles
+# This file is in a form that can be read by the very simple YAML parser
+# That is a part of phaktor, it is designed to be able to read a generic
+# Template file, no validation is performed, basically it's used as a list
+# of facts that will be gathered for the role that is running phaktor at the
+# time.
+---
+# Top level is a "dict" with  two key mappings  "meta" is a dict containing control mappings
+# whereas "body" contains mappings of the actual facts gathered from phaktor".
+# Phaktor only cares about the "body" dict and only reads the keys to populate values for 
+# the audit records that it writes. The value side is ignored.
+
+
+meta :
+
+    super                  : None
+    type                   : "Generic"
+    version                : "0.1"
+
+body :
+
+    architecture           : "x86_64"
+    domain                 : None
+    fqdn                   : None
+    hostname               : None
+    interfaces             : "eth0,imaging,lo"
+    ipaddress              : None
+    ipaddress_lo           : "127.0.0.1"
+    is_virtual             : "true"
+    kernelrelease          : "2.6.18-308.4.1.el5"
+    memorysize             : "3.86 GB,4.00 GB,4 GB"
+    operatingsystem        : "CentOS"
+    operatingsystemrelease : "5.8"
+    physicalprocessorcount : "2"
+    processorcount         : "2"
+    sh_code_version        : None
+    sh_envloc              : None
+    sh_envnum              : None
+    sh_rolenum             : None
+    sh_shape_version       : None
+    sh_system_role         : None
+    swapsize               : None
+    uniqueid               : None
+    virtual                : "vmware"

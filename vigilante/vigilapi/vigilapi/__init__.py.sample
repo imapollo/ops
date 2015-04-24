@@ -1,0 +1,4 @@
+import sys
+
+# sys.path.insert(1, "/nas/reg/devops-vigilante/vigilante/vigillib")
+sys.path.insert(1, "/nas/home/minjzhang/gitebay/devops/vigilante/vigillib")
