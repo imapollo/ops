@@ -1,0 +1,8 @@
+name    'stubhub-vigilante'
+version '0.0.3'
+source 'stubhub'
+author 'ge0white'
+license 'Apache License, Version 2.0'
+summary 'This modules gathers facts from the Dev/QA hosts and writes it into JSON structured files on the NAS'
+description 'This modules gathers facts from the Dev/QA hosts and writes it into JSON structured files on the NAS'
+project_page  'https://wiki.stubcorp.dev/display/~geowhite/Vigilante+Project+Time+Estimates'

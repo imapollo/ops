@@ -1,0 +1,4 @@
+MONGODB_HOST = "srwd00dvo002.stubcorp.dev"
+MONGODB_PORT = 27017
+MONGODB_NAME = "test_facts"
+#MONGODB_NAME = "live_facts"

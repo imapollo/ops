@@ -1,0 +1,31 @@
+vigilante
+
+This is the vigilante module.
+This module contains puppet processes that support the vigilante package of
+DEV/QA Environment auditing and monitoring. Such as phaktor.
+
+License
+-------
+Apache License, Version 2.0
+
+Contact
+-------
+Geoff White - DevOps
+geowhite@stubhub.com
+
+Support
+-------
+File a JIRA, yo!
+
+Please log tickets and issues at our Projects site (https://wiki.stubcorp.dev/display/~geowhite/Vigilante+Project+Time+Estimates)
+
+Version History
+-------
+0.0.3
+Update generated report to have "meta" and "body" key structure
+
+0.0.2
+Use yaml library and reading templates from yaml
+
+0.0.1
+Initial version
