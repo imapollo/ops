@@ -23,9 +23,12 @@ set smarttab
 " configure ctag and taglist
 let Tlist_Show_One_File = 1
 let Tlist_Exit_OnlyWindow = 1
-let Tlist_Use_Right_Window = 1   
+let Tlist_Use_Right_Window = 1
 
 " enable file type
+filetype on
+au BufRead,BufNewFile *.go set filetype=go
+
 filetype plugin on
 filetype indent on
 " let g:tlist_ant_settings = 'ant;p:Project;t:Target'
@@ -45,6 +48,11 @@ noremap \<> mm:%s/</\&lt;/g<CR>:%s/>/\&gt;/g<CR>'m
 noremap \2 :set tabstop=2<CR>:set sw=2<CR>:set sts=2<CR>:set wm=2<CR>
 noremap \3 :set tabstop=3<CR>:set sw=3<CR>:set sts=3<CR>:set wm=3<CR>
 noremap \4 :set tabstop=4<CR>:set sw=4<CR>:set sts=4<CR>:set wm=4<CR>
+
+map <up> <nop>
+map <down> <nop>
+map <left> <nop>
+map <right> <nop>
 
 " minibuffer explorer
 let g:miniBufExplModSelTarget = 1
