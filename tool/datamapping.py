@@ -83,9 +83,12 @@ def main(argv=None):  # IGNORE:C0111
         match = re.match( r'([0-9]+).*', line)
         if match:
             old_id = match.group(1)
-            print(line.replace(old_id, id_map[old_id]), end='')
+            if (old_id in id_map):
+                print(line.replace("^%s" % old_id, id_map[old_id]), end='')
+            else:
+                print("ERROR: No id [%s] in the map" % old_id)
         else:
-            print("No match on line: %s" % line)
+            print("ERROR: No match on line: %s" % line)
 
 if __name__ == "__main__":
     main()
