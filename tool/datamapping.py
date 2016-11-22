@@ -84,7 +84,7 @@ def main(argv=None):  # IGNORE:C0111
         if match:
             old_id = match.group(1)
             if (old_id in id_map):
-                print(line.replace("^%s" % old_id, id_map[old_id]), end='')
+                print(line.replace(old_id, id_map[old_id], 1), end='')
             else:
                 print("ERROR: No id [%s] in the map" % old_id)
         else:
