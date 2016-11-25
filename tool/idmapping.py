@@ -81,7 +81,10 @@ def main(argv=None):  # IGNORE:C0111
     new_map = get_id_name_map(args.new_file)
 
     for name in old_map:
-        print "%s %s" % (old_map[name], new_map[name])
+        if name in new_map:
+            print "%s %s" % (old_map[name], new_map[name])
+        else:
+            print "ERROR: fail to find name [%s] in new list" % name
 
 if __name__ == "__main__":
     main()
