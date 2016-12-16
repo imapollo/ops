@@ -1,13 +1,7 @@
 #!/usr/bin/python
 
-import os
-import io
-import time
-import subprocess
-import sys
 import re
-import tempfile
-import signal
+import json
 from screenparser import ScreenParser
 
 class TopParser(ScreenParser):
@@ -30,7 +24,7 @@ class TopParser(ScreenParser):
                 result["pid"] = elements[0]
                 result["user"] = elements[1]
                 results.append(result)
-        print results
+        print json.dumps(results)
 
 c = TopParser()
 c.execute(["top"])
