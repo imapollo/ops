@@ -1,12 +1,21 @@
 #!/usr/bin/python
 
+import os
 import io
 import time
 import subprocess
 import sys
 import re
+import tempfile
+import signal
 
-TMP_FILE_NAME = 'test.log'
+TMP_FILE_NAME = tempfile.NamedTemporaryFile().name
+
+writer = io.open(TMP_FILE_NAME, 'w')
+
+def signal_handler(signal, frame):
+    os.remove(TMP_FILE_NAME)
+    sys.exit(0)
 
 def escape_gnu(line):
     escaped_line = re.sub("\x1b[[()=][;?0-9]*[0-9A-Za-z]?", "", line)
@@ -15,9 +24,6 @@ def escape_gnu(line):
     escaped_line = re.sub("\n", "", escaped_line)
     escaped_line = re.sub("\007", "", escaped_line)
     return escaped_line
-
-# TODO
-# 2. resolve file growing too large issue
 
 def handle_output(lines):
     results = []
@@ -39,15 +45,16 @@ def handle_output(lines):
             results.append(result)
     print results
 
-writer = io.open(TMP_FILE_NAME, 'w')
+# catch signal
+signal.signal(signal.SIGINT, signal_handler)
+
 with io.open(TMP_FILE_NAME, 'r', 1) as reader:
     process = subprocess.Popen("top", stdout=writer)
     while process.poll() is None:
         lines = reader.read()
+        io.open(TMP_FILE_NAME, 'w').close()
         if lines:
             escaped_lines = [escape_gnu(line) for line in lines.split("\n")]
             handle_output(escaped_lines)
         time.sleep(2)
-
-    # Skip the remaining
 
