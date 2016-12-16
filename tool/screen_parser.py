@@ -1,48 +1,50 @@
 #!/usr/bin/python
 
-import time, os, threading, subprocess, re
+import os
+import io
+import time
+import subprocess
+import sys
+import re
+import tempfile
+import signal
 
-# try this perl magic
-# perl -ne 's/\x1b[[()=][;?0-9]*[0-9A-Za-z]?//g;s/\r//g;s/\007//g;print' < ss.txt
+# Parse output from screen to json
+class ScreenParser(object):
 
-TMP_LOG_FILE_PATH = "ss.txt"
-TMP_LOG_FILE = open(TMP_LOG_FILE_PATH, 'r+')
-p = None
-output = None
+    TMP_FILE_NAME = tempfile.NamedTemporaryFile().name
 
-def repeat():
-  print(time.ctime())
-  threading.Timer(10, repeat).start()
-  with open(TMP_LOG_FILE_PATH, 'w') as f:
-    subprocess.call(["ls"],stdout=f)
+    # Note:
+    # override this method to handle lines
+    # lines: all the lines from the screen
+    def handle_output(self, lines):
+        pass
 
-def escape_gnu(line):
-    escaped_line = re.sub("\x1b[[()=][;?0-9]*[0-9A-Za-z]?", "", line)
-    escaped_line = re.sub("\r", "", escaped_line)
-    escaped_line = re.sub("\n", "", escaped_line)
-    escaped_line = re.sub("\007", "", escaped_line)
-    return escaped_line
+    def signal_handler(self, signal, frame):
+        os.remove(self.TMP_FILE_NAME)
+        sys.exit(0)
 
-def parse_full_log():
-    threading.Timer(5, parse_full_log).start()
-    # TMP_LOG_FILE.flush()
-    # lines = [escape_gnu(line.strip()) for line in TMP_LOG_FILE]
-    print "-----------"
-    # lines = [escape_gnu(line.strip()) for line in output]
-    print p.stdout.read()
-    # print output
-    print "-----------"
+    def escape_gnu(self, line):
+        escaped_line = re.sub("\x1b[[()=][;?0-9]*[0-9A-Za-z]?", "", line)
+        escaped_line = re.sub("\x00", "", escaped_line)
+        escaped_line = re.sub("\r", "", escaped_line)
+        escaped_line = re.sub("\n", "", escaped_line)
+        escaped_line = re.sub("\007", "", escaped_line)
+        return escaped_line
 
-def do_once():
-    # p = subprocess.Popen("top", stdout=TMP_LOG_FILE)
-    # p = subprocess.Popen("top", stdout=subprocess.PIPE, universal_newlines=True)
-    print "abc"
-    p = subprocess.Popen("top", stdout=subprocess.PIPE)
-    print p.stdout.read()
-    # for stdout_line in iter(p.stdout.readline, ""):
-    #    yield stdout_line
-    # p.stdout.close()
-    # return_code = p.wait()
+    def execute(self, commands, interval=2):
+        # catch signal
+        signal.signal(signal.SIGINT, self.signal_handler)
 
-do_once()
+        writer = io.open(self.TMP_FILE_NAME, 'w')
+        with io.open(self.TMP_FILE_NAME, 'r', 1) as reader:
+            process = subprocess.Popen(commands, stdout=writer)
+            while process.poll() is None:
+                lines = reader.read()
+                io.open(self.TMP_FILE_NAME, 'w').close()
+                if lines:
+                    escaped_lines = [self.escape_gnu(line) for line in lines.split("\n")]
+                    self.handle_output(escaped_lines)
+                time.sleep(interval)
+
 
