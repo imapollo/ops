@@ -8,7 +8,7 @@ import sys
 import re
 import tempfile
 import signal
-from screen_parser import ScreenParser
+from screenparser import ScreenParser
 
 class TopParser(ScreenParser):
 
