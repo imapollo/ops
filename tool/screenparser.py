@@ -8,11 +8,15 @@ import sys
 import re
 import tempfile
 import signal
+import threading
 
 # Parse output from screen to json
 class ScreenParser(object):
 
     TMP_FILE_NAME = tempfile.NamedTemporaryFile().name
+
+    repeat_commands = None
+    interval = None
 
     # Note:
     # override this method to handle lines
@@ -31,6 +35,19 @@ class ScreenParser(object):
         escaped_line = re.sub("\n", "", escaped_line)
         escaped_line = re.sub("\007", "", escaped_line)
         return escaped_line
+
+    def repeat(self, commands, interval=2):
+        self.repeat_commands = commands
+        self.interval = interval
+        self._do_repeat()
+
+    def _do_repeat(self):
+        threading.Timer(self.interval, self._do_repeat).start()
+        p = subprocess.Popen(self.repeat_commands, stdout=subprocess.PIPE)
+        lines = p.stdout.read()
+        if lines:
+            escaped_lines = [self.escape_gnu(line) for line in lines.split("\n")]
+            self.handle_output(escaped_lines)
 
     def execute(self, commands, interval=2):
         # catch signal
