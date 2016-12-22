@@ -19,8 +19,7 @@ def async_read(fd):
             # EOF
             if not ch:
                 break
-            print ch
-            #sys.stdout.write(ch)
+            sys.stdout.write(ch)
             chs.append(ch)
         except OSError:
             # waiting for data be available on fd
@@ -34,6 +33,6 @@ def shell(args, async=True):
     return (sout, serr)
 
 if __name__ == '__main__':
-    cmd = 'top'
+    cmd = '/data/workspace/ops/tool/pingping.sh'
     sout, serr = shell(cmd.split())
 

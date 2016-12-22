@@ -43,19 +43,21 @@ class ScreenParser(object):
 
     def _do_repeat(self):
         threading.Timer(self.interval, self._do_repeat).start()
-        p = subprocess.Popen(self.repeat_commands, stdout=subprocess.PIPE)
+        p = subprocess.Popen(self.repeat_commands, stdout=subprocess.PIPE, shell=True)
         lines = p.stdout.read()
         if lines:
             escaped_lines = [self.escape_gnu(line) for line in lines.split("\n")]
             self.handle_output(escaped_lines)
 
+    # Use stdbuf -o0 to run
+    # Avoid buffering on stdin, stdout, stderr
     def execute(self, commands, interval=2):
         # catch signal
         signal.signal(signal.SIGINT, self.signal_handler)
 
         writer = io.open(self.TMP_FILE_NAME, 'w')
         with io.open(self.TMP_FILE_NAME, 'r', 1) as reader:
-            process = subprocess.Popen(commands, stdout=writer)
+            process = subprocess.Popen(commands, stdout=writer, shell=True)
             while process.poll() is None:
                 lines = reader.read()
                 io.open(self.TMP_FILE_NAME, 'w').close()

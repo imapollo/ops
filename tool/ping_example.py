@@ -24,4 +24,4 @@ class TopParser(ScreenParser):
         print json.dumps(results)
 
 c = TopParser()
-c.execute(["ping", "8.8.8.8"], interval=0.5)
+c.execute(["ping 8.8.8.8 | sed 's/bytes//'"], interval=0.5)
