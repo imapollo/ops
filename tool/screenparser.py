@@ -47,6 +47,7 @@ class ScreenParser(object):
         lines = p.stdout.read()
         if lines:
             escaped_lines = [self.escape_gnu(line) for line in lines.split("\n")]
+            del escaped_lines[len(escaped_lines)-1]
             self.handle_output(escaped_lines)
 
     # Use stdbuf -o0 to run
@@ -63,6 +64,7 @@ class ScreenParser(object):
                 io.open(self.TMP_FILE_NAME, 'w').close()
                 if lines:
                     escaped_lines = [self.escape_gnu(line) for line in lines.split("\n")]
+                    del escaped_lines[len(escaped_lines)-1]
                     self.handle_output(escaped_lines)
                 time.sleep(interval)
 
