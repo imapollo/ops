@@ -1,81 +1,79 @@
-Africa,,-8.7832,34.5085
-Africa,Algeria,,28.0339,1.6596
-Africa,Egypt,,26.8206,30.8025
-Africa,Morocco,,31.7917,-7.0926
-Africa,Tunisia,,33.8869,9.5375
-Africa,Uganda,,1.3733,32.2903
-Africa,Zimbabwe,,-19.0154,29.1549
-Australia,Australia,,-25.2744,133.7751
-Australia,Australia,Sydney,-33.8688,151.2093
-East Asia,China,,35.8617,104.1954
-East Asia,China,Tibet,29.6475,91.1175
-East Asia,China,Xinjiang,43.7930,87.6277
-East Asia,Japan,,36.2048,138.2529
-East Asia,Japan,Tokyo,35.6895,139.6917
-East Asia,Korea,,35.9078,127.7669
-Euorpe,Austria,Vienna,48.2082,16.3738
-Europe,,,54.5260,15.2551
-Europe,Bulgaria,,42.7339,25.4858
-Europe,France,
-Europe,France,Paris
-Europe,German,
-Europe,German,Berlin
-Europe,Greece
-Europe,Greece,
-Europe,Hungary,
-Europe,Iceland,
-Europe,Ireland,
-Europe,Italy,
-Europe,Italy,Milan
-Europe,Italy,Venice
-Europe,Netherlands,
-Europe,Netherlands,Amsterdam
-Europe,Poland,
-Europe,Portugal,
-Europe,Roma,
-Europe,Russia,
-Europe,Russia,Moscow
-Europe,Scotland,
-Europe,Soviet,
-Europe,Spain,
-Europe,Spain,Barcelona
-Europe,Spain,Madrid
-Europe,Sweden,
-Europe,UK,
-Europe,UK,London
-Europe,UK,Oxford
-Europe,Ukraine,
-Middle East,Afghanistan,
-Middle East,Constantinople,
-Middle East,Iran,
-Middle East,Iraq,
-Middle East,Israel,
-Middle East,Persian,
-Middle East,Syria
-Middle East,Syrian,
-Middle East,Turkey,
-Middle East,Turkey,Istanbul
-Middle East,Yemen,
-North America,Canada,
-North America,Haiti,
-North America,Mexico,
-North America,USA,
-North America,USA,Chicago
-North America,USA,Louisiana
-North America,USA,New York
-North America,USA,Pennsylvania
-North America,USA,Seattle
-North America,USA,Washington
-North America,USA,Wisconsin
-Pacific,USA,Hawaii
-South Aisa,Thailand,
-South America,Argentina
-South America,Brazil,
-South America,Chile,
-South America,Columbia,
-South Asia,India,
-South Asia,Indonesia
-South Asia,Perkistan,
-South Asia,Philippines,
-South Asia,Singapore,
-South Asia,Vietnam,
+africa,Africa,,-8.7832,34.5085
+algeria,Africa,Algeria,,28.0339,1.6596
+egypt,Africa,Egypt,,26.8206,30.8025
+morocco,Africa,Morocco,,31.7917,-7.0926
+tunisia,Africa,Tunisia,,33.8869,9.5375
+uganda,Africa,Uganda,,1.3733,32.2903
+zimbabwe,Africa,Zimbabwe,,-19.0154,29.1549
+australia,Australia,Australia,,-25.2744,133.7751
+sydney,Australia,Australia,Sydney,-33.8688,151.2093
+china,East Asia,China,,35.8617,104.1954
+tibet,East Asia,China,Tibet,29.6475,91.1175
+xinjiang,East Asia,China,Xinjiang,43.7930,87.6277
+japan,East Asia,Japan,,36.2048,138.2529
+tokyo,East Asia,Japan,Tokyo,35.6895,139.6917
+korea,East Asia,Korea,,35.9078,127.7669
+vienna,Euorpe,Austria,Vienna,48.2082,16.3738
+europe,Europe,,,54.5260,15.2551
+bulgaria,Europe,Bulgaria,,42.7339,25.4858
+france,Europe,France,,46.2276,2.2137
+paris,Europe,France,Paris,48.8566,2.3522
+german,Europe,German,,51.1657,10.4515
+berlin,Europe,German,Berlin,52.5200,13.4050
+greece,Europe,Greece,,39.0742,21.8243
+hungary,Europe,Hungary,,47.1625,19.5033
+iceland,Europe,Iceland,,64.9631,-19.0208
+ireland,Europe,Ireland,,53.1424,-7.6921
+italy,Europe,Italy,,41.8719,12.5674
+milan,Europe,Italy,Milan,45.4654,9.1859
+venice,Europe,Italy,Venice,45.4408,12.3155
+netherlands,Europe,Netherlands,,52.1326,5.2913
+amsterdam,Europe,Netherlands,Amsterdam,52.3702,4.8952
+poland,Europe,Poland,,51.9194,19.1451
+portugal,Europe,Portugal,,39.3999,-8.2245
+roma,Europe,Roma,,41.9028,12.4964
+russia,Europe,Russia,,61.5240,105.3188
+moscow,Europe,Russia,Moscow,55.7558,37.6173
+scotland,Europe,Scotland,,56.4907,-4.2026
+soviet,Europe,Soviet,,61.5240,105.3188
+spain,Europe,Spain,,40.4637,-3.7492
+barcelona,Europe,Spain,Barcelona,41.3851,2.1734
+madrid,Europe,Spain,Madrid,40.4168,-3.7038
+sweden,Europe,Sweden,,60.1282,18.6435
+uk,Europe,UK,,55.3781,-3.4360
+london,Europe,UK,London,51.5074,-0.1278
+oxford,Europe,UK,Oxford,51.7520,-1.2577
+ukraine,Europe,Ukraine,,48.3794,31.1656
+afghanistan,Middle East,Afghanistan,,33.9391,67.7100
+constantinople,Middle East,Constantinople,,41.0082,28.9784
+iran,Middle East,Iran,,32.4279,53.6880
+iraq,Middle East,Iraq,,33.2232,43.6793
+israel,Middle East,Israel,,31.0461,34.8516
+persian,Middle East,Persian,,32.4279,53.6880
+syria,Middle East,Syria,,34.8021,38.9968
+turkey,Middle East,Turkey,,38.9637,35.2433
+istanbul,Middle East,Turkey,Istanbul,41.0082,28.9784
+yemen,Middle East,Yemen,,15.5527,48.5164
+canada,North America,Canada,,56.1304,-106.3468
+haiti,North America,Haiti,,18.9712,-72.2852
+mexico,North America,Mexico,,23.6345,-102.5528
+usa,North America,USA,,37.0902,-95.7129
+chicago,North America,USA,Chicago,41.8781,-87.6298
+louisiana,North America,USA,Louisiana,30.9843,-91.9623
+ny,North America,USA,New York,40.7128,-74.0059
+pennsylvania,North America,USA,Pennsylvania,41.2033,-77.1945
+seattle,North America,USA,Seattle,47.6062,-122.3321
+washington,North America,USA,Washington,38.9072,-77.0369
+wisconsin,North America,USA,Wisconsin,43.7844,-88.7879
+hawaii,Pacific,USA,Hawaii,19.8968,-155.5828
+thailand,South Aisa,Thailand,,15.8700,100.9925
+argentina,South America,Argentina,,-38.4161,-63.6167
+brazil,South America,Brazil,,-14.2350,-51.9253
+chile,South America,Chile,,-35.6751,-71.5430
+columbia,South America,Columbia,,4.5709,-74.2973
+india,South Asia,India,,20.5937,78.9629
+indonesia,South Asia,Indonesia,,-0.7893,113.9213
+perkistan,South Asia,Perkistan,,30.3753,69.3451
+philippines,South Asia,Philippines,,12.8797,121.7740
+singapore,South Asia,Singapore,,1.3521,103.8198
+vietnam,South Asia,Vietnam,,14.0583,108.2772
