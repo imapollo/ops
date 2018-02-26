@@ -7,6 +7,7 @@
 #
 
 from instagram.client import InstagramAPI
+from time import sleep
 import commands
 import datetime
 
@@ -24,7 +25,7 @@ def main():
     for searched_media in searched_medias[0]:
         likes = client.api.media_likes( searched_media.id )
         if ( len(likes) > 2 ):
-            commands.getoutput( '/bin/sleep 30' )
+            sleep(2)
             print ("%s: %s" % ( datetime.datetime.now(), searched_media.id ) )
             try:
                 client.api.like_media( searched_media.id )
